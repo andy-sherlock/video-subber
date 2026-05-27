@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+*.mp4
+*.mp3
+*.wav
+*.ts
+*.avi
+*.mkv
+.DS_Store
+.git.trash/
+.git.trash2/
+.git.broken/
+.git.old/
+.git.backup/
