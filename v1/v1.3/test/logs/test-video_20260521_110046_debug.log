@@ -1,0 +1,568 @@
+11:00:46.337 [cli] ===== video-subber debug log =====
+11:00:46.337 [cli] 视频: /Users/andy/Andy-agent/video-subtitle/v1/v1.3/test/test-video.ts
+11:00:46.337 [cli] 模型: tiny | 语言: auto | 字幕: yes | VAD: 关
+11:00:47.594 [transcriber] transcribe() 开始: audio=test/test-video.video-subber-cache/7c3a0fe9cdff/audio.wav model=tiny lang=auto
+11:00:54.178 [transcriber] VAD 语音占比: 21.2%
+11:00:54.790 [transcriber] 模型已加载: tiny (device=cpu compute_type=int8)
+11:00:54.834 [transcriber] 完整音频已加载: 23742311 采样 @ 16000 Hz
+11:00:57.949 [transcriber] 电话音频检测: 4kHz以上能量=12.9739% → 正常
+11:00:58.700 [transcriber] 检测语言: ru (概率 0.99)
+11:05:34.728 [transcriber] 动态阈值: rms_var gap=0.000057 默认=0.000500 → 动态=0.000106 (low_ratio=173)
+11:05:34.728 [transcriber] 动态阈值: cent_mean 低值区单峰(ratio=1.9), 使用默认值 1200.000000
+11:05:34.728 [transcriber] 动态阈值: zcr_mean gap=0.005859 默认=0.060000 → 动态=0.038464 (low_ratio=3)
+11:05:34.728 [transcriber] 最终阈值: nsp=0.60 rms=0.000106 cent=1200 zcr=0.0385 kurt=1.5
+11:05:34.728 [transcriber] seg[0] KEEP [?] start=0.00 end=6.48 nsp=0.0968 music=1 DISPUTE  text='ТРЕВОЖНАЯ МУЗЫКА'
+11:05:34.728 [transcriber] seg[0] DROP L2   start=0.00 end=6.48 nsp=0.0968  text='ТРЕВОЖНАЯ МУЗЫКА'
+11:05:34.728 [transcriber] seg[1] KEEP      start=6.48 end=9.08 nsp=0.0968  text='Саш, я тебя. Я хотела.'
+11:05:34.728 [transcriber] seg[2] KEEP      start=9.08 end=11.84 nsp=0.0968  text='А тебе стучаться не ущили?'
+11:05:34.728 [transcriber] seg[3] KEEP      start=11.84 end=14.84 nsp=0.0968  text='Куда я стучаться, вы лучше отферить даже меня?'
+11:05:34.729 [transcriber] seg[4] KEEP      start=14.84 end=18.12 nsp=0.0968  text='Ладно, по голове ему стучала.'
+11:05:34.729 [transcriber] seg[5] KEEP      start=18.12 end=20.08 nsp=0.0968  text='Ладно, я тебя поделала. Может, не пожалуйста,'
+11:05:34.729 [transcriber] seg[6] KEEP      start=20.08 end=23.60 nsp=0.0968  text='это денег в долг вообще не на долг, а на час и на два буквально?'
+11:05:34.729 [transcriber] seg[7] KEEP [?] start=23.60 end=24.60 nsp=0.0968 music=1 DISPUTE  text='Нет.'
+11:05:34.729 [transcriber] seg[7] KEEP      start=23.60 end=24.60 nsp=0.0968  text='Нет.'
+11:05:34.729 [transcriber] seg[9] KEEP      start=24.60 end=25.60 nsp=0.0968  text='Почему?'
+11:05:34.729 [transcriber] seg[10] KEEP      start=25.60 end=30.08 nsp=0.0810  text='Дяна, сколько раз я утяжет денег, давал тренировать, когда предыдущие вернёшь, т'
+11:05:34.729 [transcriber] seg[11] KEEP      start=30.08 end=34.72 nsp=0.0810  text='Слушай, ну что, я с водной сестра, ну что-то, как-то проявишь, ко мне какой-то ч'
+11:05:34.729 [transcriber] seg[12] KEEP      start=34.72 end=37.04 nsp=0.0810  text='С конце концов, я на доброе дело хочу.'
+11:05:34.729 [transcriber] seg[13] KEEP [?] start=37.04 end=38.24 nsp=0.0810 music=1 DISPUTE  text='На какой доброе дело?'
+11:05:34.729 [transcriber] seg[13] KEEP      start=37.04 end=38.24 nsp=0.0810  text='На какой доброе дело?'
+11:05:34.729 [transcriber] seg[15] KEEP      start=38.24 end=39.84 nsp=0.0810  text='Собачек, надо покормить.'
+11:05:34.729 [transcriber] seg[16] KEEP      start=40.48 end=42.84 nsp=0.0810  text='И в приюте я не к задонатить, конечно.'
+11:05:34.729 [transcriber] seg[17] KEEP      start=42.84 end=44.72 nsp=0.0810  text='Ну, не совсем.'
+11:05:34.729 [transcriber] seg[18] KEEP      start=44.72 end=50.00 nsp=0.0810  text='Просто надо покормить собачек, а то же на час на два я пергнусь очень быстро, че'
+11:05:34.729 [transcriber] seg[19] KEEP [?] start=50.40 end=51.40 nsp=0.0810 music=1 DISPUTE  text='Нет, тянный.'
+11:05:34.729 [transcriber] seg[19] KEEP      start=50.40 end=51.40 nsp=0.0810  text='Нет, тянный.'
+11:05:34.729 [transcriber] seg[21] KEEP      start=51.40 end=52.40 nsp=0.3461  text='Я не говорю.'
+11:05:34.729 [transcriber] seg[22] KEEP      start=52.40 end=53.40 nsp=0.3461  text='Шид, запретете.'
+11:05:34.729 [transcriber] seg[23] KEEP      start=53.40 end=54.40 nsp=0.3461  text='На какой-то приют.'
+11:05:34.729 [transcriber] seg[24] KEEP      start=54.40 end=55.40 nsp=0.3461  text='Ты никогда ничего не донатела.'
+11:05:34.729 [transcriber] seg[25] KEEP      start=55.40 end=57.40 nsp=0.3461  text='Да ладно, слушает тебя и будут отчистами.'
+11:05:34.729 [transcriber] seg[26] KEEP      start=57.40 end=58.40 nsp=0.3461  text='На вас теперь нужно.'
+11:05:34.729 [transcriber] seg[27] KEEP      start=58.40 end=60.40 nsp=0.3461  text='Какой вас это?'
+11:05:34.729 [transcriber] seg[28] KEEP      start=60.40 end=62.40 nsp=0.3461  text='Не ты же понимаешь.'
+11:05:34.729 [transcriber] seg[29] KEEP      start=63.40 end=65.40 nsp=0.3461  text='Нет, я понимаю.'
+11:05:34.729 [transcriber] seg[30] KEEP      start=65.40 end=68.40 nsp=0.3461  text='Иди, а на мой первый, чтобы вас это подожди,'
+11:05:34.729 [transcriber] seg[31] KEEP      start=68.40 end=69.40 nsp=0.3461  text='как я.'
+11:05:34.729 [transcriber] seg[32] KEEP      start=69.40 end=70.40 nsp=0.3461  text='Первый, как.'
+11:05:34.729 [transcriber] seg[33] KEEP      start=70.40 end=72.40 nsp=0.3461  text='Короче, это не Дам, сколько денег.'
+11:05:34.729 [transcriber] seg[34] KEEP      start=72.40 end=75.40 nsp=0.3461  text='Ну может быть, мы с тобой что-то придумаем.'
+11:05:34.729 [transcriber] seg[35] KEEP      start=75.40 end=76.40 nsp=0.3461  text='Я много чего могу сделать.'
+11:05:34.729 [transcriber] seg[36] KEEP      start=76.40 end=79.40 nsp=0.3461  text='Всё, что годов не просто мы очень адасаж понимаешь.'
+11:05:34.729 [transcriber] seg[37] KEEP      start=79.40 end=80.40 nsp=0.3461  text='Ну вот прям сейчас.'
+11:05:34.729 [transcriber] seg[38] KEEP [?] start=80.40 end=84.68 nsp=0.6317 music=0 DISPUTE  text='понимаешь, ну я тебя понимаю, но я их у деньги зарабатываю, у меня на'
+11:05:34.729 [transcriber] seg[38] KEEP      start=80.40 end=84.68 nsp=0.6317  text='понимаешь, ну я тебя понимаю, но я их у деньги зарабатываю, у меня на'
+11:05:34.729 [transcriber] seg[40] KEEP [?] start=84.68 end=90.08 nsp=0.6317 music=0 DISPUTE  text='это все есть, а латы просто клянчишек, ну, саш, ну мне ну что мы тебе'
+11:05:34.729 [transcriber] seg[40] KEEP      start=84.68 end=90.08 nsp=0.6317  text='это все есть, а латы просто клянчишек, ну, саш, ну мне ну что мы тебе'
+11:05:34.729 [transcriber] seg[42] KEEP [?] start=90.08 end=94.24 nsp=0.6317 music=0 DISPUTE  text='делать, ну я не знаю, ну мне очень нужно, но это ну правда вас, ну последний'
+11:05:34.729 [transcriber] seg[42] KEEP      start=90.08 end=94.24 nsp=0.6317  text='делать, ну я не знаю, ну мне очень нужно, но это ну правда вас, ну последний'
+11:05:34.729 [transcriber] seg[44] KEEP [?] start=94.24 end=103.36 nsp=0.6317 music=0 DISPUTE  text='а ты слушай, а ты умеешь, хранить же секрет, да, да, я все что'
+11:05:34.729 [transcriber] seg[44] KEEP      start=94.24 end=103.36 nsp=0.6317  text='а ты слушай, а ты умеешь, хранить же секрет, да, да, я все что'
+11:05:34.729 [transcriber] seg[46] KEEP [?] start=103.36 end=109.08 nsp=0.6317 music=0 DISPUTE  text='ко мне делаю, ну если ты умеешь хранить секрет, тогда давай между нами'
+11:05:34.729 [transcriber] seg[46] KEEP      start=103.36 end=109.08 nsp=0.6317  text='ко мне делаю, ну если ты умеешь хранить секрет, тогда давай между нами'
+11:05:34.729 [transcriber] seg[48] KEEP      start=109.08 end=111.08 nsp=0.5997  text='они появятся один маленький секрет.'
+11:05:34.729 [transcriber] seg[49] KEEP      start=111.08 end=113.08 nsp=0.5997  text='Да, там я какой секрет будет.'
+11:05:34.729 [transcriber] seg[50] KEEP      start=113.08 end=116.08 nsp=0.5997  text='Ну, стайроника.'
+11:05:34.729 [transcriber] seg[51] KEEP      start=116.08 end=120.08 nsp=0.5997  text='Может, юбка мне кажется, это слишком линии.'
+11:05:34.729 [transcriber] seg[52] KEEP [?] start=120.08 end=122.08 nsp=0.5997 music=1 DISPUTE  text='Как-то хлопок, кто ему не подходит в линии.'
+11:05:34.729 [transcriber] seg[52] KEEP      start=120.08 end=122.08 nsp=0.5997  text='Как-то хлопок, кто ему не подходит в линии.'
+11:05:34.729 [transcriber] seg[54] KEEP [?] start=122.08 end=124.08 nsp=0.5997 music=1 DISPUTE  text='Да, мы не знаем.'
+11:05:34.729 [transcriber] seg[54] KEEP      start=122.08 end=124.08 nsp=0.5997  text='Да, мы не знаем.'
+11:05:34.729 [transcriber] seg[56] KEEP      start=124.08 end=126.08 nsp=0.5997  text='Вот, петини ее чуть-чуть.'
+11:05:34.729 [transcriber] seg[57] KEEP      start=126.08 end=131.08 nsp=0.5997  text='Ну, сейчас еще чуть-чуть петини.'
+11:05:34.729 [transcriber] seg[58] KEEP      start=131.08 end=134.08 nsp=0.5997  text='И еще чуть-чуть петини.'
+11:05:34.729 [transcriber] seg[59] KEEP      start=134.08 end=135.08 nsp=0.5997  text='Да, потому что...'
+11:05:34.729 [transcriber] seg[60] KEEP      start=135.08 end=141.58 nsp=0.4420  text='Но она не может на роборах висеть, я вообще сейчас уже все видно будет, как-то м'
+11:05:34.729 [transcriber] seg[61] KEEP      start=142.08 end=143.08 nsp=0.4420  text='Тогда поверись.'
+11:05:34.729 [transcriber] seg[62] KEEP [?] start=144.58 end=145.58 nsp=0.4420 music=1 DISPUTE  text='Подайди, попробуй уже.'
+11:05:34.729 [transcriber] seg[62] KEEP      start=144.58 end=145.58 nsp=0.4420  text='Подайди, попробуй уже.'
+11:05:34.729 [transcriber] seg[64] KEEP      start=149.08 end=152.08 nsp=0.4420  text='Ты что там делать будешь? Ты мне трахнуть хочешь?'
+11:05:34.729 [transcriber] seg[65] KEEP      start=154.08 end=158.08 nsp=0.4420  text='Ну, но ты же сказал, что ты умеешь хранить секретов.'
+11:05:34.730 [transcriber] seg[66] KEEP      start=158.08 end=163.08 nsp=0.4420  text='Поэтому, давай умеешь, наверное, появился секрет, и что мы с тобой занимаемся са'
+11:05:34.730 [transcriber] seg[67] KEEP      start=163.08 end=165.08 nsp=0.3834  text='Я не думал, что ты хочешь мне трапать.'
+11:05:34.730 [transcriber] seg[68] KEEP      start=165.08 end=169.08 nsp=0.3834  text='Это всё-таки уже что-то другой, и я не уверен, что согласно не трапать.'
+11:05:34.730 [transcriber] seg[69] KEEP      start=169.08 end=171.08 nsp=0.3834  text='Ну, не согласно, так не согласно.'
+11:05:34.730 [transcriber] seg[70] KEEP      start=171.08 end=174.08 nsp=0.3834  text='Ну, с другой стороны, это всё-таки на нужное дело.'
+11:05:34.730 [transcriber] seg[71] KEEP      start=174.08 end=178.08 nsp=0.3834  text='Но просто паше, я же всё-таки не шлюх, чтобы за деньги трапать, всё-таки всё-так'
+11:05:34.730 [transcriber] seg[72] KEEP [?] start=178.08 end=182.08 nsp=0.3834 music=1 DISPUTE  text='Так ты не заденди, ты вон там придут донатить будешь.'
+11:05:34.730 [transcriber] seg[72] KEEP      start=178.08 end=182.08 nsp=0.3834  text='Так ты не заденди, ты вон там придут донатить будешь.'
+11:05:34.730 [transcriber] seg[74] KEEP      start=182.08 end=183.08 nsp=0.3834  text='Да?'
+11:05:34.730 [transcriber] seg[75] KEEP      start=183.08 end=185.08 nsp=0.3834  text='Ну, не совсем.'
+11:05:34.730 [transcriber] seg[76] KEEP      start=185.08 end=189.08 nsp=0.3834  text='Ну, я не знаю, ты мне нормально дашь.'
+11:05:34.730 [transcriber] seg[77] KEEP      start=189.08 end=191.08 nsp=0.3834  text='Да вас деппать это?'
+11:05:34.730 [transcriber] seg[78] KEEP [?] start=191.08 end=192.08 nsp=0.3834 music=1 DISPUTE  text='Ну, вас депп хватит.'
+11:05:34.730 [transcriber] seg[78] KEEP      start=191.08 end=192.08 nsp=0.3834  text='Ну, вас депп хватит.'
+11:05:34.730 [transcriber] seg[80] KEEP [?] start=192.08 end=193.72 nsp=0.4225 music=1 DISPUTE  text='Викнешь?'
+11:05:34.730 [transcriber] seg[80] KEEP      start=192.08 end=193.72 nsp=0.4225  text='Викнешь?'
+11:05:34.730 [transcriber] seg[82] KEEP      start=193.72 end=200.12 nsp=0.4225  text='Ну, ну, но, ну, ну, или у нас ещё few места произнакомые-то уже давно и этот я к'
+11:05:34.730 [transcriber] seg[83] KEEP      start=200.12 end=203.98 nsp=0.4225  text='Невердешь тебя, ну что, отлично просто давай на таклец.'
+11:05:34.730 [transcriber] seg[84] KEEP      start=203.98 end=208.28 nsp=0.4225  text='Ну, ладно, с чего начать-то надо?'
+11:05:34.730 [transcriber] seg[85] KEEP      start=208.28 end=213.64 nsp=0.4225  text='Ну, наверно, я до этого ясический как бы уже видел.'
+11:05:34.730 [transcriber] seg[86] KEEP      start=213.64 end=216.82 nsp=0.4225  text='Когда их видел как, за нападка я релал где-то штули.'
+11:05:34.730 [transcriber] seg[87] KEEP [?] start=216.82 end=217.82 nsp=0.4225 music=1 DISPUTE  text='Нет, я.'
+11:05:34.730 [transcriber] seg[87] KEEP      start=216.82 end=217.82 nsp=0.4225  text='Нет, я.'
+11:05:34.730 [transcriber] seg[89] KEEP      start=217.82 end=219.40 nsp=0.4225  text='Во-первых, просто не надо отсылать.'
+11:05:34.730 [transcriber] seg[90] KEEP [?] start=219.40 end=222.80 nsp=0.3844 music=1 DISPUTE  text='Голы, фотки, всякими сунь додика, которые потом'
+11:05:34.730 [transcriber] seg[90] KEEP      start=219.40 end=222.80 nsp=0.3844  text='Голы, фотки, всякими сунь додика, которые потом'
+11:05:34.730 [transcriber] seg[92] KEEP      start=222.80 end=227.82 nsp=0.3844  text='раскинули, но я бы посмотрел на них в живую, если честно.'
+11:05:34.730 [transcriber] seg[93] KEEP      start=227.82 end=230.52 nsp=0.3844  text='Ну, сучается, такие их сцессы, понимаешь?'
+11:05:34.730 [transcriber] seg[94] KEEP      start=236.52 end=238.52 nsp=0.3844  text='Вот сейчас на фотках.'
+11:05:34.730 [transcriber] seg[95] KEEP      start=238.52 end=241.52 nsp=0.3844  text='Да, а теперь все же предпринимение, почему, как я просил.'
+11:05:34.730 [transcriber] seg[96] KEEP      start=245.52 end=247.52 nsp=0.3844  text='Ну, вообще шикарно выглядешь?'
+11:05:34.730 [transcriber] seg[97] KEEP      start=247.52 end=254.52 nsp=0.1486  text='Да, ну, давай уже быстрее начнем быстрее закончим, все-таки, я тебя не шизминать'
+11:05:34.730 [transcriber] seg[98] KEEP      start=254.52 end=257.52 nsp=0.1486  text='В принципе, деньги отровает, да?'
+11:05:34.730 [transcriber] seg[99] KEEP [?] start=257.52 end=258.52 nsp=0.1486 music=1 DISPUTE  text='Да.'
+11:05:34.730 [transcriber] seg[99] KEEP      start=257.52 end=258.52 nsp=0.1486  text='Да.'
+11:05:34.730 [transcriber] seg[101] KEEP      start=258.52 end=259.52 nsp=0.1486  text='Ну, давай, перестепь.'
+11:05:34.730 [transcriber] seg[102] KEEP      start=259.52 end=261.52 nsp=0.1486  text='Только не так близко, вот это в кайсе.'
+11:05:34.730 [transcriber] seg[103] KEEP      start=266.52 end=269.52 nsp=0.1486  text='Слушай, а че, но тебе очень даже не плохой.'
+11:05:34.730 [transcriber] seg[104] KEEP      start=337.52 end=339.52 nsp=0.0150  text='Ну что, может, я же к делу приступил?'
+11:05:34.730 [transcriber] seg[105] KEEP [?] start=341.02 end=342.02 nsp=0.0150 music=1 DISPUTE  text='Присаживайтесь?'
+11:05:34.730 [transcriber] seg[105] KEEP      start=341.02 end=342.02 nsp=0.0150  text='Присаживайтесь?'
+11:05:34.730 [transcriber] seg[107] KEEP [?] start=361.52 end=362.52 nsp=0.0150 music=1 DISPUTE  text='Да.'
+11:05:34.730 [transcriber] seg[107] KEEP      start=361.52 end=362.52 nsp=0.0150  text='Да.'
+11:05:34.730 [transcriber] seg[109] KEEP      start=367.52 end=371.90 nsp=0.2640  text='да что'
+11:05:34.730 [transcriber] seg[110] KEEP      start=371.90 end=389.08 nsp=0.2640  text='сахар'
+11:05:34.730 [transcriber] seg[111] KEEP      start=389.08 end=391.78 nsp=0.2640  text='вен, вен, вен, вен, вен, вен, вен.'
+11:05:34.730 [transcriber] seg[112] KEEP      start=391.78 end=393.58 nsp=0.2640  text='как вен!'
+11:05:34.730 [transcriber] seg[113] KEEP      start=393.58 end=395.58 nsp=0.2349  text='Вау!'
+11:05:34.730 [transcriber] seg[114] KEEP      start=399.58 end=402.58 nsp=0.2349  text='О, му же ты!'
+11:05:34.730 [transcriber] seg[115] KEEP      start=403.58 end=405.58 nsp=0.2349  text='О, му!'
+11:05:34.730 [transcriber] seg[116] KEEP      start=405.58 end=407.58 nsp=0.2349  text='О, му!'
+11:05:34.730 [transcriber] seg[117] KEEP      start=409.58 end=410.58 nsp=0.2349  text='О, му!'
+11:05:34.730 [transcriber] seg[118] KEEP      start=415.58 end=416.58 nsp=0.2349  text='Вау!'
+11:05:34.730 [transcriber] seg[119] KEEP      start=416.58 end=417.58 nsp=0.2232  text='Да, да!'
+11:05:34.730 [transcriber] seg[120] KEEP      start=422.94 end=424.66 nsp=0.2232  text='Пусть кокетта будет, да.'
+11:05:34.730 [transcriber] seg[121] KEEP      start=432.18 end=433.02 nsp=0.2232  text='Удя!'
+11:05:34.730 [transcriber] seg[122] KEEP      start=446.58 end=456.58 nsp=0.3058  text='Рядите тебе!'
+11:05:34.730 [transcriber] seg[123] KEEP      start=476.58 end=483.58 nsp=0.2354  text='Удвайся, что?'
+11:05:34.730 [transcriber] seg[124] KEEP      start=483.58 end=491.58 nsp=0.2354  text='Убуши-дам, окей же класса-дам.'
+11:05:34.730 [transcriber] seg[125] KEEP      start=491.58 end=496.58 nsp=0.2354  text='Удвайся, что?'
+11:05:34.730 [transcriber] seg[126] KEEP      start=496.58 end=501.58 nsp=0.2354  text='Удвайся, что?'
+11:05:34.730 [transcriber] seg[127] KEEP      start=501.58 end=517.74 nsp=0.1009  text='Нет, ну нет!'
+11:05:34.730 [transcriber] seg[128] KEEP      start=517.74 end=522.70 nsp=0.2007  text='Ну, да, да, вот, да...'
+11:05:34.730 [transcriber] seg[129] KEEP      start=535.70 end=536.90 nsp=0.2007  text='Да-да, да...'
+11:05:34.730 [transcriber] seg[130] KEEP      start=547.74 end=557.74 nsp=0.4089  text='Убоже, да, уху, я на так...'
+11:05:34.730 [transcriber] seg[131] KEEP      start=569.74 end=573.74 nsp=0.4089  text='Убоже, да, уху, я на так...'
+11:05:34.730 [transcriber] seg[132] KEEP      start=577.74 end=579.74 nsp=0.2591  text='Убежим Дэдdo.'
+11:05:34.731 [transcriber] seg[133] DROP L2   start=583.78 end=586.78 nsp=0.2591  text='Вот, вот, вот, вот, вот'
+11:05:34.731 [transcriber] seg[134] KEEP      start=588.52 end=590.72 nsp=0.2591  text='Можно.'
+11:05:34.731 [transcriber] seg[135] KEEP      start=591.20 end=593.20 nsp=0.2591  text='Убежим Дэдdo.'
+11:05:34.731 [transcriber] seg[136] KEEP      start=598.84 end=600.12 nsp=0.2591  text='Дэдdo.'
+11:05:34.731 [transcriber] seg[137] KEEP      start=600.36 end=601.84 nsp=0.2591  text='Убежим.'
+11:05:34.731 [transcriber] seg[138] KEEP      start=601.84 end=631.84 nsp=0.4397  text='Сюда, аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+11:05:34.731 [transcriber] seg[139] KEEP      start=631.84 end=661.84 nsp=0.1953  text='Хммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммммм'
+11:05:34.731 [transcriber] seg[140] KEEP      start=661.84 end=663.84 nsp=0.2490  text='Да, да, да, да!'
+11:05:34.731 [transcriber] seg[141] KEEP      start=666.34 end=668.34 nsp=0.2490  text='О, мужем, как же это охиена.'
+11:05:34.731 [transcriber] seg[142] KEEP      start=671.34 end=672.84 nsp=0.2490  text='А так, хочешь трампать?'
+11:05:34.731 [transcriber] seg[143] KEEP      start=677.84 end=679.84 nsp=0.2490  text='Да, ну, что рекорез.'
+11:05:34.731 [transcriber] seg[144] KEEP      start=685.84 end=687.84 nsp=0.2490  text='Ну, как же это клада, да?'
+11:05:34.731 [transcriber] seg[145] KEEP      start=691.84 end=695.50 nsp=0.2655  text='– Oаа!'
+11:05:34.731 [transcriber] seg[146] KEEP      start=695.50 end=699.92 nsp=0.2655  text='– Два!'
+11:05:34.731 [transcriber] seg[147] KEEP      start=707.68 end=710.12 nsp=0.2655  text='– Па-сарг!'
+11:05:34.731 [transcriber] seg[148] KEEP      start=710.12 end=712.88 nsp=0.2655  text='Наивень Jeśli!'
+11:05:34.731 [transcriber] seg[149] KEEP      start=712.88 end=715.86 nsp=0.2655  text='– Сыща, удастся!'
+11:05:34.731 [transcriber] seg[150] KEEP      start=715.86 end=716.48 nsp=0.2655  text='Уа-ка!'
+11:05:34.731 [transcriber] seg[151] KEEP      start=716.80 end=718.24 nsp=0.2655  text='Уа.'
+11:05:34.731 [transcriber] seg[152] KEEP      start=718.98 end=720.88 nsp=0.2655  text='О!'
+11:05:34.731 [transcriber] seg[153] KEEP      start=720.88 end=731.28 nsp=0.3353  text='Оiringо!'
+11:05:34.731 [transcriber] seg[154] KEEP      start=731.28 end=736.00 nsp=0.3353  text='О!'
+11:05:34.731 [transcriber] seg[155] KEEP      start=736.00 end=746.48 nsp=0.3353  text='Оiringо!'
+11:05:34.731 [transcriber] seg[156] KEEP      start=746.48 end=748.44 nsp=0.3353  text='Оiringо!'
+11:05:34.731 [transcriber] seg[157] KEEP      start=748.44 end=751.56 nsp=0.4476  text='Даня!'
+11:05:34.731 [transcriber] seg[158] KEEP      start=751.56 end=754.20 nsp=0.4476  text='Нет, а...'
+11:05:34.731 [transcriber] seg[159] KEEP      start=754.20 end=758.24 nsp=0.4476  text='Как же классный божь?'
+11:05:34.731 [transcriber] seg[160] KEEP      start=758.24 end=760.44 nsp=0.4476  text='Что надо?'
+11:05:34.731 [transcriber] seg[161] KEEP      start=760.44 end=761.44 nsp=0.4476  text='Что если?'
+11:05:34.731 [transcriber] seg[162] KEEP      start=761.44 end=762.84 nsp=0.4476  text='Как бы все двадцать?'
+11:05:34.731 [transcriber] seg[163] KEEP      start=762.84 end=763.84 nsp=0.4476  text='Какая?'
+11:05:34.731 [transcriber] seg[164] KEEP      start=763.84 end=765.32 nsp=0.4476  text='Когда обычное после дады,'
+11:05:34.731 [transcriber] seg[165] KEEP      start=765.32 end=768.32 nsp=0.4476  text='идет у вас дадык.'
+11:05:34.731 [transcriber] seg[166] KEEP      start=768.32 end=771.60 nsp=0.4476  text='Ну да, знаю, а ты мне еще и не хочешь дать.'
+11:05:34.731 [transcriber] seg[167] KEEP      start=771.60 end=774.48 nsp=0.4476  text='Ну могу предложить.'
+11:05:34.731 [transcriber] seg[168] KEEP      start=774.48 end=776.12 nsp=0.4476  text='саквейш, что?'
+11:05:34.731 [transcriber] seg[169] KEEP      start=776.12 end=778.08 nsp=0.4476  text='А что тебе надо?'
+11:05:34.731 [transcriber] seg[170] KEEP      start=778.08 end=779.32 nsp=0.1430  text='Шоколада.'
+11:05:34.731 [transcriber] seg[171] KEEP      start=779.32 end=780.68 nsp=0.1430  text='В смысле?'
+11:05:34.731 [transcriber] seg[172] KEEP      start=781.32 end=783.20 nsp=0.1430  text='Ну, в смысле, анал?'
+11:05:34.731 [transcriber] seg[173] KEEP      start=783.20 end=788.80 nsp=0.1430  text='Анал с сошных я не знаю, мне это первый раз будет как-то...'
+11:05:34.731 [transcriber] seg[174] KEEP      start=788.80 end=792.40 nsp=0.1430  text='Я, ну зато, вы так увидите на дадек. Лаз дадек.'
+11:05:34.731 [transcriber] seg[175] KEEP      start=792.40 end=796.32 nsp=0.1430  text='Слушай, ну звучит, конечно, классный, но только будет осторожен.'
+11:05:34.731 [transcriber] seg[176] KEEP      start=796.32 end=798.36 nsp=0.1430  text='Ладно, я думаю, первый раз все-таки.'
+11:05:34.731 [transcriber] seg[177] KEEP      start=798.36 end=799.36 nsp=0.1430  text='Ну, ты вставляй, да?'
+11:05:34.731 [transcriber] seg[178] KEEP [?] start=799.36 end=800.64 nsp=0.1430 music=1 DISPUTE  text='Ну, да.'
+11:05:34.731 [transcriber] seg[178] KEEP      start=799.36 end=800.64 nsp=0.1430  text='Ну, да.'
+11:05:34.731 [transcriber] seg[180] KEEP [?] start=800.64 end=801.60 nsp=0.1430 music=1 DISPUTE  text='Ты готова?'
+11:05:34.731 [transcriber] seg[180] KEEP      start=800.64 end=801.60 nsp=0.1430  text='Ты готова?'
+11:05:34.731 [transcriber] seg[182] KEEP      start=801.60 end=804.36 nsp=0.1430  text='Ну, да, только с ваша хорошая Николаевна.'
+11:05:34.731 [transcriber] seg[183] KEEP      start=808.08 end=813.00 nsp=0.5691  text='לא� יותר…'
+11:05:34.731 [transcriber] seg[184] KEEP      start=813.00 end=818.36 nsp=0.5691  text='Ойnn accident!'
+11:05:34.731 [transcriber] seg[185] KEEP      start=818.36 end=820.76 nsp=0.5691  text='Ох…'
+11:05:34.731 [transcriber] seg[186] KEEP      start=820.76 end=823.98 nsp=0.5691  text='Ой…'
+11:05:34.731 [transcriber] seg[187] KEEP      start=823.98 end=828.62 nsp=0.5691  text='Кого же потрясаю, я тогда…'
+11:05:34.731 [transcriber] seg[188] KEEP      start=828.62 end=830.74 nsp=0.5691  text='Удала…'
+11:05:34.731 [transcriber] seg[189] KEEP      start=830.74 end=832.06 nsp=0.5691  text='Боже, что-то…'
+11:05:34.731 [transcriber] seg[190] KEEP      start=832.06 end=833.56 nsp=0.5691  text='ovуха.'
+11:05:34.731 [transcriber] seg[191] KEEP      start=833.56 end=834.94 nsp=0.5691  text='Ох...'
+11:05:34.731 [transcriber] seg[192] KEEP      start=864.94 end=873.58 nsp=0.3362  text='Уй-timра.'
+11:05:34.731 [transcriber] seg[193] KEEP      start=873.58 end=878.54 nsp=0.3362  text='Ты кр ratкаف?'
+11:05:34.731 [transcriber] seg[194] KEEP      start=878.54 end=883.18 nsp=0.3362  text='Уй-timра!'
+11:05:34.731 [transcriber] seg[195] KEEP      start=883.18 end=886.82 nsp=0.3362  text='Уй-timра!'
+11:05:34.731 [transcriber] seg[196] KEEP      start=886.82 end=888.82 nsp=0.1369  text='Упушит.'
+11:05:34.731 [transcriber] seg[197] KEEP [?] start=898.82 end=900.82 nsp=0.1369 music=1 DISPUTE  text='Удал.'
+11:05:34.731 [transcriber] seg[197] KEEP      start=898.82 end=900.82 nsp=0.1369  text='Удал.'
+11:05:34.731 [transcriber] seg[199] KEEP [?] start=916.82 end=918.82 nsp=0.2589 music=1 DISPUTE  text='Вася!'
+11:05:34.731 [transcriber] seg[199] KEEP      start=916.82 end=918.82 nsp=0.2589  text='Вася!'
+11:05:34.732 [transcriber] seg[201] KEEP      start=926.66 end=928.66 nsp=0.2589  text='Он представляет.'
+11:05:34.732 [transcriber] seg[202] KEEP      start=946.82 end=976.82 nsp=0.5984  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+11:05:34.732 [transcriber] seg[203] KEEP      start=1006.82 end=1036.82 nsp=0.4781  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+11:05:34.732 [transcriber] seg[204] DROP L2   start=1036.82 end=1055.42 nsp=0.5155  text='...'
+11:05:34.732 [transcriber] seg[205] KEEP      start=1055.42 end=1060.40 nsp=0.5155  text='А, сос matter, мне сделают.'
+11:05:34.732 [transcriber] seg[206] KEEP      start=1060.40 end=1063.90 nsp=0.5155  text='Сдаем год.'
+11:05:34.732 [transcriber] seg[207] KEEP      start=1063.90 end=1065.50 nsp=0.5155  text='Став!'
+11:05:34.732 [transcriber] seg[208] DROP L2   start=1065.50 end=1066.14 nsp=0.5155  text='...'
+11:05:34.732 [transcriber] seg[209] KEEP      start=1096.14 end=1098.14 nsp=0.0874  text='Готов.'
+11:05:34.732 [transcriber] seg[210] KEEP      start=1098.14 end=1102.24 nsp=0.0874  text='Ага, четыре.'
+11:05:34.732 [transcriber] seg[211] KEEP      start=1102.24 end=1112.90 nsp=0.0874  text='Ага, вот эта, эта, эта.'
+11:05:34.732 [transcriber] seg[212] KEEP      start=1112.90 end=1119.40 nsp=0.0874  text='Ага, эта.'
+11:05:34.732 [transcriber] seg[213] KEEP      start=1119.40 end=1121.40 nsp=0.2785  text='Задо, да, да, да, да!'
+11:05:34.732 [transcriber] seg[214] KEEP      start=1124.48 end=1125.68 nsp=0.2785  text='О,門а.'
+11:05:34.732 [transcriber] seg[215] KEEP      start=1126.48 end=1128.48 nsp=0.2785  text='Ой, ты хочешь тебя сушла?'
+11:05:34.732 [transcriber] seg[216] DROP L2   start=1129.52 end=1131.52 nsp=0.2785  text='О, да, да, да, да, да, да!'
+11:05:34.732 [transcriber] seg[217] KEEP      start=1137.08 end=1139.00 nsp=0.2785  text='О, да, да, да!'
+11:05:34.732 [transcriber] seg[218] KEEP      start=1144.52 end=1146.04 nsp=0.2785  text='О,門а,門а!'
+11:05:34.732 [transcriber] seg[219] KEEP      start=1149.40 end=1150.54 nsp=0.1395  text='О temptingа.'
+11:05:34.732 [transcriber] seg[220] KEEP      start=1159.54 end=1160.60 nsp=0.1395  text='Да, да и позже.'
+11:05:34.732 [transcriber] seg[221] KEEP      start=1169.96 end=1172.58 nsp=0.1395  text='Хвоу!!!'
+11:05:34.732 [transcriber] seg[222] KEEP      start=1179.40 end=1182.34 nsp=0.2196  text='Х Clear'
+11:05:34.732 [transcriber] seg[223] DROP L5   start=1182.34 end=1183.42 nsp=0.2196  text='А'
+11:05:34.732 [transcriber] seg[223] DROP L5   start=1183.90 end=1186.38 nsp=0.2196  text='А'
+11:05:34.732 [transcriber] seg[223] DROP L5   start=1187.38 end=1188.18 nsp=0.2196  text='Х'
+11:05:34.732 [transcriber] seg[223] KEEP      start=1188.66 end=1190.12 nsp=0.2196  text='А, дадал'
+11:05:34.732 [transcriber] seg[224] DROP L5   start=1192.08 end=1193.48 nsp=0.2196  text='А'
+11:05:34.732 [transcriber] seg[224] DROP L5   start=1194.36 end=1195.72 nsp=0.2196  text='А'
+11:05:34.732 [transcriber] seg[224] DROP L5   start=1195.72 end=1197.68 nsp=0.2196  text='А'
+11:05:34.732 [transcriber] seg[224] DROP L5   start=1198.24 end=1199.76 nsp=0.2196  text='А'
+11:05:34.732 [transcriber] seg[224] DROP L5   start=1200.38 end=1203.44 nsp=0.2196  text='帥'
+11:05:34.732 [transcriber] seg[224] DROP L5   start=1203.44 end=1205.24 nsp=0.2196  text='А'
+11:05:34.732 [transcriber] seg[224] KEEP      start=1205.24 end=1207.42 nsp=0.2196  text='А, Дал'
+11:05:34.732 [transcriber] seg[225] KEEP      start=1207.42 end=1209.42 nsp=0.3432  text='Удаст вы что-то?'
+11:05:34.732 [transcriber] seg[226] KEEP      start=1237.42 end=1242.20 nsp=0.2590  text='Ау, о мужем и вся dro調, не там!'
+11:05:34.732 [transcriber] seg[227] KEEP      start=1244.50 end=1247.02 nsp=0.2590  text='Уу, уу...'
+11:05:34.732 [transcriber] seg[228] KEEP      start=1248.34 end=1249.94 nsp=0.2590  text='Уу...'
+11:05:34.732 [transcriber] seg[229] KEEP      start=1261.94 end=1263.70 nsp=0.2590  text='Уу, да, да...'
+11:05:34.732 [transcriber] seg[230] KEEP      start=1263.70 end=1265.70 nsp=0.5762  text='Ну...'
+11:05:34.732 [transcriber] seg[231] KEEP      start=1265.72 end=1269.26 nsp=0.5762  text='ааа'
+11:05:34.732 [transcriber] seg[232] KEEP      start=1271.64 end=1274.94 nsp=0.5762  text='Ну...'
+11:05:34.732 [transcriber] seg[233] KEEP      start=1275.76 end=1277.76 nsp=0.5762  text='Ааа!!!'
+11:05:34.732 [transcriber] seg[234] DROP L2   start=1278.76 end=1281.24 nsp=0.5762  text='Ааааааа!!!'
+11:05:34.732 [transcriber] seg[235] DROP L2   start=1283.24 end=1285.12 nsp=0.5762  text='Ааааа!!!'
+11:05:34.732 [transcriber] seg[236] KEEP      start=1289.08 end=1290.46 nsp=0.5762  text='Ох, это…'
+11:05:34.732 [transcriber] seg[237] KEEP      start=1290.46 end=1291.84 nsp=0.5762  text='Ох..'
+11:05:34.732 [transcriber] seg[238] DROP L2   start=1291.84 end=1293.36 nsp=0.5762  text='Ааааааааааааа!!!'
+11:05:34.732 [transcriber] seg[239] KEEP      start=1293.36 end=1313.12 nsp=0.2699  text='там он палит на поле.'
+11:05:34.732 [transcriber] seg[240] KEEP      start=1313.12 end=1315.12 nsp=0.4383  text='Аээ...'
+11:05:34.732 [transcriber] seg[241] KEEP      start=1316.12 end=1319.12 nsp=0.4383  text='Ох, осочда, закончим!'
+11:05:34.732 [transcriber] seg[242] KEEP      start=1319.12 end=1319.62 nsp=0.4383  text='Вth..'
+11:05:34.732 [transcriber] seg[243] KEEP      start=1319.62 end=1321.12 nsp=0.4383  text='Ибо вы не statt unterschied...'
+11:05:34.732 [transcriber] seg[244] KEEP      start=1321.12 end=1323.12 nsp=0.4383  text='Кто же с такой учёбодор...'
+11:05:34.732 [transcriber] seg[245] KEEP      start=1324.12 end=1326.12 nsp=0.4383  text='Ох, опожиться, Оха!'
+11:05:34.732 [transcriber] seg[246] KEEP      start=1327.12 end=1328.62 nsp=0.4383  text='Ох, да, Оха!'
+11:05:34.732 [transcriber] seg[247] KEEP [?] start=1331.12 end=1332.12 nsp=0.4383 music=1 DISPUTE  text='Ам... Да...'
+11:05:34.732 [transcriber] seg[247] KEEP      start=1331.12 end=1332.12 nsp=0.4383  text='Ам... Да...'
+11:05:34.732 [transcriber] seg[249] KEEP [?] start=1333.12 end=1334.12 nsp=0.4383 music=1 DISPUTE  text='Ох, мне соль!'
+11:05:34.732 [transcriber] seg[249] KEEP      start=1333.12 end=1334.12 nsp=0.4383  text='Ох, мне соль!'
+11:05:34.732 [transcriber] seg[251] KEEP      start=1334.12 end=1336.12 nsp=0.4383  text='Ох, да...'
+11:05:34.732 [transcriber] seg[252] KEEP      start=1336.12 end=1339.12 nsp=0.4383  text='Ах, да...'
+11:05:34.732 [transcriber] seg[253] KEEP [?] start=1339.12 end=1340.12 nsp=0.4383 music=1 DISPUTE  text='А, да...'
+11:05:34.732 [transcriber] seg[253] KEEP      start=1339.12 end=1340.12 nsp=0.4383  text='А, да...'
+11:05:34.732 [transcriber] seg[255] KEEP [?] start=1341.12 end=1342.12 nsp=0.4383 music=1 DISPUTE  text='Ах, мэ...'
+11:05:34.732 [transcriber] seg[255] KEEP      start=1341.12 end=1342.12 nsp=0.4383  text='Ах, мэ...'
+11:05:34.732 [transcriber] seg[257] KEEP [?] start=1343.96 end=1345.78 nsp=0.0727 music=1 DISPUTE  text='Аээээээээ'
+11:05:34.732 [transcriber] seg[257] DROP L2   start=1343.96 end=1345.78 nsp=0.0727  text='Аээээээээ'
+11:05:34.732 [transcriber] seg[258] KEEP      start=1363.38 end=1365.02 nsp=0.0727  text='Ну…'
+11:05:34.732 [transcriber] seg[259] KEEP      start=1365.94 end=1367.82 nsp=0.0727  text='И... Ле утуда свои денег и…'
+11:05:34.733 [transcriber] seg[260] KEEP      start=1367.82 end=1371.82 nsp=0.0727  text='Ну, видишь, она у не страшного, also, хорошо?'
+11:05:34.733 [transcriber] seg[261] KEEP      start=1371.82 end=1373.82 nsp=0.1939  text='С тобой было не страшно действительно?'
+11:05:34.733 [transcriber] seg[262] KEEP      start=1373.90 end=1376.78 nsp=0.1939  text='Ну все, тогда сейчас эти на карту закинули.'
+11:05:34.733 [transcriber] seg[263] KEEP      start=1376.78 end=1379.50 nsp=0.1939  text='Так что может теперь одеваться.'
+11:05:34.733 [transcriber] seg[264] KEEP      start=1379.50 end=1381.98 nsp=0.1939  text='И помнит на нас с тобой у секретих.'
+11:05:34.733 [transcriber] seg[265] KEEP      start=1381.98 end=1382.98 nsp=0.1939  text='Да, да.'
+11:05:34.733 [transcriber] seg[266] KEEP      start=1382.98 end=1384.74 nsp=0.1939  text='Так же как и продвиг в собак?'
+11:05:34.733 [transcriber] seg[267] KEEP      start=1384.74 end=1385.74 nsp=0.1939  text='Да, да.'
+11:05:34.733 [transcriber] seg[268] KEEP      start=1385.74 end=1386.74 nsp=0.1939  text='Замний секрет.'
+11:05:34.733 [transcriber] seg[269] KEEP      start=1386.74 end=1389.82 nsp=0.1939  text='Это не нравится что-нибудь ждут от денег, у ИПДУ.'
+11:05:34.733 [transcriber] seg[270] KEEP      start=1389.82 end=1394.22 nsp=0.1939  text='А вы его и продолжу обокращаться играть?'
+11:05:34.733 [transcriber] seg[271] KEEP      start=1394.22 end=1395.22 nsp=0.1939  text='Ага.'
+11:05:34.733 [transcriber] seg[272] KEEP      start=1395.22 end=1397.22 nsp=0.1939  text='Кормится, давай.'
+11:05:34.733 [transcriber] seg[273] KEEP [?] start=1401.82 end=1406.82 nsp=0.3093 music=1 DISPUTE  text='Ну...'
+11:05:34.733 [transcriber] seg[273] KEEP      start=1401.82 end=1406.82 nsp=0.3093  text='Ну...'
+11:05:34.733 [transcriber] seg[275] KEEP      start=1406.82 end=1411.82 nsp=0.3093  text='Так я собат его, а мне...'
+11:05:34.733 [transcriber] seg[276] KEEP      start=1411.82 end=1413.82 nsp=0.3093  text='Я тебе...'
+11:05:34.733 [transcriber] seg[277] KEEP      start=1420.82 end=1423.82 nsp=0.3093  text='Саша, ты что, как мы делаем?'
+11:05:34.733 [transcriber] seg[278] KEEP      start=1423.82 end=1427.82 nsp=0.3093  text='Ну, может, это повторим, ты что, у нас было?'
+11:05:34.733 [transcriber] seg[279] KEEP [?] start=1427.82 end=1428.82 nsp=0.4364 music=1 DISPUTE  text='Кровоповто?'
+11:05:34.733 [transcriber] seg[279] KEEP      start=1427.82 end=1428.82 nsp=0.4364  text='Кровоповто?'
+11:05:34.733 [transcriber] seg[281] KEEP      start=1428.82 end=1429.82 nsp=0.4364  text='Где он?'
+11:05:34.733 [transcriber] seg[282] KEEP      start=1429.82 end=1432.82 nsp=0.4364  text='Тут еще он для спирной жопы, не высохов.'
+11:05:34.733 [transcriber] seg[283] KEEP      start=1432.82 end=1434.82 nsp=0.4364  text='Ну, ну может, подповти.'
+11:05:34.733 [transcriber] seg[284] KEEP      start=1434.82 end=1435.82 nsp=0.4364  text='Где он?'
+11:05:34.733 [transcriber] seg[285] KEEP [?] start=1435.82 end=1436.82 nsp=0.4364 music=1 DISPUTE  text='Я...'
+11:05:34.733 [transcriber] seg[285] KEEP      start=1435.82 end=1436.82 nsp=0.4364  text='Я...'
+11:05:34.733 [transcriber] seg[287] KEEP      start=1436.82 end=1438.82 nsp=0.4364  text='Пушка все, она, как бы отстреля.'
+11:05:34.733 [transcriber] seg[288] KEEP      start=1438.82 end=1439.82 nsp=0.4364  text='Зачем повторять опер?'
+11:05:34.733 [transcriber] seg[289] KEEP      start=1439.82 end=1441.82 nsp=0.4364  text='Ну, хочу очень сильно.'
+11:05:34.733 [transcriber] seg[290] KEEP      start=1441.82 end=1443.82 nsp=0.4364  text='Так, подходит, с вашей мамой.'
+11:05:34.733 [transcriber] seg[291] KEEP      start=1443.82 end=1444.82 nsp=0.4364  text='Ну, давай покожайся.'
+11:05:34.733 [transcriber] seg[292] KEEP      start=1444.82 end=1445.82 nsp=0.4364  text='Хочется, давай вечер.'
+11:05:34.733 [transcriber] seg[293] KEEP      start=1445.82 end=1447.82 nsp=0.4364  text='Ну, ну, ну, может, просто у меня,'
+11:05:34.733 [transcriber] seg[294] KEEP      start=1447.82 end=1449.82 nsp=0.4364  text='ну, ладно, честно говоря, ну, мне вот на ласу.'
+11:05:34.733 [transcriber] seg[295] KEEP      start=1449.82 end=1450.82 nsp=0.4364  text='Ой, нет, все, диан.'
+11:05:34.733 [transcriber] seg[296] KEEP      start=1450.82 end=1451.82 nsp=0.4364  text='Все, давай.'
+11:05:34.733 [transcriber] seg[297] KEEP      start=1451.82 end=1453.82 nsp=0.4364  text='Саш, ну, ну почему?'
+11:05:34.733 [transcriber] seg[298] KEEP      start=1453.82 end=1455.82 nsp=0.4364  text='Я тебе уже дала на ласу и на ласу.'
+11:05:34.733 [transcriber] seg[299] KEEP      start=1455.82 end=1458.86 nsp=0.3671  text='Лас, Лас, Лас, на все вас ты все.'
+11:05:34.733 [transcriber] seg[300] KEEP      start=1458.86 end=1459.86 nsp=0.3671  text='Нет.'
+11:05:34.733 [transcriber] seg[301] KEEP      start=1459.86 end=1461.38 nsp=0.3671  text='Сажды последний ты был честно.'
+11:05:34.733 [transcriber] seg[302] KEEP [?] start=1461.38 end=1463.38 nsp=0.3671 music=1 DISPUTE  text='Ну собаки голодают.'
+11:05:34.733 [transcriber] seg[302] KEEP      start=1461.38 end=1463.38 nsp=0.3671  text='Ну собаки голодают.'
+11:05:34.733 [transcriber] seg[304] KEEP      start=1463.38 end=1467.62 nsp=0.3671  text='Дянут, если ты сейчас не отстанешь, сейчас всем расскажу, каких ты собакорный.'
+11:05:34.733 [transcriber] seg[305] KEEP      start=1467.62 end=1468.66 nsp=0.3671  text='Что, давай уходи?'
+11:05:34.733 [transcriber] seg[306] KEEP      start=1468.66 end=1469.66 nsp=0.3671  text='Нет.'
+11:05:34.733 [transcriber] seg[307] KEEP      start=1469.66 end=1470.66 nsp=0.3671  text='Уходи.'
+11:05:34.733 [transcriber] seg[308] KEEP      start=1470.66 end=1471.66 nsp=0.3671  text='Уходи.'
+11:05:34.733 [transcriber] seg[309] KEEP      start=1471.66 end=1472.66 nsp=0.3671  text='Ну давай еще.'
+11:05:34.733 [transcriber] seg[310] KEEP      start=1472.66 end=1473.66 nsp=0.3671  text='Уходи.'
+11:05:34.733 [transcriber] seg[311] KEEP      start=1473.66 end=1474.66 nsp=0.3671  text='Кышь.'
+11:05:34.733 [transcriber] seg[312] KEEP      start=1474.66 end=1475.66 nsp=0.3671  text='Ну давай, видно.'
+11:05:34.733 [transcriber] seg[313] KEEP [?] start=1475.66 end=1476.66 nsp=0.3671 music=1 DISPUTE  text='Кышь.'
+11:05:34.733 [transcriber] seg[313] KEEP      start=1475.66 end=1476.66 nsp=0.3671  text='Кышь.'
+11:05:34.733 [transcriber] seg[315] KEEP      start=1476.66 end=1478.66 nsp=0.3671  text='Я еще жопа, наверное, не затянулась.'
+11:05:34.733 [transcriber] seg[316] KEEP      start=1478.66 end=1480.66 nsp=0.3671  text='Просто без чувствуя на человек.'
+11:05:34.733 [transcriber] seg[317] DROP L2   start=1480.66 end=1482.66 nsp=0.3671  text='Давай, давай, давай, давай.'
+11:05:34.733 [transcriber] 过滤摘要: 总=295 保留=276 丢弃=10 (L1a=0 L2=10 L4=0) 存疑=32
+11:05:34.733 [transcriber] 说话人检测开始 (threshold=0.75)
+11:05:34.907 [transcriber] 说话人变化: seg[1] start=9.08 sim=0.423 < 0.75
+11:05:34.932 [transcriber] 说话人变化: seg[2] start=11.84 sim=0.524 < 0.75
+11:05:34.957 [transcriber] 说话人变化: seg[3] start=14.84 sim=0.599 < 0.75
+11:05:34.969 [transcriber] 说话人变化: seg[4] start=18.12 sim=0.592 < 0.75
+11:05:35.008 [transcriber] 说话人变化: seg[6] start=23.60 sim=0.432 < 0.75
+11:05:35.019 [transcriber] 说话人变化: seg[7] start=24.60 sim=0.547 < 0.75
+11:05:35.053 [transcriber] 说话人变化: seg[8] start=25.60 sim=0.414 < 0.75
+11:05:35.084 [transcriber] 说话人变化: seg[9] start=30.08 sim=0.537 < 0.75
+11:05:35.118 [transcriber] 说话人变化: seg[11] start=37.04 sim=0.429 < 0.75
+11:05:35.129 [transcriber] 说话人变化: seg[12] start=38.24 sim=0.390 < 0.75
+11:05:35.142 [transcriber] 说话人变化: seg[13] start=40.48 sim=0.488 < 0.75
+11:05:35.153 [transcriber] 说话人变化: seg[14] start=42.84 sim=0.424 < 0.75
+11:05:35.186 [transcriber] 说话人变化: seg[15] start=44.72 sim=0.729 < 0.75
+11:05:35.197 [transcriber] 说话人变化: seg[16] start=50.40 sim=0.349 < 0.75
+11:05:35.208 [transcriber] 说话人变化: seg[17] start=51.40 sim=0.703 < 0.75
+11:05:35.219 [transcriber] 说话人变化: seg[18] start=52.40 sim=0.699 < 0.75
+11:05:35.264 [transcriber] 说话人变化: seg[21] start=55.40 sim=0.520 < 0.75
+11:05:35.275 [transcriber] 说话人变化: seg[22] start=57.40 sim=0.616 < 0.75
+11:05:35.288 [transcriber] 说话人变化: seg[23] start=58.40 sim=0.553 < 0.75
+11:05:35.300 [transcriber] 说话人变化: seg[24] start=60.40 sim=0.431 < 0.75
+11:05:35.311 [transcriber] 说话人变化: seg[25] start=63.40 sim=0.448 < 0.75
+11:05:35.350 [transcriber] 说话人变化: seg[27] start=68.40 sim=0.656 < 0.75
+11:05:35.373 [transcriber] 说话人变化: seg[29] start=70.40 sim=0.504 < 0.75
+11:05:35.398 [transcriber] 说话人变化: seg[30] start=72.40 sim=0.438 < 0.75
+11:05:35.409 [transcriber] 说话人变化: seg[31] start=75.40 sim=0.595 < 0.75
+11:05:35.436 [transcriber] 说话人变化: seg[32] start=76.40 sim=0.635 < 0.75
+11:05:35.447 [transcriber] 说话人变化: seg[33] start=79.40 sim=0.669 < 0.75
+11:05:35.476 [transcriber] 说话人变化: seg[34] start=80.40 sim=0.448 < 0.75
+11:05:35.539 [transcriber] 说话人变化: seg[36] start=90.08 sim=0.661 < 0.75
+11:05:35.579 [transcriber] 说话人变化: seg[37] start=94.24 sim=0.641 < 0.75
+11:05:35.637 [transcriber] 说话人变化: seg[40] start=111.08 sim=0.534 < 0.75
+11:05:35.650 [transcriber] 说话人变化: seg[41] start=113.08 sim=0.423 < 0.75
+11:05:35.675 [transcriber] 说话人变化: seg[42] start=116.08 sim=0.712 < 0.75
+11:05:35.698 [transcriber] 说话人变化: seg[43] start=120.08 sim=0.702 < 0.75
+11:05:35.721 [transcriber] 说话人变化: seg[44] start=122.08 sim=0.547 < 0.75
+11:05:35.733 [transcriber] 说话人变化: seg[45] start=124.08 sim=0.541 < 0.75
+11:05:35.761 [transcriber] 说话人变化: seg[46] start=126.08 sim=0.729 < 0.75
+11:05:35.797 [transcriber] 说话人变化: seg[48] start=134.08 sim=0.559 < 0.75
+11:05:35.835 [transcriber] 说话人变化: seg[49] start=135.08 sim=0.243 < 0.75
+11:05:35.846 [transcriber] 说话人变化: seg[50] start=142.08 sim=0.303 < 0.75
+11:05:35.884 [transcriber] 说话人变化: seg[52] start=149.08 sim=0.394 < 0.75
+11:05:35.912 [transcriber] 说话人变化: seg[53] start=154.08 sim=0.584 < 0.75
+11:05:35.956 [transcriber] 说话人变化: seg[55] start=163.08 sim=0.520 < 0.75
+11:05:35.997 [transcriber] 说话人变化: seg[57] start=169.08 sim=0.482 < 0.75
+11:05:36.021 [transcriber] 说话人变化: seg[58] start=171.08 sim=0.496 < 0.75
+11:05:36.078 [transcriber] 说话人变化: seg[60] start=178.08 sim=0.494 < 0.75
+11:05:36.090 [transcriber] 说话人变化: seg[61] start=182.08 sim=0.445 < 0.75
+11:05:36.102 [transcriber] 说话人变化: seg[62] start=183.08 sim=0.531 < 0.75
+11:05:36.129 [transcriber] 说话人变化: seg[63] start=185.08 sim=0.498 < 0.75
+11:05:36.141 [transcriber] 说话人变化: seg[64] start=189.08 sim=0.543 < 0.75
+11:05:36.152 [transcriber] 说话人变化: seg[65] start=191.08 sim=0.461 < 0.75
+11:05:36.164 [transcriber] 说话人变化: seg[66] start=192.08 sim=0.484 < 0.75
+11:05:36.202 [transcriber] 说话人变化: seg[67] start=193.72 sim=0.601 < 0.75
+11:05:36.230 [transcriber] 说话人变化: seg[68] start=200.12 sim=0.534 < 0.75
+11:05:36.254 [transcriber] 说话人变化: seg[69] start=203.98 sim=0.485 < 0.75
+11:05:36.285 [transcriber] 说话人变化: seg[70] start=208.28 sim=0.522 < 0.75
+11:05:36.313 [transcriber] 说话人变化: seg[71] start=213.64 sim=0.526 < 0.75
+11:05:36.324 [transcriber] 说话人变化: seg[72] start=216.82 sim=0.343 < 0.75
+11:05:36.336 [transcriber] 说话人变化: seg[73] start=217.82 sim=0.546 < 0.75
+11:05:36.363 [transcriber] 说话人变化: seg[74] start=219.40 sim=0.710 < 0.75
+11:05:36.419 [transcriber] 说话人变化: seg[76] start=227.82 sim=0.556 < 0.75
+11:05:36.431 [transcriber] 说话人变化: seg[77] start=236.52 sim=0.451 < 0.75
+11:05:36.456 [transcriber] 说话人变化: seg[78] start=238.52 sim=0.504 < 0.75
+11:05:36.504 [transcriber] 说话人变化: seg[80] start=247.52 sim=0.552 < 0.75
+11:05:36.517 [transcriber] 说话人变化: seg[81] start=254.52 sim=0.586 < 0.75
+11:05:36.528 [transcriber] 说话人变化: seg[82] start=257.52 sim=0.400 < 0.75
+11:05:36.539 [transcriber] 说话人变化: seg[83] start=258.52 sim=0.743 < 0.75
+11:05:36.551 [transcriber] 说话人变化: seg[84] start=259.52 sim=0.440 < 0.75
+11:05:36.574 [transcriber] 说话人变化: seg[85] start=266.52 sim=0.710 < 0.75
+11:05:36.597 [transcriber] 说话人变化: seg[87] start=341.02 sim=0.364 < 0.75
+11:05:36.622 [transcriber] 说话人变化: seg[89] start=367.52 sim=0.168 < 0.75
+11:05:36.729 [transcriber] 说话人变化: seg[91] start=389.08 sim=0.746 < 0.75
+11:05:36.741 [transcriber] 说话人变化: seg[92] start=391.78 sim=0.554 < 0.75
+11:05:36.753 [transcriber] 说话人变化: seg[93] start=393.58 sim=0.615 < 0.75
+11:05:36.779 [transcriber] 说话人变化: seg[94] start=399.58 sim=0.698 < 0.75
+11:05:36.791 [transcriber] 说话人变化: seg[95] start=403.58 sim=0.608 < 0.75
+11:05:36.803 [transcriber] 说话人变化: seg[96] start=405.58 sim=0.604 < 0.75
+11:05:36.814 [transcriber] 说话人变化: seg[97] start=409.58 sim=0.570 < 0.75
+11:05:36.825 [transcriber] 说话人变化: seg[98] start=415.58 sim=0.692 < 0.75
+11:05:36.836 [transcriber] 说话人变化: seg[99] start=416.58 sim=0.748 < 0.75
+11:05:36.848 [transcriber] 说话人变化: seg[100] start=422.94 sim=0.415 < 0.75
+11:05:36.859 [transcriber] 说话人变化: seg[101] start=432.18 sim=0.470 < 0.75
+11:05:36.934 [transcriber] 说话人变化: seg[102] start=446.58 sim=0.497 < 0.75
+11:05:37.177 [transcriber] 说话人变化: seg[109] start=535.70 sim=0.567 < 0.75
+11:05:37.252 [transcriber] 说话人变化: seg[110] start=547.74 sim=0.563 < 0.75
+11:05:37.339 [transcriber] 说话人变化: seg[115] start=598.84 sim=0.606 < 0.75
+11:05:37.351 [transcriber] 说话人变化: seg[116] start=600.36 sim=0.606 < 0.75
+11:05:37.504 [transcriber] 说话人变化: seg[117] start=601.84 sim=0.677 < 0.75
+11:05:37.697 [transcriber] 说话人变化: seg[120] start=666.34 sim=0.586 < 0.75
+11:05:37.708 [transcriber] 说话人变化: seg[121] start=671.34 sim=0.565 < 0.75
+11:05:37.721 [transcriber] 说话人变化: seg[122] start=677.84 sim=0.538 < 0.75
+11:05:37.733 [transcriber] 说话人变化: seg[123] start=685.84 sim=0.509 < 0.75
+11:05:37.760 [transcriber] 说话人变化: seg[124] start=691.84 sim=0.599 < 0.75
+11:05:37.803 [transcriber] 说话人变化: seg[126] start=707.68 sim=0.715 < 0.75
+11:05:37.827 [transcriber] 说话人变化: seg[127] start=710.12 sim=0.704 < 0.75
+11:05:37.862 [transcriber] 说话人变化: seg[129] start=715.86 sim=0.448 < 0.75
+11:05:37.873 [transcriber] 说话人变化: seg[130] start=716.80 sim=0.527 < 0.75
+11:05:37.885 [transcriber] 说话人变化: seg[131] start=718.98 sim=0.498 < 0.75
+11:05:38.075 [transcriber] 说话人变化: seg[135] start=746.48 sim=0.588 < 0.75
+11:05:38.100 [transcriber] 说话人变化: seg[136] start=748.44 sim=0.494 < 0.75
+11:05:38.113 [transcriber] 说话人变化: seg[137] start=751.56 sim=0.593 < 0.75
+11:05:38.141 [transcriber] 说话人变化: seg[138] start=754.20 sim=0.734 < 0.75
+11:05:38.153 [transcriber] 说话人变化: seg[139] start=758.24 sim=0.572 < 0.75
+11:05:38.164 [transcriber] 说话人变化: seg[140] start=760.44 sim=0.535 < 0.75
+11:05:38.175 [transcriber] 说话人变化: seg[141] start=761.44 sim=0.626 < 0.75
+11:05:38.187 [transcriber] 说话人变化: seg[142] start=762.84 sim=0.583 < 0.75
+11:05:38.199 [transcriber] 说话人变化: seg[143] start=763.84 sim=0.736 < 0.75
+11:05:38.223 [transcriber] 说话人变化: seg[144] start=765.32 sim=0.611 < 0.75
+11:05:38.249 [transcriber] 说话人变化: seg[145] start=768.32 sim=0.594 < 0.75
+11:05:38.262 [transcriber] 说话人变化: seg[146] start=771.60 sim=0.517 < 0.75
+11:05:38.274 [transcriber] 说话人变化: seg[147] start=774.48 sim=0.603 < 0.75
+11:05:38.286 [transcriber] 说话人变化: seg[148] start=776.12 sim=0.466 < 0.75
+11:05:38.297 [transcriber] 说话人变化: seg[149] start=778.08 sim=0.606 < 0.75
+11:05:38.308 [transcriber] 说话人变化: seg[150] start=779.32 sim=0.611 < 0.75
+11:05:38.320 [transcriber] 说话人变化: seg[151] start=781.32 sim=0.373 < 0.75
+11:05:38.353 [transcriber] 说话人变化: seg[152] start=783.20 sim=0.576 < 0.75
+11:05:38.380 [transcriber] 说话人变化: seg[153] start=788.80 sim=0.525 < 0.75
+11:05:38.409 [transcriber] 说话人变化: seg[154] start=792.40 sim=0.505 < 0.75
+11:05:38.432 [transcriber] 说话人变化: seg[156] start=798.36 sim=0.305 < 0.75
+11:05:38.443 [transcriber] 说话人变化: seg[157] start=799.36 sim=0.498 < 0.75
+11:05:38.455 [transcriber] 说话人变化: seg[158] start=800.64 sim=0.543 < 0.75
+11:05:38.478 [transcriber] 说话人变化: seg[159] start=801.60 sim=0.334 < 0.75
+11:05:38.508 [transcriber] 说话人变化: seg[160] start=808.08 sim=0.683 < 0.75
+11:05:38.562 [transcriber] 说话人变化: seg[162] start=818.36 sim=0.694 < 0.75
+11:05:38.646 [transcriber] 说话人变化: seg[166] start=830.74 sim=0.722 < 0.75
+11:05:38.657 [transcriber] 说话人变化: seg[167] start=832.06 sim=0.531 < 0.75
+11:05:38.669 [transcriber] 说话人变化: seg[168] start=833.56 sim=0.604 < 0.75
+11:05:38.741 [transcriber] 说话人变化: seg[169] start=864.94 sim=0.722 < 0.75
+11:05:38.850 [transcriber] 说话人变化: seg[174] start=898.82 sim=0.644 < 0.75
+11:05:38.862 [transcriber] 说话人变化: seg[175] start=916.82 sim=0.652 < 0.75
+11:05:38.885 [transcriber] 说话人变化: seg[176] start=926.66 sim=0.637 < 0.75
+11:05:39.272 [transcriber] 说话人变化: seg[182] start=1096.14 sim=0.464 < 0.75
+11:05:39.299 [transcriber] 说话人变化: seg[183] start=1098.14 sim=0.658 < 0.75
+11:05:39.424 [transcriber] 说话人变化: seg[186] start=1119.40 sim=0.736 < 0.75
+11:05:39.435 [transcriber] 说话人变化: seg[187] start=1124.48 sim=0.496 < 0.75
+11:05:39.447 [transcriber] 说话人变化: seg[188] start=1126.48 sim=0.514 < 0.75
+11:05:39.459 [transcriber] 说话人变化: seg[189] start=1137.08 sim=0.614 < 0.75
+11:05:39.471 [transcriber] 说话人变化: seg[190] start=1144.52 sim=0.649 < 0.75
+11:05:39.482 [transcriber] 说话人变化: seg[191] start=1149.40 sim=0.612 < 0.75
+11:05:39.494 [transcriber] 说话人变化: seg[192] start=1159.54 sim=0.710 < 0.75
+11:05:39.518 [transcriber] 说话人变化: seg[193] start=1169.96 sim=0.634 < 0.75
+11:05:39.541 [transcriber] 说话人变化: seg[194] start=1179.40 sim=0.585 < 0.75
+11:05:39.553 [transcriber] 说话人变化: seg[195] start=1188.66 sim=0.517 < 0.75
+11:05:39.565 [transcriber] 说话人变化: seg[196] start=1205.24 sim=0.530 < 0.75
+11:05:39.577 [transcriber] 说话人变化: seg[197] start=1207.42 sim=0.652 < 0.75
+11:05:39.606 [transcriber] 说话人变化: seg[198] start=1237.42 sim=0.746 < 0.75
+11:05:39.619 [transcriber] 说话人变化: seg[199] start=1244.50 sim=0.750 < 0.75
+11:05:39.630 [transcriber] 说话人变化: seg[200] start=1248.34 sim=0.633 < 0.75
+11:05:39.642 [transcriber] 说话人变化: seg[201] start=1261.94 sim=0.623 < 0.75
+11:05:39.731 [transcriber] 说话人变化: seg[205] start=1275.76 sim=0.701 < 0.75
+11:05:39.742 [transcriber] 说话人变化: seg[206] start=1289.08 sim=0.650 < 0.75
+11:05:39.754 [transcriber] 说话人变化: seg[207] start=1290.46 sim=0.695 < 0.75
+11:05:39.851 [transcriber] 说话人变化: seg[208] start=1293.36 sim=0.681 < 0.75
+11:05:39.886 [transcriber] 说话人变化: seg[210] start=1316.12 sim=0.634 < 0.75
+11:05:39.897 [transcriber] 说话人变化: seg[211] start=1319.12 sim=0.317 < 0.75
+11:05:39.908 [transcriber] 说话人变化: seg[212] start=1319.62 sim=0.350 < 0.75
+11:05:39.920 [transcriber] 说话人变化: seg[213] start=1321.12 sim=0.605 < 0.75
+11:05:39.932 [transcriber] 说话人变化: seg[214] start=1324.12 sim=0.672 < 0.75
+11:05:39.944 [transcriber] 说话人变化: seg[215] start=1327.12 sim=0.635 < 0.75
+11:05:39.955 [transcriber] 说话人变化: seg[216] start=1331.12 sim=0.552 < 0.75
+11:05:39.966 [transcriber] 说话人变化: seg[217] start=1333.12 sim=0.599 < 0.75
+11:05:39.978 [transcriber] 说话人变化: seg[218] start=1334.12 sim=0.599 < 0.75
+11:05:40.001 [transcriber] 说话人变化: seg[219] start=1336.12 sim=0.515 < 0.75
+11:05:40.013 [transcriber] 说话人变化: seg[220] start=1339.12 sim=0.470 < 0.75
+11:05:40.035 [transcriber] 说话人变化: seg[222] start=1363.38 sim=0.742 < 0.75
+11:05:40.047 [transcriber] 说话人变化: seg[223] start=1365.94 sim=0.543 < 0.75
+11:05:40.074 [transcriber] 说话人变化: seg[224] start=1367.82 sim=0.549 < 0.75
+11:05:40.098 [transcriber] 说话人变化: seg[225] start=1371.82 sim=0.418 < 0.75
+11:05:40.122 [transcriber] 说话人变化: seg[226] start=1373.90 sim=0.509 < 0.75
+11:05:40.180 [transcriber] 说话人变化: seg[229] start=1381.98 sim=0.425 < 0.75
+11:05:40.192 [transcriber] 说话人变化: seg[230] start=1382.98 sim=0.644 < 0.75
+11:05:40.203 [transcriber] 说话人变化: seg[231] start=1384.74 sim=0.581 < 0.75
+11:05:40.213 [transcriber] 说话人变化: seg[232] start=1385.74 sim=0.706 < 0.75
+11:05:40.240 [transcriber] 说话人变化: seg[233] start=1386.74 sim=0.638 < 0.75
+11:05:40.279 [transcriber] 说话人变化: seg[235] start=1394.22 sim=0.302 < 0.75
+11:05:40.292 [transcriber] 说话人变化: seg[236] start=1395.22 sim=0.376 < 0.75
+11:05:40.317 [transcriber] 说话人变化: seg[237] start=1401.82 sim=0.522 < 0.75
+11:05:40.345 [transcriber] 说话人变化: seg[238] start=1406.82 sim=0.565 < 0.75
+11:05:40.357 [transcriber] 说话人变化: seg[239] start=1411.82 sim=0.432 < 0.75
+11:05:40.381 [transcriber] 说话人变化: seg[240] start=1420.82 sim=0.465 < 0.75
+11:05:40.409 [transcriber] 说话人变化: seg[241] start=1423.82 sim=0.749 < 0.75
+11:05:40.420 [transcriber] 说话人变化: seg[242] start=1427.82 sim=0.330 < 0.75
+11:05:40.431 [transcriber] 说话人变化: seg[243] start=1428.82 sim=0.685 < 0.75
+11:05:40.455 [transcriber] 说话人变化: seg[244] start=1429.82 sim=0.605 < 0.75
+11:05:40.477 [transcriber] 说话人变化: seg[245] start=1432.82 sim=0.656 < 0.75
+11:05:40.488 [transcriber] 说话人变化: seg[246] start=1434.82 sim=0.504 < 0.75
+11:05:40.499 [transcriber] 说话人变化: seg[247] start=1435.82 sim=0.604 < 0.75
+11:05:40.521 [transcriber] 说话人变化: seg[248] start=1436.82 sim=0.587 < 0.75
+11:05:40.532 [transcriber] 说话人变化: seg[249] start=1438.82 sim=0.618 < 0.75
+11:05:40.555 [transcriber] 说话人变化: seg[250] start=1439.82 sim=0.456 < 0.75
+11:05:40.567 [transcriber] 说话人变化: seg[251] start=1441.82 sim=0.658 < 0.75
+11:05:40.578 [transcriber] 说话人变化: seg[252] start=1443.82 sim=0.336 < 0.75
+11:05:40.601 [transcriber] 说话人变化: seg[254] start=1445.82 sim=0.385 < 0.75
+11:05:40.624 [transcriber] 说话人变化: seg[255] start=1447.82 sim=0.688 < 0.75
+11:05:40.635 [transcriber] 说话人变化: seg[256] start=1449.82 sim=0.545 < 0.75
+11:05:40.646 [transcriber] 说话人变化: seg[257] start=1450.82 sim=0.710 < 0.75
+11:05:40.658 [transcriber] 说话人变化: seg[258] start=1451.82 sim=0.660 < 0.75
+11:05:40.680 [transcriber] 说话人变化: seg[259] start=1453.82 sim=0.516 < 0.75
+11:05:40.719 [transcriber] 说话人变化: seg[261] start=1458.86 sim=0.390 < 0.75
+11:05:40.730 [transcriber] 说话人变化: seg[262] start=1459.86 sim=0.656 < 0.75
+11:05:40.742 [transcriber] 说话人变化: seg[263] start=1461.38 sim=0.681 < 0.75
+11:05:40.772 [transcriber] 说话人变化: seg[264] start=1463.38 sim=0.512 < 0.75
+11:05:40.783 [transcriber] 说话人变化: seg[265] start=1467.62 sim=0.535 < 0.75
+11:05:40.794 [transcriber] 说话人变化: seg[266] start=1468.66 sim=0.465 < 0.75
+11:05:40.805 [transcriber] 说话人变化: seg[267] start=1469.66 sim=0.562 < 0.75
+11:05:40.816 [transcriber] 说话人变化: seg[268] start=1470.66 sim=0.624 < 0.75
+11:05:40.827 [transcriber] 说话人变化: seg[269] start=1471.66 sim=0.723 < 0.75
+11:05:40.838 [transcriber] 说话人变化: seg[270] start=1472.66 sim=0.652 < 0.75
+11:05:40.849 [transcriber] 说话人变化: seg[271] start=1473.66 sim=0.598 < 0.75
+11:05:40.860 [transcriber] 说话人变化: seg[272] start=1474.66 sim=0.648 < 0.75
+11:05:40.883 [transcriber] 说话人变化: seg[274] start=1476.66 sim=0.310 < 0.75
+11:05:40.895 [transcriber] 说话人变化: seg[275] start=1478.66 sim=0.412 < 0.75
+11:05:40.895 [transcriber] 说话人检测完成: 212 处变化 (threshold=0.75)
+11:05:40.895 [transcriber] transcribe() 结束: 返回 276 段
+11:05:40.909 [translator] 翻译开始: 276 句 → 4 批 (每批上限 2000 字符)
+11:05:40.909 [translator] 批次 1/4: 53 句, 字符数=1993
+11:06:11.382 [translator] 批次 1/4: 53/53 成功 (第 1 次尝试)
+11:06:12.387 [translator] 批次 2/4: 64 句, 字符数=1859
+11:06:42.761 [translator] 批次 2/4: 64/64 成功 (第 1 次尝试)
+11:06:43.766 [translator] 批次 3/4: 72 句, 字符数=2000
+11:07:14.217 [translator] 批次 3/4: 72/72 成功 (第 1 次尝试)
+11:07:15.223 [translator] 批次 4/4: 87 句, 字符数=1674
+11:07:35.492 [translator] 批次 4/4: 87/87 成功 (第 1 次尝试)
+11:07:35.492 [translator] 翻译结束: 276/276 成功, 0 失败

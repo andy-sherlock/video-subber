@@ -1,0 +1,9 @@
+10:58:14.146 [cli] ===== video-subber debug log =====
+10:58:14.147 [cli] 视频: /Users/andy/Andy-agent/video-subtitle/v1/v1.3/test/test-video.ts
+10:58:14.147 [cli] 模型: tiny | 语言: auto | 字幕: yes | VAD: 关
+10:58:15.366 [transcriber] transcribe() 开始: audio=test/test-video.video-subber-cache/7c3a0fe9cdff/audio.wav model=tiny lang=auto
+10:58:21.514 [transcriber] VAD 语音占比: 21.2%
+10:58:22.191 [transcriber] 模型已加载: tiny (device=cpu compute_type=int8)
+10:58:22.235 [transcriber] 完整音频已加载: 23742311 采样 @ 16000 Hz
+10:58:25.325 [transcriber] 电话音频检测: 4kHz以上能量=12.9739% → 正常
+10:58:26.057 [transcriber] 检测语言: ru (概率 0.99)

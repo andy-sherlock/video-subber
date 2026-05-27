@@ -1,0 +1,1966 @@
+01:39:08.935 [cli] ===== video-subber debug log =====
+01:39:08.935 [cli] 视频: /Users/andy/Andy-agent/video-subtitle/v1/v1.2/test/test-video_zh.mp4
+01:39:08.936 [cli] 模型: tiny | 语言: auto | 字幕: yes | VAD: 关
+01:39:10.246 [transcriber] transcribe() 开始: audio=test/test-video_zh.video-subber-cache/32c61734c29b/audio.wav model=tiny lang=auto
+01:39:16.467 [transcriber] VAD 语音占比: 21.2%
+01:39:16.652 [httpcore.connection] connect_tcp.started host='127.0.0.1' port=7890 local_address=None timeout=None socket_options=None
+01:39:16.652 [httpcore.connection] connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x127755a90>
+01:39:16.652 [httpcore.http11] send_request_headers.started request=<Request [b'CONNECT']>
+01:39:16.652 [httpcore.http11] send_request_headers.complete
+01:39:16.652 [httpcore.http11] send_request_body.started request=<Request [b'CONNECT']>
+01:39:16.652 [httpcore.http11] send_request_body.complete
+01:39:16.652 [httpcore.http11] receive_response_headers.started request=<Request [b'CONNECT']>
+01:39:16.653 [httpcore.http11] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'Connection established', [])
+01:39:16.653 [httpcore.proxy] start_tls.started ssl_context=<ssl.SSLContext object at 0x12775c370> server_hostname='huggingface.co' timeout=None
+01:39:16.705 [httpcore.proxy] start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1276edbd0>
+01:39:16.706 [httpcore.http11] send_request_headers.started request=<Request [b'GET']>
+01:39:16.706 [httpcore.http11] send_request_headers.complete
+01:39:16.706 [httpcore.http11] send_request_body.started request=<Request [b'GET']>
+01:39:16.706 [httpcore.http11] send_request_body.complete
+01:39:16.706 [httpcore.http11] receive_response_headers.started request=<Request [b'GET']>
+01:39:16.968 [httpcore.http11] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Wed, 20 May 2026 17:39:17 GMT'), (b'content-encoding', b'gzip'), (b'ETag', b'W/"7cc-7cDj4nnkxSoZu81nv/B514KD71s"'), (b'X-Powered-By', b'huggingface-moon'), (b'X-Request-Id', b'Root=1-6a0df1c5-590185c870322dc42feddc34;8171d078-8253-4e74-9f7e-e1c3a75f3864'), (b'RateLimit', b'"api";r=499;t=271'), (b'RateLimit-Policy', b'"fixed window";"api";q=500;w=300'), (b'cross-origin-opener-policy', b'same-origin'), (b'Referrer-Policy', b'strict-origin-when-cross-origin'), (b'Access-Control-Max-Age', b'86400'), (b'Access-Control-Allow-Origin', b'https://huggingface.co'), (b'Vary', b'Origin'), (b'vary', b'Accept-Encoding'), (b'Access-Control-Expose-Headers', b'X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash'), (b'X-Cache', b'Miss from cloudfront'), (b'Via', b'1.1 09ad7bf944ae5150b489ccd299a545c6.cloudfront.net (CloudFront)'), (b'X-Amz-Cf-Pop', b'HKG62-P1'), (b'X-Amz-Cf-Id', b'rZP0WibyQgYGMUaNh1uc0TUjiKS4GhtzO-0J77cr0qnEsg4SSHB39g==')])
+01:39:16.968 [httpx] HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-tiny/revision/main "HTTP/1.1 200 OK"
+01:39:16.969 [httpcore.http11] receive_response_body.started request=<Request [b'GET']>
+01:39:16.969 [httpcore.http11] receive_response_body.complete
+01:39:16.969 [httpcore.http11] response_closed.started
+01:39:16.969 [httpcore.http11] response_closed.complete
+01:39:17.141 [transcriber] 模型已加载: tiny (device=cpu compute_type=int8)
+01:39:17.186 [transcriber] 完整音频已加载: 23742311 采样 @ 16000 Hz
+01:39:17.340 [faster_whisper] Processing audio with duration 24:43.894
+01:39:17.978 [faster_whisper] Detected language 'ru' with probability 0.99
+01:39:17.981 [transcriber] 检测语言: ru (概率 0.99)
+01:39:17.981 [faster_whisper] Processing segment at 00:00.000
+01:39:19.498 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=1137)
+           2	RESUME(arg=0, lineno=1137)
+           4	LOAD_FAST(arg=0, lineno=1140)
+           6	LOAD_CONST(arg=1, lineno=1140)
+           8	BINARY_SUBSCR(arg=None, lineno=1140)
+          12	STORE_FAST(arg=3, lineno=1140)
+          14	LOAD_FAST(arg=1, lineno=1141)
+          16	UNARY_NEGATIVE(arg=None, lineno=1141)
+          18	LOAD_FAST(arg=3, lineno=1141)
+          20	SWAP(arg=2, lineno=1141)
+          22	COPY(arg=2, lineno=1141)
+          24	COMPARE_OP(arg=58, lineno=1141)
+          28	POP_JUMP_IF_FALSE(arg=6, lineno=1141)
+          32	LOAD_FAST(arg=1, lineno=1141)
+          34	COMPARE_OP(arg=58, lineno=1141)
+          38	POP_JUMP_IF_FALSE(arg=5, lineno=1141)
+          42	JUMP_FORWARD(arg=2, lineno=1141)
+>         44	POP_TOP(arg=None, lineno=1141)
+          46	JUMP_FORWARD(arg=2, lineno=1141)
+>         48	LOAD_CONST(arg=1, lineno=1142)
+          50	STORE_FAST(arg=3, lineno=1142)
+>         52	LOAD_FAST(arg=0, lineno=1144)
+          54	LOAD_CONST(arg=2, lineno=1144)
+          56	BINARY_SUBSCR(arg=None, lineno=1144)
+          60	STORE_FAST(arg=4, lineno=1144)
+          62	LOAD_FAST(arg=1, lineno=1145)
+          64	UNARY_NEGATIVE(arg=None, lineno=1145)
+          66	LOAD_FAST(arg=4, lineno=1145)
+          68	SWAP(arg=2, lineno=1145)
+          70	COPY(arg=2, lineno=1145)
+          72	COMPARE_OP(arg=58, lineno=1145)
+          76	POP_JUMP_IF_FALSE(arg=6, lineno=1145)
+          80	LOAD_FAST(arg=1, lineno=1145)
+          82	COMPARE_OP(arg=58, lineno=1145)
+          86	POP_JUMP_IF_FALSE(arg=5, lineno=1145)
+          90	JUMP_FORWARD(arg=2, lineno=1145)
+>         92	POP_TOP(arg=None, lineno=1145)
+          94	JUMP_FORWARD(arg=2, lineno=1145)
+>         96	LOAD_CONST(arg=1, lineno=1146)
+          98	STORE_FAST(arg=4, lineno=1146)
+>        100	LOAD_FAST(arg=2, lineno=1148)
+         102	TO_BOOL(arg=None, lineno=1148)
+         110	POP_JUMP_IF_FALSE(arg=45, lineno=1148)
+         114	LOAD_GLOBAL(arg=0, lineno=1149)
+         124	LOAD_ATTR(arg=2, lineno=1149)
+         144	PUSH_NULL(arg=None, lineno=1149)
+         146	LOAD_FAST(arg=3, lineno=1149)
+         148	CALL(arg=1, lineno=1149)
+         156	LOAD_GLOBAL(arg=0, lineno=1149)
+         166	LOAD_ATTR(arg=2, lineno=1149)
+         186	PUSH_NULL(arg=None, lineno=1149)
+         188	LOAD_FAST(arg=4, lineno=1149)
+         190	CALL(arg=1, lineno=1149)
+         198	COMPARE_OP(arg=103, lineno=1149)
+         202	RETURN_VALUE(arg=None, lineno=1149)
+>        204	LOAD_GLOBAL(arg=0, lineno=1151)
+         214	LOAD_ATTR(arg=4, lineno=1151)
+         234	PUSH_NULL(arg=None, lineno=1151)
+         236	LOAD_FAST(arg=3, lineno=1151)
+         238	CALL(arg=1, lineno=1151)
+         246	LOAD_GLOBAL(arg=0, lineno=1151)
+         256	LOAD_ATTR(arg=4, lineno=1151)
+         276	PUSH_NULL(arg=None, lineno=1151)
+         278	LOAD_FAST(arg=4, lineno=1151)
+         280	CALL(arg=1, lineno=1151)
+         288	COMPARE_OP(arg=103, lineno=1151)
+         292	RETURN_VALUE(arg=None, lineno=1151)
+01:39:19.498 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+01:39:19.498 [numba.core.byteflow] stack: []
+01:39:19.498 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+01:39:19.499 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=1137)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=1137)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=1140)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=1140)
+01:39:19.499 [numba.core.byteflow] stack ['$x4.0']
+01:39:19.499 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=1140)
+01:39:19.499 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+01:39:19.499 [numba.core.byteflow] dispatch pc=12, inst=STORE_FAST(arg=3, lineno=1140)
+01:39:19.499 [numba.core.byteflow] stack ['$8binary_subscr.2']
+01:39:19.499 [numba.core.byteflow] dispatch pc=14, inst=LOAD_FAST(arg=1, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] dispatch pc=16, inst=UNARY_NEGATIVE(arg=None, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$threshold14.3']
+01:39:19.499 [numba.core.byteflow] dispatch pc=18, inst=LOAD_FAST(arg=3, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$16unary_negative.4']
+01:39:19.499 [numba.core.byteflow] dispatch pc=20, inst=SWAP(arg=2, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$16unary_negative.4', '$x018.5']
+01:39:19.499 [numba.core.byteflow] dispatch pc=22, inst=COPY(arg=2, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$x018.5', '$16unary_negative.4']
+01:39:19.499 [numba.core.byteflow] dispatch pc=24, inst=COMPARE_OP(arg=58, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$x018.5', '$16unary_negative.4', '$x018.5']
+01:39:19.499 [numba.core.byteflow] dispatch pc=28, inst=POP_JUMP_IF_FALSE(arg=6, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$x018.5', '$24compare_op.6']
+01:39:19.499 [numba.core.byteflow] end state. edges=[Edge(pc=32, stack=('$x018.5',), blockstack=(), npush=0), Edge(pc=44, stack=('$x018.5',), blockstack=(), npush=0)]
+01:39:19.499 [numba.core.byteflow] pending: deque([State(pc_initial=32 nstack_initial=1), State(pc_initial=44 nstack_initial=1)])
+01:39:19.499 [numba.core.byteflow] stack: ['$phi32.0']
+01:39:19.499 [numba.core.byteflow] state.pc_initial: State(pc_initial=32 nstack_initial=1)
+01:39:19.499 [numba.core.byteflow] dispatch pc=32, inst=LOAD_FAST(arg=1, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$phi32.0']
+01:39:19.499 [numba.core.byteflow] dispatch pc=34, inst=COMPARE_OP(arg=58, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$phi32.0', '$threshold32.1']
+01:39:19.499 [numba.core.byteflow] dispatch pc=38, inst=POP_JUMP_IF_FALSE(arg=5, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$34compare_op.2']
+01:39:19.499 [numba.core.byteflow] end state. edges=[Edge(pc=42, stack=(), blockstack=(), npush=0), Edge(pc=52, stack=(), blockstack=(), npush=0)]
+01:39:19.499 [numba.core.byteflow] pending: deque([State(pc_initial=44 nstack_initial=1), State(pc_initial=42 nstack_initial=0), State(pc_initial=52 nstack_initial=0)])
+01:39:19.499 [numba.core.byteflow] stack: ['$phi44.0']
+01:39:19.499 [numba.core.byteflow] state.pc_initial: State(pc_initial=44 nstack_initial=1)
+01:39:19.499 [numba.core.byteflow] dispatch pc=44, inst=POP_TOP(arg=None, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack ['$phi44.0']
+01:39:19.499 [numba.core.byteflow] dispatch pc=46, inst=JUMP_FORWARD(arg=2, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] end state. edges=[Edge(pc=52, stack=(), blockstack=(), npush=0)]
+01:39:19.499 [numba.core.byteflow] pending: deque([State(pc_initial=42 nstack_initial=0), State(pc_initial=52 nstack_initial=0), State(pc_initial=52 nstack_initial=0)])
+01:39:19.499 [numba.core.byteflow] stack: []
+01:39:19.499 [numba.core.byteflow] state.pc_initial: State(pc_initial=42 nstack_initial=0)
+01:39:19.499 [numba.core.byteflow] dispatch pc=42, inst=JUMP_FORWARD(arg=2, lineno=1141)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] end state. edges=[Edge(pc=48, stack=(), blockstack=(), npush=0)]
+01:39:19.499 [numba.core.byteflow] pending: deque([State(pc_initial=52 nstack_initial=0), State(pc_initial=52 nstack_initial=0), State(pc_initial=48 nstack_initial=0)])
+01:39:19.499 [numba.core.byteflow] stack: []
+01:39:19.499 [numba.core.byteflow] state.pc_initial: State(pc_initial=52 nstack_initial=0)
+01:39:19.499 [numba.core.byteflow] dispatch pc=52, inst=LOAD_FAST(arg=0, lineno=1144)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] dispatch pc=54, inst=LOAD_CONST(arg=2, lineno=1144)
+01:39:19.499 [numba.core.byteflow] stack ['$x52.0']
+01:39:19.499 [numba.core.byteflow] dispatch pc=56, inst=BINARY_SUBSCR(arg=None, lineno=1144)
+01:39:19.499 [numba.core.byteflow] stack ['$x52.0', '$const54.1.2']
+01:39:19.499 [numba.core.byteflow] dispatch pc=60, inst=STORE_FAST(arg=4, lineno=1144)
+01:39:19.499 [numba.core.byteflow] stack ['$56binary_subscr.2']
+01:39:19.499 [numba.core.byteflow] dispatch pc=62, inst=LOAD_FAST(arg=1, lineno=1145)
+01:39:19.499 [numba.core.byteflow] stack []
+01:39:19.499 [numba.core.byteflow] dispatch pc=64, inst=UNARY_NEGATIVE(arg=None, lineno=1145)
+01:39:19.499 [numba.core.byteflow] stack ['$threshold62.3']
+01:39:19.499 [numba.core.byteflow] dispatch pc=66, inst=LOAD_FAST(arg=4, lineno=1145)
+01:39:19.499 [numba.core.byteflow] stack ['$64unary_negative.4']
+01:39:19.499 [numba.core.byteflow] dispatch pc=68, inst=SWAP(arg=2, lineno=1145)
+01:39:19.499 [numba.core.byteflow] stack ['$64unary_negative.4', '$x166.5']
+01:39:19.499 [numba.core.byteflow] dispatch pc=70, inst=COPY(arg=2, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack ['$x166.5', '$64unary_negative.4']
+01:39:19.500 [numba.core.byteflow] dispatch pc=72, inst=COMPARE_OP(arg=58, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack ['$x166.5', '$64unary_negative.4', '$x166.5']
+01:39:19.500 [numba.core.byteflow] dispatch pc=76, inst=POP_JUMP_IF_FALSE(arg=6, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack ['$x166.5', '$72compare_op.6']
+01:39:19.500 [numba.core.byteflow] end state. edges=[Edge(pc=80, stack=('$x166.5',), blockstack=(), npush=0), Edge(pc=92, stack=('$x166.5',), blockstack=(), npush=0)]
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=52 nstack_initial=0), State(pc_initial=48 nstack_initial=0), State(pc_initial=80 nstack_initial=1), State(pc_initial=92 nstack_initial=1)])
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=48 nstack_initial=0), State(pc_initial=80 nstack_initial=1), State(pc_initial=92 nstack_initial=1)])
+01:39:19.500 [numba.core.byteflow] stack: []
+01:39:19.500 [numba.core.byteflow] state.pc_initial: State(pc_initial=48 nstack_initial=0)
+01:39:19.500 [numba.core.byteflow] dispatch pc=48, inst=LOAD_CONST(arg=1, lineno=1142)
+01:39:19.500 [numba.core.byteflow] stack []
+01:39:19.500 [numba.core.byteflow] dispatch pc=50, inst=STORE_FAST(arg=3, lineno=1142)
+01:39:19.500 [numba.core.byteflow] stack ['$const48.0.1']
+01:39:19.500 [numba.core.byteflow] end state. edges=[Edge(pc=52, stack=(), blockstack=(), npush=0)]
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=80 nstack_initial=1), State(pc_initial=92 nstack_initial=1), State(pc_initial=52 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] stack: ['$phi80.0']
+01:39:19.500 [numba.core.byteflow] state.pc_initial: State(pc_initial=80 nstack_initial=1)
+01:39:19.500 [numba.core.byteflow] dispatch pc=80, inst=LOAD_FAST(arg=1, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack ['$phi80.0']
+01:39:19.500 [numba.core.byteflow] dispatch pc=82, inst=COMPARE_OP(arg=58, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack ['$phi80.0', '$threshold80.1']
+01:39:19.500 [numba.core.byteflow] dispatch pc=86, inst=POP_JUMP_IF_FALSE(arg=5, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack ['$82compare_op.2']
+01:39:19.500 [numba.core.byteflow] end state. edges=[Edge(pc=90, stack=(), blockstack=(), npush=0), Edge(pc=100, stack=(), blockstack=(), npush=0)]
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=92 nstack_initial=1), State(pc_initial=52 nstack_initial=0), State(pc_initial=90 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] stack: ['$phi92.0']
+01:39:19.500 [numba.core.byteflow] state.pc_initial: State(pc_initial=92 nstack_initial=1)
+01:39:19.500 [numba.core.byteflow] dispatch pc=92, inst=POP_TOP(arg=None, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack ['$phi92.0']
+01:39:19.500 [numba.core.byteflow] dispatch pc=94, inst=JUMP_FORWARD(arg=2, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack []
+01:39:19.500 [numba.core.byteflow] end state. edges=[Edge(pc=100, stack=(), blockstack=(), npush=0)]
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=52 nstack_initial=0), State(pc_initial=90 nstack_initial=0), State(pc_initial=100 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=90 nstack_initial=0), State(pc_initial=100 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] stack: []
+01:39:19.500 [numba.core.byteflow] state.pc_initial: State(pc_initial=90 nstack_initial=0)
+01:39:19.500 [numba.core.byteflow] dispatch pc=90, inst=JUMP_FORWARD(arg=2, lineno=1145)
+01:39:19.500 [numba.core.byteflow] stack []
+01:39:19.500 [numba.core.byteflow] end state. edges=[Edge(pc=96, stack=(), blockstack=(), npush=0)]
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=100 nstack_initial=0), State(pc_initial=100 nstack_initial=0), State(pc_initial=96 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] stack: []
+01:39:19.500 [numba.core.byteflow] state.pc_initial: State(pc_initial=100 nstack_initial=0)
+01:39:19.500 [numba.core.byteflow] dispatch pc=100, inst=LOAD_FAST(arg=2, lineno=1148)
+01:39:19.500 [numba.core.byteflow] stack []
+01:39:19.500 [numba.core.byteflow] dispatch pc=102, inst=TO_BOOL(arg=None, lineno=1148)
+01:39:19.500 [numba.core.byteflow] stack ['$zero_pos100.0']
+01:39:19.500 [numba.core.byteflow] dispatch pc=110, inst=POP_JUMP_IF_FALSE(arg=45, lineno=1148)
+01:39:19.500 [numba.core.byteflow] stack ['$102to_bool.1']
+01:39:19.500 [numba.core.byteflow] end state. edges=[Edge(pc=114, stack=(), blockstack=(), npush=0), Edge(pc=204, stack=(), blockstack=(), npush=0)]
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=100 nstack_initial=0), State(pc_initial=96 nstack_initial=0), State(pc_initial=114 nstack_initial=0), State(pc_initial=204 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=96 nstack_initial=0), State(pc_initial=114 nstack_initial=0), State(pc_initial=204 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] stack: []
+01:39:19.500 [numba.core.byteflow] state.pc_initial: State(pc_initial=96 nstack_initial=0)
+01:39:19.500 [numba.core.byteflow] dispatch pc=96, inst=LOAD_CONST(arg=1, lineno=1146)
+01:39:19.500 [numba.core.byteflow] stack []
+01:39:19.500 [numba.core.byteflow] dispatch pc=98, inst=STORE_FAST(arg=4, lineno=1146)
+01:39:19.500 [numba.core.byteflow] stack ['$const96.0.1']
+01:39:19.500 [numba.core.byteflow] end state. edges=[Edge(pc=100, stack=(), blockstack=(), npush=0)]
+01:39:19.500 [numba.core.byteflow] pending: deque([State(pc_initial=114 nstack_initial=0), State(pc_initial=204 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+01:39:19.500 [numba.core.byteflow] stack: []
+01:39:19.500 [numba.core.byteflow] state.pc_initial: State(pc_initial=114 nstack_initial=0)
+01:39:19.500 [numba.core.byteflow] dispatch pc=114, inst=LOAD_GLOBAL(arg=0, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack []
+01:39:19.500 [numba.core.byteflow] dispatch pc=124, inst=LOAD_ATTR(arg=2, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$114load_global.0']
+01:39:19.500 [numba.core.byteflow] dispatch pc=144, inst=PUSH_NULL(arg=None, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$124load_attr.1']
+01:39:19.500 [numba.core.byteflow] dispatch pc=146, inst=LOAD_FAST(arg=3, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$124load_attr.1', '$null$144.2']
+01:39:19.500 [numba.core.byteflow] dispatch pc=148, inst=CALL(arg=1, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$124load_attr.1', '$null$144.2', '$x0146.3']
+01:39:19.500 [numba.core.byteflow] dispatch pc=156, inst=LOAD_GLOBAL(arg=0, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$148call.4']
+01:39:19.500 [numba.core.byteflow] dispatch pc=166, inst=LOAD_ATTR(arg=2, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$148call.4', '$156load_global.5']
+01:39:19.500 [numba.core.byteflow] dispatch pc=186, inst=PUSH_NULL(arg=None, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$148call.4', '$166load_attr.6']
+01:39:19.500 [numba.core.byteflow] dispatch pc=188, inst=LOAD_FAST(arg=4, lineno=1149)
+01:39:19.500 [numba.core.byteflow] stack ['$148call.4', '$166load_attr.6', '$null$186.7']
+01:39:19.500 [numba.core.byteflow] dispatch pc=190, inst=CALL(arg=1, lineno=1149)
+01:39:19.501 [numba.core.byteflow] stack ['$148call.4', '$166load_attr.6', '$null$186.7', '$x1188.8']
+01:39:19.501 [numba.core.byteflow] dispatch pc=198, inst=COMPARE_OP(arg=103, lineno=1149)
+01:39:19.501 [numba.core.byteflow] stack ['$148call.4', '$190call.9']
+01:39:19.501 [numba.core.byteflow] dispatch pc=202, inst=RETURN_VALUE(arg=None, lineno=1149)
+01:39:19.501 [numba.core.byteflow] stack ['$198compare_op.10']
+01:39:19.501 [numba.core.byteflow] end state. edges=[]
+01:39:19.501 [numba.core.byteflow] pending: deque([State(pc_initial=204 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+01:39:19.501 [numba.core.byteflow] stack: []
+01:39:19.501 [numba.core.byteflow] state.pc_initial: State(pc_initial=204 nstack_initial=0)
+01:39:19.501 [numba.core.byteflow] dispatch pc=204, inst=LOAD_GLOBAL(arg=0, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack []
+01:39:19.501 [numba.core.byteflow] dispatch pc=214, inst=LOAD_ATTR(arg=4, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$204load_global.0']
+01:39:19.501 [numba.core.byteflow] dispatch pc=234, inst=PUSH_NULL(arg=None, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$214load_attr.1']
+01:39:19.501 [numba.core.byteflow] dispatch pc=236, inst=LOAD_FAST(arg=3, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$214load_attr.1', '$null$234.2']
+01:39:19.501 [numba.core.byteflow] dispatch pc=238, inst=CALL(arg=1, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$214load_attr.1', '$null$234.2', '$x0236.3']
+01:39:19.501 [numba.core.byteflow] dispatch pc=246, inst=LOAD_GLOBAL(arg=0, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$238call.4']
+01:39:19.501 [numba.core.byteflow] dispatch pc=256, inst=LOAD_ATTR(arg=4, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$238call.4', '$246load_global.5']
+01:39:19.501 [numba.core.byteflow] dispatch pc=276, inst=PUSH_NULL(arg=None, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$238call.4', '$256load_attr.6']
+01:39:19.501 [numba.core.byteflow] dispatch pc=278, inst=LOAD_FAST(arg=4, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$238call.4', '$256load_attr.6', '$null$276.7']
+01:39:19.501 [numba.core.byteflow] dispatch pc=280, inst=CALL(arg=1, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$238call.4', '$256load_attr.6', '$null$276.7', '$x1278.8']
+01:39:19.501 [numba.core.byteflow] dispatch pc=288, inst=COMPARE_OP(arg=103, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$238call.4', '$280call.9']
+01:39:19.501 [numba.core.byteflow] dispatch pc=292, inst=RETURN_VALUE(arg=None, lineno=1151)
+01:39:19.501 [numba.core.byteflow] stack ['$288compare_op.10']
+01:39:19.501 [numba.core.byteflow] end state. edges=[]
+01:39:19.501 [numba.core.byteflow] pending: deque([State(pc_initial=100 nstack_initial=0)])
+01:39:19.501 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+01:39:19.501 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>,
+            {State(pc_initial=0 nstack_initial=0): set(),
+             State(pc_initial=32 nstack_initial=1): {'$phi32.0'},
+             State(pc_initial=42 nstack_initial=0): set(),
+             State(pc_initial=44 nstack_initial=1): set(),
+             State(pc_initial=48 nstack_initial=0): set(),
+             State(pc_initial=52 nstack_initial=0): set(),
+             State(pc_initial=80 nstack_initial=1): {'$phi80.0'},
+             State(pc_initial=90 nstack_initial=0): set(),
+             State(pc_initial=92 nstack_initial=1): set(),
+             State(pc_initial=96 nstack_initial=0): set(),
+             State(pc_initial=100 nstack_initial=0): set(),
+             State(pc_initial=114 nstack_initial=0): set(),
+             State(pc_initial=204 nstack_initial=0): set()})
+01:39:19.501 [numba.core.byteflow] defmap: {'$phi32.0': State(pc_initial=0 nstack_initial=0),
+ '$phi44.0': State(pc_initial=0 nstack_initial=0),
+ '$phi80.0': State(pc_initial=52 nstack_initial=0),
+ '$phi92.0': State(pc_initial=52 nstack_initial=0)}
+01:39:19.501 [numba.core.byteflow] phismap: defaultdict(<class 'set'>,
+            {'$phi32.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi44.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi80.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))},
+             '$phi92.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))}})
+01:39:19.501 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>,
+            {'$phi32.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi44.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi80.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))},
+             '$phi92.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))}})
+01:39:19.501 [numba.core.byteflow] keep phismap: {'$phi32.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+ '$phi80.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))}}
+01:39:19.501 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>,
+            {State(pc_initial=0 nstack_initial=0): {'$phi32.0': '$x018.5'},
+             State(pc_initial=52 nstack_initial=0): {'$phi80.0': '$x166.5'}})
+01:39:19.501 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'value': '$8binary_subscr.2'}), (14, {'res': '$threshold14.3'}), (16, {'value': '$threshold14.3', 'res': '$16unary_negative.4'}), (18, {'res': '$x018.5'}), (24, {'lhs': '$16unary_negative.4', 'rhs': '$x018.5', 'res': '$24compare_op.6'}), (28, {'pred': '$24compare_op.6'})), outgoing_phis={'$phi32.0': '$x018.5'}, blockstack=(), active_try_block=None, outgoing_edgepushed={32: ('$x018.5',), 44: ('$x018.5',)})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=32 nstack_initial=1):
+AdaptBlockInfo(insts=((32, {'res': '$threshold32.1'}), (34, {'lhs': '$phi32.0', 'rhs': '$threshold32.1', 'res': '$34compare_op.2'}), (38, {'pred': '$34compare_op.2'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={42: (), 52: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=42 nstack_initial=0):
+AdaptBlockInfo(insts=((42, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={48: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=44 nstack_initial=1):
+AdaptBlockInfo(insts=((46, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={52: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=48 nstack_initial=0):
+AdaptBlockInfo(insts=((48, {'res': '$const48.0.1'}), (50, {'value': '$const48.0.1'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={52: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=52 nstack_initial=0):
+AdaptBlockInfo(insts=((52, {'res': '$x52.0'}), (54, {'res': '$const54.1.2'}), (56, {'index': '$const54.1.2', 'target': '$x52.0', 'res': '$56binary_subscr.2'}), (60, {'value': '$56binary_subscr.2'}), (62, {'res': '$threshold62.3'}), (64, {'value': '$threshold62.3', 'res': '$64unary_negative.4'}), (66, {'res': '$x166.5'}), (72, {'lhs': '$64unary_negative.4', 'rhs': '$x166.5', 'res': '$72compare_op.6'}), (76, {'pred': '$72compare_op.6'})), outgoing_phis={'$phi80.0': '$x166.5'}, blockstack=(), active_try_block=None, outgoing_edgepushed={80: ('$x166.5',), 92: ('$x166.5',)})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=80 nstack_initial=1):
+AdaptBlockInfo(insts=((80, {'res': '$threshold80.1'}), (82, {'lhs': '$phi80.0', 'rhs': '$threshold80.1', 'res': '$82compare_op.2'}), (86, {'pred': '$82compare_op.2'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={90: (), 100: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=90 nstack_initial=0):
+AdaptBlockInfo(insts=((90, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={96: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=92 nstack_initial=1):
+AdaptBlockInfo(insts=((94, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={100: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=96 nstack_initial=0):
+AdaptBlockInfo(insts=((96, {'res': '$const96.0.1'}), (98, {'value': '$const96.0.1'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={100: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=100 nstack_initial=0):
+AdaptBlockInfo(insts=((100, {'res': '$zero_pos100.0'}), (102, {'val': '$zero_pos100.0', 'res': '$102to_bool.1'}), (110, {'pred': '$102to_bool.1'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={114: (), 204: ()})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=114 nstack_initial=0):
+AdaptBlockInfo(insts=((114, {'idx': 0, 'res': '$114load_global.0'}), (124, {'item': '$114load_global.0', 'res': '$124load_attr.1'}), (144, {}), (146, {'res': '$x0146.3'}), (148, {'func': '$124load_attr.1', 'args': ['$x0146.3'], 'kw_names': None, 'res': '$148call.4'}), (156, {'idx': 0, 'res': '$156load_global.5'}), (166, {'item': '$156load_global.5', 'res': '$166load_attr.6'}), (186, {}), (188, {'res': '$x1188.8'}), (190, {'func': '$166load_attr.6', 'args': ['$x1188.8'], 'kw_names': None, 'res': '$190call.9'}), (198, {'lhs': '$148call.4', 'rhs': '$190call.9', 'res': '$198compare_op.10'}), (202, {'retval': '$198compare_op.10', 'castval': '$202return_value.11'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+01:39:19.501 [numba.core.byteflow] block_infos State(pc_initial=204 nstack_initial=0):
+AdaptBlockInfo(insts=((204, {'idx': 0, 'res': '$204load_global.0'}), (214, {'item': '$204load_global.0', 'res': '$214load_attr.1'}), (234, {}), (236, {'res': '$x0236.3'}), (238, {'func': '$214load_attr.1', 'args': ['$x0236.3'], 'kw_names': None, 'res': '$238call.4'}), (246, {'idx': 0, 'res': '$246load_global.5'}), (256, {'item': '$246load_global.5', 'res': '$256load_attr.6'}), (276, {}), (278, {'res': '$x1278.8'}), (280, {'func': '$256load_attr.6', 'args': ['$x1278.8'], 'kw_names': None, 'res': '$280call.9'}), (288, {'lhs': '$238call.4', 'rhs': '$280call.9', 'res': '$288compare_op.10'}), (292, {'retval': '$288compare_op.10', 'castval': '$292return_value.11'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+01:39:19.502 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    threshold = arg(1, name=threshold)       ['threshold']
+    zero_pos = arg(2, name=zero_pos)         ['zero_pos']
+    $const6.1.1 = const(int, 0)              ['$const6.1.1']
+    x0 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$const6.1.1', 'x', 'x0']
+    $16unary_negative.4 = unary(fn=<built-in function neg>, value=threshold) ['$16unary_negative.4', 'threshold']
+    $24compare_op.6 = $16unary_negative.4 <= x0 ['$16unary_negative.4', '$24compare_op.6', 'x0']
+    $bool28 = global(bool: <class 'bool'>)   ['$bool28']
+    $28pred = call $bool28($24compare_op.6, func=$bool28, args=(Var($24compare_op.6, audio.py:1141),), kws=(), vararg=None, varkwarg=None, target=None) ['$24compare_op.6', '$28pred', '$bool28']
+    $phi32.0 = x0                            ['$phi32.0', 'x0']
+    branch $28pred, 32, 44                   ['$28pred']
+label 32:
+    $34compare_op.2 = $phi32.0 <= threshold  ['$34compare_op.2', '$phi32.0', 'threshold']
+    $bool38 = global(bool: <class 'bool'>)   ['$bool38']
+    $38pred = call $bool38($34compare_op.2, func=$bool38, args=(Var($34compare_op.2, audio.py:1141),), kws=(), vararg=None, varkwarg=None, target=None) ['$34compare_op.2', '$38pred', '$bool38']
+    branch $38pred, 42, 52                   ['$38pred']
+label 42:
+    jump 48                                  []
+label 44:
+    jump 52                                  []
+label 48:
+    x0 = const(int, 0)                       ['x0']
+    jump 52                                  []
+label 52:
+    $const54.1.2 = const(int, -1)            ['$const54.1.2']
+    x1 = getitem(value=x, index=$const54.1.2, fn=<built-in function getitem>) ['$const54.1.2', 'x', 'x1']
+    $64unary_negative.4 = unary(fn=<built-in function neg>, value=threshold) ['$64unary_negative.4', 'threshold']
+    $72compare_op.6 = $64unary_negative.4 <= x1 ['$64unary_negative.4', '$72compare_op.6', 'x1']
+    $bool76 = global(bool: <class 'bool'>)   ['$bool76']
+    $76pred = call $bool76($72compare_op.6, func=$bool76, args=(Var($72compare_op.6, audio.py:1145),), kws=(), vararg=None, varkwarg=None, target=None) ['$72compare_op.6', '$76pred', '$bool76']
+    $phi80.0 = x1                            ['$phi80.0', 'x1']
+    branch $76pred, 80, 92                   ['$76pred']
+label 80:
+    $82compare_op.2 = $phi80.0 <= threshold  ['$82compare_op.2', '$phi80.0', 'threshold']
+    $bool86 = global(bool: <class 'bool'>)   ['$bool86']
+    $86pred = call $bool86($82compare_op.2, func=$bool86, args=(Var($82compare_op.2, audio.py:1145),), kws=(), vararg=None, varkwarg=None, target=None) ['$82compare_op.2', '$86pred', '$bool86']
+    branch $86pred, 90, 100                  ['$86pred']
+label 90:
+    jump 96                                  []
+label 92:
+    jump 100                                 []
+label 96:
+    x1 = const(int, 0)                       ['x1']
+    jump 100                                 []
+label 100:
+    $bool110 = global(bool: <class 'bool'>)  ['$bool110']
+    $110pred = call $bool110(zero_pos, func=$bool110, args=(Var(zero_pos, audio.py:1137),), kws=(), vararg=None, varkwarg=None, target=None) ['$110pred', '$bool110', 'zero_pos']
+    branch $110pred, 114, 204                ['$110pred']
+label 114:
+    $114load_global.0 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$114load_global.0']
+    $124load_attr.1 = getattr(value=$114load_global.0, attr=signbit) ['$114load_global.0', '$124load_attr.1']
+    $148call.4 = call $124load_attr.1(x0, func=$124load_attr.1, args=[Var(x0, audio.py:1140)], kws=(), vararg=None, varkwarg=None, target=None) ['$124load_attr.1', '$148call.4', 'x0']
+    $156load_global.5 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$156load_global.5']
+    $166load_attr.6 = getattr(value=$156load_global.5, attr=signbit) ['$156load_global.5', '$166load_attr.6']
+    $190call.9 = call $166load_attr.6(x1, func=$166load_attr.6, args=[Var(x1, audio.py:1144)], kws=(), vararg=None, varkwarg=None, target=None) ['$166load_attr.6', '$190call.9', 'x1']
+    $198compare_op.10 = $148call.4 != $190call.9 ['$148call.4', '$190call.9', '$198compare_op.10']
+    $202return_value.11 = cast(value=$198compare_op.10) ['$198compare_op.10', '$202return_value.11']
+    return $202return_value.11               ['$202return_value.11']
+label 204:
+    $204load_global.0 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$204load_global.0']
+    $214load_attr.1 = getattr(value=$204load_global.0, attr=sign) ['$204load_global.0', '$214load_attr.1']
+    $238call.4 = call $214load_attr.1(x0, func=$214load_attr.1, args=[Var(x0, audio.py:1140)], kws=(), vararg=None, varkwarg=None, target=None) ['$214load_attr.1', '$238call.4', 'x0']
+    $246load_global.5 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$246load_global.5']
+    $256load_attr.6 = getattr(value=$246load_global.5, attr=sign) ['$246load_global.5', '$256load_attr.6']
+    $280call.9 = call $256load_attr.6(x1, func=$256load_attr.6, args=[Var(x1, audio.py:1144)], kws=(), vararg=None, varkwarg=None, target=None) ['$256load_attr.6', '$280call.9', 'x1']
+    $288compare_op.10 = $238call.4 != $280call.9 ['$238call.4', '$280call.9', '$288compare_op.10']
+    $292return_value.11 = cast(value=$288compare_op.10) ['$288compare_op.10', '$292return_value.11']
+    return $292return_value.11               ['$292return_value.11']
+
+01:39:19.599 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=1023)
+           2	RESUME(arg=0, lineno=1023)
+           4	LOAD_FAST(arg=0, lineno=1026)
+           6	LOAD_CONST(arg=1, lineno=1026)
+           8	BINARY_SUBSCR(arg=None, lineno=1026)
+          12	LOAD_FAST(arg=0, lineno=1026)
+          14	LOAD_CONST(arg=2, lineno=1026)
+          16	BINARY_SUBSCR(arg=None, lineno=1026)
+          20	COMPARE_OP(arg=132, lineno=1026)
+          24	LOAD_FAST(arg=0, lineno=1026)
+          26	LOAD_CONST(arg=1, lineno=1026)
+          28	BINARY_SUBSCR(arg=None, lineno=1026)
+          32	LOAD_FAST(arg=0, lineno=1026)
+          34	LOAD_CONST(arg=3, lineno=1026)
+          36	BINARY_SUBSCR(arg=None, lineno=1026)
+          40	COMPARE_OP(arg=172, lineno=1026)
+          44	BINARY_OP(arg=1, lineno=1026)
+          48	RETURN_VALUE(arg=None, lineno=1026)
+01:39:19.600 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+01:39:19.600 [numba.core.byteflow] stack: []
+01:39:19.600 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+01:39:19.600 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=1023)
+01:39:19.600 [numba.core.byteflow] stack []
+01:39:19.600 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=1023)
+01:39:19.600 [numba.core.byteflow] stack []
+01:39:19.600 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack []
+01:39:19.600 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$x4.0']
+01:39:19.600 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+01:39:19.600 [numba.core.byteflow] dispatch pc=12, inst=LOAD_FAST(arg=0, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$8binary_subscr.2']
+01:39:19.600 [numba.core.byteflow] dispatch pc=14, inst=LOAD_CONST(arg=2, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3']
+01:39:19.600 [numba.core.byteflow] dispatch pc=16, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3', '$const14.4.2']
+01:39:19.600 [numba.core.byteflow] dispatch pc=20, inst=COMPARE_OP(arg=132, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$8binary_subscr.2', '$16binary_subscr.5']
+01:39:19.600 [numba.core.byteflow] dispatch pc=24, inst=LOAD_FAST(arg=0, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6']
+01:39:19.600 [numba.core.byteflow] dispatch pc=26, inst=LOAD_CONST(arg=1, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7']
+01:39:19.600 [numba.core.byteflow] dispatch pc=28, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7', '$const26.8.1']
+01:39:19.600 [numba.core.byteflow] dispatch pc=32, inst=LOAD_FAST(arg=0, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9']
+01:39:19.600 [numba.core.byteflow] dispatch pc=34, inst=LOAD_CONST(arg=3, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10']
+01:39:19.600 [numba.core.byteflow] dispatch pc=36, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10', '$const34.11.3']
+01:39:19.600 [numba.core.byteflow] dispatch pc=40, inst=COMPARE_OP(arg=172, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$36binary_subscr.12']
+01:39:19.600 [numba.core.byteflow] dispatch pc=44, inst=BINARY_OP(arg=1, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$20compare_op.6', '$40compare_op.13']
+01:39:19.600 [numba.core.byteflow] dispatch pc=48, inst=RETURN_VALUE(arg=None, lineno=1026)
+01:39:19.600 [numba.core.byteflow] stack ['$binop_and_44.14']
+01:39:19.600 [numba.core.byteflow] end state. edges=[]
+01:39:19.600 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+01:39:19.600 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>, {State(pc_initial=0 nstack_initial=0): set()})
+01:39:19.600 [numba.core.byteflow] defmap: {}
+01:39:19.600 [numba.core.byteflow] phismap: defaultdict(<class 'set'>, {})
+01:39:19.600 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>, {})
+01:39:19.600 [numba.core.byteflow] keep phismap: {}
+01:39:19.600 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>, {})
+01:39:19.600 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+01:39:19.600 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'res': '$x12.3'}), (14, {'res': '$const14.4.2'}), (16, {'index': '$const14.4.2', 'target': '$x12.3', 'res': '$16binary_subscr.5'}), (20, {'lhs': '$8binary_subscr.2', 'rhs': '$16binary_subscr.5', 'res': '$20compare_op.6'}), (24, {'res': '$x24.7'}), (26, {'res': '$const26.8.1'}), (28, {'index': '$const26.8.1', 'target': '$x24.7', 'res': '$28binary_subscr.9'}), (32, {'res': '$x32.10'}), (34, {'res': '$const34.11.3'}), (36, {'index': '$const34.11.3', 'target': '$x32.10', 'res': '$36binary_subscr.12'}), (40, {'lhs': '$28binary_subscr.9', 'rhs': '$36binary_subscr.12', 'res': '$40compare_op.13'}), (44, {'op': '&', 'lhs': '$20compare_op.6', 'rhs': '$40compare_op.13', 'res': '$binop_and_44.14'}), (48, {'retval': '$binop_and_44.14', 'castval': '$48return_value.15'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+01:39:19.600 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    $const6.1.1 = const(int, 0)              ['$const6.1.1']
+    $8binary_subscr.2 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$8binary_subscr.2', '$const6.1.1', 'x']
+    $const14.4.2 = const(int, -1)            ['$const14.4.2']
+    $16binary_subscr.5 = getitem(value=x, index=$const14.4.2, fn=<built-in function getitem>) ['$16binary_subscr.5', '$const14.4.2', 'x']
+    $20compare_op.6 = $8binary_subscr.2 > $16binary_subscr.5 ['$16binary_subscr.5', '$20compare_op.6', '$8binary_subscr.2']
+    $const26.8.1 = const(int, 0)             ['$const26.8.1']
+    $28binary_subscr.9 = getitem(value=x, index=$const26.8.1, fn=<built-in function getitem>) ['$28binary_subscr.9', '$const26.8.1', 'x']
+    $const34.11.3 = const(int, 1)            ['$const34.11.3']
+    $36binary_subscr.12 = getitem(value=x, index=$const34.11.3, fn=<built-in function getitem>) ['$36binary_subscr.12', '$const34.11.3', 'x']
+    $40compare_op.13 = $28binary_subscr.9 >= $36binary_subscr.12 ['$28binary_subscr.9', '$36binary_subscr.12', '$40compare_op.13']
+    $binop_and_44.14 = $20compare_op.6 & $40compare_op.13 ['$20compare_op.6', '$40compare_op.13', '$binop_and_44.14']
+    $48return_value.15 = cast(value=$binop_and_44.14) ['$48return_value.15', '$binop_and_44.14']
+    return $48return_value.15                ['$48return_value.15']
+
+01:39:19.601 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=1029)
+           2	RESUME(arg=0, lineno=1029)
+           4	LOAD_FAST(arg=0, lineno=1032)
+           6	LOAD_CONST(arg=1, lineno=1032)
+           8	BINARY_SUBSCR(arg=None, lineno=1032)
+          12	LOAD_FAST(arg=0, lineno=1032)
+          14	LOAD_CONST(arg=2, lineno=1032)
+          16	BINARY_SUBSCR(arg=None, lineno=1032)
+          20	COMPARE_OP(arg=2, lineno=1032)
+          24	LOAD_FAST(arg=0, lineno=1032)
+          26	LOAD_CONST(arg=1, lineno=1032)
+          28	BINARY_SUBSCR(arg=None, lineno=1032)
+          32	LOAD_FAST(arg=0, lineno=1032)
+          34	LOAD_CONST(arg=3, lineno=1032)
+          36	BINARY_SUBSCR(arg=None, lineno=1032)
+          40	COMPARE_OP(arg=42, lineno=1032)
+          44	BINARY_OP(arg=1, lineno=1032)
+          48	RETURN_VALUE(arg=None, lineno=1032)
+01:39:19.601 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+01:39:19.601 [numba.core.byteflow] stack: []
+01:39:19.601 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+01:39:19.601 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=1029)
+01:39:19.601 [numba.core.byteflow] stack []
+01:39:19.601 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=1029)
+01:39:19.601 [numba.core.byteflow] stack []
+01:39:19.601 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack []
+01:39:19.601 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$x4.0']
+01:39:19.601 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+01:39:19.601 [numba.core.byteflow] dispatch pc=12, inst=LOAD_FAST(arg=0, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$8binary_subscr.2']
+01:39:19.601 [numba.core.byteflow] dispatch pc=14, inst=LOAD_CONST(arg=2, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3']
+01:39:19.601 [numba.core.byteflow] dispatch pc=16, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3', '$const14.4.2']
+01:39:19.601 [numba.core.byteflow] dispatch pc=20, inst=COMPARE_OP(arg=2, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$8binary_subscr.2', '$16binary_subscr.5']
+01:39:19.601 [numba.core.byteflow] dispatch pc=24, inst=LOAD_FAST(arg=0, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6']
+01:39:19.601 [numba.core.byteflow] dispatch pc=26, inst=LOAD_CONST(arg=1, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7']
+01:39:19.601 [numba.core.byteflow] dispatch pc=28, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7', '$const26.8.1']
+01:39:19.601 [numba.core.byteflow] dispatch pc=32, inst=LOAD_FAST(arg=0, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9']
+01:39:19.601 [numba.core.byteflow] dispatch pc=34, inst=LOAD_CONST(arg=3, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10']
+01:39:19.601 [numba.core.byteflow] dispatch pc=36, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10', '$const34.11.3']
+01:39:19.601 [numba.core.byteflow] dispatch pc=40, inst=COMPARE_OP(arg=42, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$36binary_subscr.12']
+01:39:19.601 [numba.core.byteflow] dispatch pc=44, inst=BINARY_OP(arg=1, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$20compare_op.6', '$40compare_op.13']
+01:39:19.601 [numba.core.byteflow] dispatch pc=48, inst=RETURN_VALUE(arg=None, lineno=1032)
+01:39:19.601 [numba.core.byteflow] stack ['$binop_and_44.14']
+01:39:19.601 [numba.core.byteflow] end state. edges=[]
+01:39:19.601 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+01:39:19.601 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>, {State(pc_initial=0 nstack_initial=0): set()})
+01:39:19.601 [numba.core.byteflow] defmap: {}
+01:39:19.601 [numba.core.byteflow] phismap: defaultdict(<class 'set'>, {})
+01:39:19.601 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>, {})
+01:39:19.601 [numba.core.byteflow] keep phismap: {}
+01:39:19.601 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>, {})
+01:39:19.601 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+01:39:19.601 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'res': '$x12.3'}), (14, {'res': '$const14.4.2'}), (16, {'index': '$const14.4.2', 'target': '$x12.3', 'res': '$16binary_subscr.5'}), (20, {'lhs': '$8binary_subscr.2', 'rhs': '$16binary_subscr.5', 'res': '$20compare_op.6'}), (24, {'res': '$x24.7'}), (26, {'res': '$const26.8.1'}), (28, {'index': '$const26.8.1', 'target': '$x24.7', 'res': '$28binary_subscr.9'}), (32, {'res': '$x32.10'}), (34, {'res': '$const34.11.3'}), (36, {'index': '$const34.11.3', 'target': '$x32.10', 'res': '$36binary_subscr.12'}), (40, {'lhs': '$28binary_subscr.9', 'rhs': '$36binary_subscr.12', 'res': '$40compare_op.13'}), (44, {'op': '&', 'lhs': '$20compare_op.6', 'rhs': '$40compare_op.13', 'res': '$binop_and_44.14'}), (48, {'retval': '$binop_and_44.14', 'castval': '$48return_value.15'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+01:39:19.602 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    $const6.1.1 = const(int, 0)              ['$const6.1.1']
+    $8binary_subscr.2 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$8binary_subscr.2', '$const6.1.1', 'x']
+    $const14.4.2 = const(int, -1)            ['$const14.4.2']
+    $16binary_subscr.5 = getitem(value=x, index=$const14.4.2, fn=<built-in function getitem>) ['$16binary_subscr.5', '$const14.4.2', 'x']
+    $20compare_op.6 = $8binary_subscr.2 < $16binary_subscr.5 ['$16binary_subscr.5', '$20compare_op.6', '$8binary_subscr.2']
+    $const26.8.1 = const(int, 0)             ['$const26.8.1']
+    $28binary_subscr.9 = getitem(value=x, index=$const26.8.1, fn=<built-in function getitem>) ['$28binary_subscr.9', '$const26.8.1', 'x']
+    $const34.11.3 = const(int, 1)            ['$const34.11.3']
+    $36binary_subscr.12 = getitem(value=x, index=$const34.11.3, fn=<built-in function getitem>) ['$36binary_subscr.12', '$const34.11.3', 'x']
+    $40compare_op.13 = $28binary_subscr.9 <= $36binary_subscr.12 ['$28binary_subscr.9', '$36binary_subscr.12', '$40compare_op.13']
+    $binop_and_44.14 = $20compare_op.6 & $40compare_op.13 ['$20compare_op.6', '$40compare_op.13', '$binop_and_44.14']
+    $48return_value.15 = cast(value=$binop_and_44.14) ['$48return_value.15', '$binop_and_44.14']
+    return $48return_value.15                ['$48return_value.15']
+
+01:39:19.729 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=416)
+           2	RESUME(arg=0, lineno=416)
+           4	LOAD_FAST(arg=0, lineno=419)
+           6	LOAD_CONST(arg=1, lineno=419)
+           8	BINARY_SUBSCR(arg=None, lineno=419)
+          12	LOAD_FAST(arg=0, lineno=419)
+          14	LOAD_CONST(arg=2, lineno=419)
+          16	BINARY_SUBSCR(arg=None, lineno=419)
+          20	BINARY_OP(arg=0, lineno=419)
+          24	LOAD_CONST(arg=3, lineno=419)
+          26	LOAD_FAST(arg=0, lineno=419)
+          28	LOAD_CONST(arg=4, lineno=419)
+          30	BINARY_SUBSCR(arg=None, lineno=419)
+          34	BINARY_OP(arg=5, lineno=419)
+          38	BINARY_OP(arg=10, lineno=419)
+          42	STORE_FAST(arg=1, lineno=419)
+          44	LOAD_FAST(arg=0, lineno=420)
+          46	LOAD_CONST(arg=1, lineno=420)
+          48	BINARY_SUBSCR(arg=None, lineno=420)
+          52	LOAD_FAST(arg=0, lineno=420)
+          54	LOAD_CONST(arg=2, lineno=420)
+          56	BINARY_SUBSCR(arg=None, lineno=420)
+          60	BINARY_OP(arg=10, lineno=420)
+          64	LOAD_CONST(arg=3, lineno=420)
+          66	BINARY_OP(arg=11, lineno=420)
+          70	STORE_FAST(arg=2, lineno=420)
+          72	LOAD_GLOBAL(arg=0, lineno=422)
+          82	LOAD_ATTR(arg=2, lineno=422)
+         102	PUSH_NULL(arg=None, lineno=422)
+         104	LOAD_FAST(arg=2, lineno=422)
+         106	CALL(arg=1, lineno=422)
+         114	LOAD_GLOBAL(arg=0, lineno=422)
+         124	LOAD_ATTR(arg=2, lineno=422)
+         144	PUSH_NULL(arg=None, lineno=422)
+         146	LOAD_FAST(arg=1, lineno=422)
+         148	CALL(arg=1, lineno=422)
+         156	COMPARE_OP(arg=188, lineno=422)
+         160	POP_JUMP_IF_FALSE(arg=1, lineno=422)
+         164	RETURN_CONST(arg=4, lineno=425)
+>        166	LOAD_FAST(arg=2, lineno=427)
+         168	UNARY_NEGATIVE(arg=None, lineno=427)
+         170	LOAD_FAST(arg=1, lineno=427)
+         172	BINARY_OP(arg=11, lineno=427)
+         176	RETURN_VALUE(arg=None, lineno=427)
+01:39:19.729 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+01:39:19.729 [numba.core.byteflow] stack: []
+01:39:19.729 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+01:39:19.729 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=416)
+01:39:19.729 [numba.core.byteflow] stack []
+01:39:19.729 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=416)
+01:39:19.729 [numba.core.byteflow] stack []
+01:39:19.729 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack []
+01:39:19.729 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$x4.0']
+01:39:19.729 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+01:39:19.729 [numba.core.byteflow] dispatch pc=12, inst=LOAD_FAST(arg=0, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$8binary_subscr.2']
+01:39:19.729 [numba.core.byteflow] dispatch pc=14, inst=LOAD_CONST(arg=2, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3']
+01:39:19.729 [numba.core.byteflow] dispatch pc=16, inst=BINARY_SUBSCR(arg=None, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3', '$const14.4.2']
+01:39:19.729 [numba.core.byteflow] dispatch pc=20, inst=BINARY_OP(arg=0, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$8binary_subscr.2', '$16binary_subscr.5']
+01:39:19.729 [numba.core.byteflow] dispatch pc=24, inst=LOAD_CONST(arg=3, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$binop_add20.6']
+01:39:19.729 [numba.core.byteflow] dispatch pc=26, inst=LOAD_FAST(arg=0, lineno=419)
+01:39:19.729 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3']
+01:39:19.729 [numba.core.byteflow] dispatch pc=28, inst=LOAD_CONST(arg=4, lineno=419)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3', '$x26.8']
+01:39:19.730 [numba.core.byteflow] dispatch pc=30, inst=BINARY_SUBSCR(arg=None, lineno=419)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3', '$x26.8', '$const28.9.4']
+01:39:19.730 [numba.core.byteflow] dispatch pc=34, inst=BINARY_OP(arg=5, lineno=419)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3', '$30binary_subscr.10']
+01:39:19.730 [numba.core.byteflow] dispatch pc=38, inst=BINARY_OP(arg=10, lineno=419)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_add20.6', '$binop_mul34.11']
+01:39:19.730 [numba.core.byteflow] dispatch pc=42, inst=STORE_FAST(arg=1, lineno=419)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_sub38.12']
+01:39:19.730 [numba.core.byteflow] dispatch pc=44, inst=LOAD_FAST(arg=0, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack []
+01:39:19.730 [numba.core.byteflow] dispatch pc=46, inst=LOAD_CONST(arg=1, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$x44.13']
+01:39:19.730 [numba.core.byteflow] dispatch pc=48, inst=BINARY_SUBSCR(arg=None, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$x44.13', '$const46.14.1']
+01:39:19.730 [numba.core.byteflow] dispatch pc=52, inst=LOAD_FAST(arg=0, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$48binary_subscr.15']
+01:39:19.730 [numba.core.byteflow] dispatch pc=54, inst=LOAD_CONST(arg=2, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$48binary_subscr.15', '$x52.16']
+01:39:19.730 [numba.core.byteflow] dispatch pc=56, inst=BINARY_SUBSCR(arg=None, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$48binary_subscr.15', '$x52.16', '$const54.17.2']
+01:39:19.730 [numba.core.byteflow] dispatch pc=60, inst=BINARY_OP(arg=10, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$48binary_subscr.15', '$56binary_subscr.18']
+01:39:19.730 [numba.core.byteflow] dispatch pc=64, inst=LOAD_CONST(arg=3, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_sub60.19']
+01:39:19.730 [numba.core.byteflow] dispatch pc=66, inst=BINARY_OP(arg=11, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_sub60.19', '$const64.20.3']
+01:39:19.730 [numba.core.byteflow] dispatch pc=70, inst=STORE_FAST(arg=2, lineno=420)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_truediv66.21']
+01:39:19.730 [numba.core.byteflow] dispatch pc=72, inst=LOAD_GLOBAL(arg=0, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack []
+01:39:19.730 [numba.core.byteflow] dispatch pc=82, inst=LOAD_ATTR(arg=2, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$72load_global.22']
+01:39:19.730 [numba.core.byteflow] dispatch pc=102, inst=PUSH_NULL(arg=None, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$82load_attr.23']
+01:39:19.730 [numba.core.byteflow] dispatch pc=104, inst=LOAD_FAST(arg=2, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$82load_attr.23', '$null$102.24']
+01:39:19.730 [numba.core.byteflow] dispatch pc=106, inst=CALL(arg=1, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$82load_attr.23', '$null$102.24', '$b104.25']
+01:39:19.730 [numba.core.byteflow] dispatch pc=114, inst=LOAD_GLOBAL(arg=0, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$106call.26']
+01:39:19.730 [numba.core.byteflow] dispatch pc=124, inst=LOAD_ATTR(arg=2, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$106call.26', '$114load_global.27']
+01:39:19.730 [numba.core.byteflow] dispatch pc=144, inst=PUSH_NULL(arg=None, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$106call.26', '$124load_attr.28']
+01:39:19.730 [numba.core.byteflow] dispatch pc=146, inst=LOAD_FAST(arg=1, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$106call.26', '$124load_attr.28', '$null$144.29']
+01:39:19.730 [numba.core.byteflow] dispatch pc=148, inst=CALL(arg=1, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$106call.26', '$124load_attr.28', '$null$144.29', '$a146.30']
+01:39:19.730 [numba.core.byteflow] dispatch pc=156, inst=COMPARE_OP(arg=188, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$106call.26', '$148call.31']
+01:39:19.730 [numba.core.byteflow] dispatch pc=160, inst=POP_JUMP_IF_FALSE(arg=1, lineno=422)
+01:39:19.730 [numba.core.byteflow] stack ['$156compare_op.32']
+01:39:19.730 [numba.core.byteflow] end state. edges=[Edge(pc=164, stack=(), blockstack=(), npush=0), Edge(pc=166, stack=(), blockstack=(), npush=0)]
+01:39:19.730 [numba.core.byteflow] pending: deque([State(pc_initial=164 nstack_initial=0), State(pc_initial=166 nstack_initial=0)])
+01:39:19.730 [numba.core.byteflow] stack: []
+01:39:19.730 [numba.core.byteflow] state.pc_initial: State(pc_initial=164 nstack_initial=0)
+01:39:19.730 [numba.core.byteflow] dispatch pc=164, inst=RETURN_CONST(arg=4, lineno=425)
+01:39:19.730 [numba.core.byteflow] stack []
+01:39:19.730 [numba.core.byteflow] end state. edges=[]
+01:39:19.730 [numba.core.byteflow] pending: deque([State(pc_initial=166 nstack_initial=0)])
+01:39:19.730 [numba.core.byteflow] stack: []
+01:39:19.730 [numba.core.byteflow] state.pc_initial: State(pc_initial=166 nstack_initial=0)
+01:39:19.730 [numba.core.byteflow] dispatch pc=166, inst=LOAD_FAST(arg=2, lineno=427)
+01:39:19.730 [numba.core.byteflow] stack []
+01:39:19.730 [numba.core.byteflow] dispatch pc=168, inst=UNARY_NEGATIVE(arg=None, lineno=427)
+01:39:19.730 [numba.core.byteflow] stack ['$b166.0']
+01:39:19.730 [numba.core.byteflow] dispatch pc=170, inst=LOAD_FAST(arg=1, lineno=427)
+01:39:19.730 [numba.core.byteflow] stack ['$168unary_negative.1']
+01:39:19.730 [numba.core.byteflow] dispatch pc=172, inst=BINARY_OP(arg=11, lineno=427)
+01:39:19.730 [numba.core.byteflow] stack ['$168unary_negative.1', '$a170.2']
+01:39:19.730 [numba.core.byteflow] dispatch pc=176, inst=RETURN_VALUE(arg=None, lineno=427)
+01:39:19.730 [numba.core.byteflow] stack ['$binop_truediv172.3']
+01:39:19.730 [numba.core.byteflow] end state. edges=[]
+01:39:19.730 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+01:39:19.730 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>,
+            {State(pc_initial=0 nstack_initial=0): set(),
+             State(pc_initial=164 nstack_initial=0): set(),
+             State(pc_initial=166 nstack_initial=0): set()})
+01:39:19.730 [numba.core.byteflow] defmap: {}
+01:39:19.731 [numba.core.byteflow] phismap: defaultdict(<class 'set'>, {})
+01:39:19.731 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>, {})
+01:39:19.731 [numba.core.byteflow] keep phismap: {}
+01:39:19.731 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>, {})
+01:39:19.731 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+01:39:19.731 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'res': '$x12.3'}), (14, {'res': '$const14.4.2'}), (16, {'index': '$const14.4.2', 'target': '$x12.3', 'res': '$16binary_subscr.5'}), (20, {'op': '+', 'lhs': '$8binary_subscr.2', 'rhs': '$16binary_subscr.5', 'res': '$binop_add20.6'}), (24, {'res': '$const24.7.3'}), (26, {'res': '$x26.8'}), (28, {'res': '$const28.9.4'}), (30, {'index': '$const28.9.4', 'target': '$x26.8', 'res': '$30binary_subscr.10'}), (34, {'op': '*', 'lhs': '$const24.7.3', 'rhs': '$30binary_subscr.10', 'res': '$binop_mul34.11'}), (38, {'op': '-', 'lhs': '$binop_add20.6', 'rhs': '$binop_mul34.11', 'res': '$binop_sub38.12'}), (42, {'value': '$binop_sub38.12'}), (44, {'res': '$x44.13'}), (46, {'res': '$const46.14.1'}), (48, {'index': '$const46.14.1', 'target': '$x44.13', 'res': '$48binary_subscr.15'}), (52, {'res': '$x52.16'}), (54, {'res': '$const54.17.2'}), (56, {'index': '$const54.17.2', 'target': '$x52.16', 'res': '$56binary_subscr.18'}), (60, {'op': '-', 'lhs': '$48binary_subscr.15', 'rhs': '$56binary_subscr.18', 'res': '$binop_sub60.19'}), (64, {'res': '$const64.20.3'}), (66, {'op': '/', 'lhs': '$binop_sub60.19', 'rhs': '$const64.20.3', 'res': '$binop_truediv66.21'}), (70, {'value': '$binop_truediv66.21'}), (72, {'idx': 0, 'res': '$72load_global.22'}), (82, {'item': '$72load_global.22', 'res': '$82load_attr.23'}), (102, {}), (104, {'res': '$b104.25'}), (106, {'func': '$82load_attr.23', 'args': ['$b104.25'], 'kw_names': None, 'res': '$106call.26'}), (114, {'idx': 0, 'res': '$114load_global.27'}), (124, {'item': '$114load_global.27', 'res': '$124load_attr.28'}), (144, {}), (146, {'res': '$a146.30'}), (148, {'func': '$124load_attr.28', 'args': ['$a146.30'], 'kw_names': None, 'res': '$148call.31'}), (156, {'lhs': '$106call.26', 'rhs': '$148call.31', 'res': '$156compare_op.32'}), (160, {'pred': '$156compare_op.32'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={164: (), 166: ()})
+01:39:19.731 [numba.core.byteflow] block_infos State(pc_initial=164 nstack_initial=0):
+AdaptBlockInfo(insts=((164, {'retval': '$const164.0', 'castval': '$164return_const.1'}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+01:39:19.731 [numba.core.byteflow] block_infos State(pc_initial=166 nstack_initial=0):
+AdaptBlockInfo(insts=((166, {'res': '$b166.0'}), (168, {'value': '$b166.0', 'res': '$168unary_negative.1'}), (170, {'res': '$a170.2'}), (172, {'op': '/', 'lhs': '$168unary_negative.1', 'rhs': '$a170.2', 'res': '$binop_truediv172.3'}), (176, {'retval': '$binop_truediv172.3', 'castval': '$176return_value.4'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+01:39:19.731 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    $const6.1.1 = const(int, 1)              ['$const6.1.1']
+    $8binary_subscr.2 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$8binary_subscr.2', '$const6.1.1', 'x']
+    $const14.4.2 = const(int, -1)            ['$const14.4.2']
+    $16binary_subscr.5 = getitem(value=x, index=$const14.4.2, fn=<built-in function getitem>) ['$16binary_subscr.5', '$const14.4.2', 'x']
+    $binop_add20.6 = $8binary_subscr.2 + $16binary_subscr.5 ['$16binary_subscr.5', '$8binary_subscr.2', '$binop_add20.6']
+    $const24.7.3 = const(int, 2)             ['$const24.7.3']
+    $const28.9.4 = const(int, 0)             ['$const28.9.4']
+    $30binary_subscr.10 = getitem(value=x, index=$const28.9.4, fn=<built-in function getitem>) ['$30binary_subscr.10', '$const28.9.4', 'x']
+    $binop_mul34.11 = $const24.7.3 * $30binary_subscr.10 ['$30binary_subscr.10', '$binop_mul34.11', '$const24.7.3']
+    a = $binop_add20.6 - $binop_mul34.11     ['$binop_add20.6', '$binop_mul34.11', 'a']
+    $const46.14.1 = const(int, 1)            ['$const46.14.1']
+    $48binary_subscr.15 = getitem(value=x, index=$const46.14.1, fn=<built-in function getitem>) ['$48binary_subscr.15', '$const46.14.1', 'x']
+    $const54.17.2 = const(int, -1)           ['$const54.17.2']
+    $56binary_subscr.18 = getitem(value=x, index=$const54.17.2, fn=<built-in function getitem>) ['$56binary_subscr.18', '$const54.17.2', 'x']
+    $binop_sub60.19 = $48binary_subscr.15 - $56binary_subscr.18 ['$48binary_subscr.15', '$56binary_subscr.18', '$binop_sub60.19']
+    $const64.20.3 = const(int, 2)            ['$const64.20.3']
+    b = $binop_sub60.19 / $const64.20.3      ['$binop_sub60.19', '$const64.20.3', 'b']
+    $72load_global.22 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$72load_global.22']
+    $82load_attr.23 = getattr(value=$72load_global.22, attr=abs) ['$72load_global.22', '$82load_attr.23']
+    $106call.26 = call $82load_attr.23(b, func=$82load_attr.23, args=[Var(b, pitch.py:420)], kws=(), vararg=None, varkwarg=None, target=None) ['$106call.26', '$82load_attr.23', 'b']
+    $114load_global.27 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$114load_global.27']
+    $124load_attr.28 = getattr(value=$114load_global.27, attr=abs) ['$114load_global.27', '$124load_attr.28']
+    $148call.31 = call $124load_attr.28(a, func=$124load_attr.28, args=[Var(a, pitch.py:419)], kws=(), vararg=None, varkwarg=None, target=None) ['$124load_attr.28', '$148call.31', 'a']
+    $156compare_op.32 = $106call.26 >= $148call.31 ['$106call.26', '$148call.31', '$156compare_op.32']
+    $bool160 = global(bool: <class 'bool'>)  ['$bool160']
+    $160pred = call $bool160($156compare_op.32, func=$bool160, args=(Var($156compare_op.32, pitch.py:422),), kws=(), vararg=None, varkwarg=None, target=None) ['$156compare_op.32', '$160pred', '$bool160']
+    branch $160pred, 164, 166                ['$160pred']
+label 164:
+    $const164.0 = const(int, 0)              ['$const164.0']
+    $164return_const.1 = cast(value=$const164.0) ['$164return_const.1', '$const164.0']
+    return $164return_const.1                ['$164return_const.1']
+label 166:
+    $168unary_negative.1 = unary(fn=<built-in function neg>, value=b) ['$168unary_negative.1', 'b']
+    $binop_truediv172.3 = $168unary_negative.1 / a ['$168unary_negative.1', '$binop_truediv172.3', 'a']
+    $176return_value.4 = cast(value=$binop_truediv172.3) ['$176return_value.4', '$binop_truediv172.3']
+    return $176return_value.4                ['$176return_value.4']
+
+01:39:19.768 [faster_whisper] Processing segment at 00:25.600
+01:39:20.983 [faster_whisper] Processing segment at 00:51.400
+01:39:22.579 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (30.454545 > 2.400000)
+01:39:24.612 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.454545 > 2.400000)
+01:39:26.709 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (30.454545 > 2.400000)
+01:39:28.678 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (30.454545 > 2.400000)
+01:39:30.314 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.540010 < -1.000000)
+01:39:31.309 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-4.628681 < -1.000000)
+01:39:31.335 [faster_whisper] Processing segment at 01:18.440
+01:39:32.290 [faster_whisper] Processing segment at 01:44.440
+01:39:33.233 [faster_whisper] Processing segment at 02:11.440
+01:39:34.899 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (19.882353 > 2.400000)
+01:39:36.369 [faster_whisper] Processing segment at 02:40.480
+01:39:37.319 [faster_whisper] Processing segment at 03:05.480
+01:39:38.915 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (5.898305 > 2.400000)
+01:39:41.102 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (5.881356 > 2.400000)
+01:39:42.855 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (5.881356 > 2.400000)
+01:39:44.140 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.000188 < -1.000000)
+01:39:45.561 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.626987 < -1.000000)
+01:39:46.602 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.798489 < -1.000000)
+01:39:46.652 [faster_whisper] Processing segment at 03:33.720
+01:39:47.791 [faster_whisper] Processing segment at 04:03.720
+01:39:48.707 [faster_whisper] Processing segment at 04:33.720
+01:39:48.910 [faster_whisper] Processing segment at 05:03.720
+01:39:49.101 [faster_whisper] Log probability threshold is not met with temperature 0.0 (-1.092545 < -1.000000)
+01:39:49.101 [faster_whisper] No speech threshold is met (0.856265 > 0.600000)
+01:39:49.101 [faster_whisper] Processing segment at 05:33.720
+01:39:49.459 [faster_whisper] Processing segment at 05:58.720
+01:39:49.799 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (2.629630 > 2.400000)
+01:39:50.174 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.049663 < -1.000000)
+01:39:51.285 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (8.868421 > 2.400000)
+01:39:52.238 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (23.783784 > 2.400000)
+01:39:53.183 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (31.428571 > 2.400000)
+01:39:53.414 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.453490 < -1.000000)
+01:39:53.423 [faster_whisper] Processing segment at 06:28.720
+01:39:55.088 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (22.300000 > 2.400000)
+01:39:56.272 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (22.300000 > 2.400000)
+01:39:57.802 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (22.300000 > 2.400000)
+01:39:59.196 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (15.310345 > 2.400000)
+01:39:59.543 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-2.397904 < -1.000000)
+01:39:59.834 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.245531 < -1.000000)
+01:39:59.846 [faster_whisper] Processing segment at 06:58.000
+01:40:01.596 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (22.300000 > 2.400000)
+01:40:01.877 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.190032 < -1.000000)
+01:40:03.036 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (26.545455 > 2.400000)
+01:40:04.001 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (25.529412 > 2.400000)
+01:40:04.497 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (2.827160 > 2.400000)
+01:40:04.497 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.872562 < -1.000000)
+01:40:04.787 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.760535 < -1.000000)
+01:40:04.792 [faster_whisper] Processing segment at 07:28.000
+01:40:06.467 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (30.125000 > 2.400000)
+01:40:06.634 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.359497 < -1.000000)
+01:40:06.809 [faster_whisper] Log probability threshold is not met with temperature 0.4 (-1.228605 < -1.000000)
+01:40:06.951 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.781299 < -1.000000)
+01:40:07.121 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.575647 < -1.000000)
+01:40:07.249 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.533905 < -1.000000)
+01:40:07.256 [faster_whisper] Processing segment at 07:58.000
+01:40:08.095 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (7.108108 > 2.400000)
+01:40:09.218 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.454545 > 2.400000)
+01:40:09.782 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (3.123077 > 2.400000)
+01:40:10.451 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (4.086957 > 2.400000)
+01:40:11.060 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (2.476636 > 2.400000)
+01:40:11.060 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.145379 < -1.000000)
+01:40:11.299 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.886466 < -1.000000)
+01:40:11.309 [faster_whisper] Processing segment at 08:11.080
+01:40:13.017 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (7.166667 > 2.400000)
+01:40:15.170 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (7.747126 > 2.400000)
+01:40:16.438 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (8.097561 > 2.400000)
+01:40:18.372 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (6.641791 > 2.400000)
+01:40:18.951 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.989692 < -1.000000)
+01:40:19.384 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.603081 < -1.000000)
+01:40:19.410 [faster_whisper] Processing segment at 08:41.080
+01:40:21.170 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (9.913043 > 2.400000)
+01:40:21.402 [faster_whisper] Processing segment at 09:11.080
+01:40:23.089 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (10.897959 > 2.400000)
+01:40:23.814 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (4.254545 > 2.400000)
+01:40:24.502 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (5.836364 > 2.400000)
+01:40:24.939 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (3.512195 > 2.400000)
+01:40:25.344 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.480099 < -1.000000)
+01:40:25.670 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.480900 < -1.000000)
+01:40:25.698 [faster_whisper] Processing segment at 09:33.580
+01:40:27.499 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (18.162162 > 2.400000)
+01:40:29.055 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (19.617647 > 2.400000)
+01:40:30.554 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.617647 > 2.400000)
+01:40:31.873 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (6.179487 > 2.400000)
+01:40:32.378 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (4.435897 > 2.400000)
+01:40:32.378 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.215250 < -1.000000)
+01:40:32.806 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-4.696902 < -1.000000)
+01:40:32.830 [faster_whisper] Processing segment at 10:02.680
+01:40:34.427 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:40:36.676 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+01:40:38.644 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+01:40:40.356 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (27.875000 > 2.400000)
+01:40:41.777 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (16.370370 > 2.400000)
+01:40:42.716 [faster_whisper] Compression ratio threshold is not met with temperature 1.0 (12.388889 > 2.400000)
+01:40:42.743 [faster_whisper] Processing segment at 10:32.680
+01:40:44.456 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (10.044118 > 2.400000)
+01:40:46.459 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (22.300000 > 2.400000)
+01:40:48.043 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (24.750000 > 2.400000)
+01:40:49.496 [faster_whisper] Processing segment at 11:01.680
+01:40:51.125 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (19.705882 > 2.400000)
+01:40:52.617 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (19.705882 > 2.400000)
+01:40:54.192 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.705882 > 2.400000)
+01:40:55.395 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (4.146789 > 2.400000)
+01:40:56.006 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.969595 < -1.000000)
+01:40:56.345 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.605561 < -1.000000)
+01:40:56.357 [faster_whisper] Processing segment at 11:20.680
+01:40:58.069 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:41:00.018 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+01:41:01.579 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+01:41:02.920 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (27.875000 > 2.400000)
+01:41:04.052 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (20.272727 > 2.400000)
+01:41:04.330 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.961217 < -1.000000)
+01:41:04.336 [faster_whisper] Processing segment at 11:44.000
+01:41:06.031 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:41:07.260 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (11.150000 > 2.400000)
+01:41:08.591 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.705882 > 2.400000)
+01:41:09.845 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (27.875000 > 2.400000)
+01:41:11.077 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (8.744186 > 2.400000)
+01:41:11.370 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.040414 < -1.000000)
+01:41:11.383 [faster_whisper] Processing segment at 12:14.000
+01:41:12.958 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:41:14.735 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (15.142857 > 2.400000)
+01:41:16.234 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (12.807692 > 2.400000)
+01:41:17.521 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (27.875000 > 2.400000)
+01:41:17.914 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.701459 < -1.000000)
+01:41:18.535 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.971934 < -1.000000)
+01:41:18.547 [faster_whisper] Processing segment at 12:27.240
+01:41:20.198 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:41:22.371 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (19.705882 > 2.400000)
+01:41:24.929 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.705882 > 2.400000)
+01:41:26.851 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (19.705882 > 2.400000)
+01:41:28.298 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (14.041667 > 2.400000)
+01:41:29.098 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.184484 < -1.000000)
+01:41:29.121 [faster_whisper] Processing segment at 12:54.160
+01:41:30.351 [faster_whisper] Processing segment at 13:22.160
+01:41:32.058 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (5.104167 > 2.400000)
+01:41:32.635 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.015207 < -1.000000)
+01:41:33.347 [faster_whisper] Log probability threshold is not met with temperature 0.4 (-1.461414 < -1.000000)
+01:41:33.898 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.525085 < -1.000000)
+01:41:34.458 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-2.114238 < -1.000000)
+01:41:34.908 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-4.021047 < -1.000000)
+01:41:34.915 [faster_whisper] Processing segment at 13:49.160
+01:41:36.545 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (26.619048 > 2.400000)
+01:41:38.765 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (26.619048 > 2.400000)
+01:41:40.845 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (5.853659 > 2.400000)
+01:41:42.372 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (25.769231 > 2.400000)
+01:41:43.525 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (5.922414 > 2.400000)
+01:41:44.085 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.220404 < -1.000000)
+01:41:44.085 [faster_whisper] No speech threshold is met (0.667133 > 0.600000)
+01:41:44.085 [faster_whisper] Processing segment at 14:19.160
+01:41:45.645 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (26.523810 > 2.400000)
+01:41:47.532 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.363636 > 2.400000)
+01:41:48.879 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (22.300000 > 2.400000)
+01:41:50.186 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (20.611111 > 2.400000)
+01:41:50.945 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-2.342950 < -1.000000)
+01:41:51.102 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.161597 < -1.000000)
+01:41:51.117 [faster_whisper] Processing segment at 14:44.120
+01:41:51.408 [faster_whisper] Log probability threshold is not met with temperature 0.0 (-1.091043 < -1.000000)
+01:41:51.676 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.092593 < -1.000000)
+01:41:52.016 [faster_whisper] Log probability threshold is not met with temperature 0.4 (-1.351567 < -1.000000)
+01:41:52.261 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.520356 < -1.000000)
+01:41:52.445 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-2.088332 < -1.000000)
+01:41:52.687 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-4.229998 < -1.000000)
+01:41:52.695 [faster_whisper] Processing segment at 15:14.120
+01:41:54.293 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:41:56.426 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+01:41:58.336 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+01:41:59.361 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (19.705882 > 2.400000)
+01:42:00.321 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (22.300000 > 2.400000)
+01:42:01.300 [faster_whisper] Compression ratio threshold is not met with temperature 1.0 (21.190476 > 2.400000)
+01:42:01.328 [faster_whisper] Processing segment at 15:44.120
+01:42:03.000 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (19.705882 > 2.400000)
+01:42:04.940 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (19.705882 > 2.400000)
+01:42:06.631 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.705882 > 2.400000)
+01:42:07.874 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (27.875000 > 2.400000)
+01:42:09.113 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (7.436364 > 2.400000)
+01:42:09.683 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.701804 < -1.000000)
+01:42:09.692 [faster_whisper] Processing segment at 15:56.600
+01:42:11.257 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:42:13.428 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (19.705882 > 2.400000)
+01:42:15.531 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+01:42:17.157 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (27.875000 > 2.400000)
+01:42:17.788 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (4.417582 > 2.400000)
+01:42:17.788 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.193291 < -1.000000)
+01:42:18.457 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.989580 < -1.000000)
+01:42:18.469 [faster_whisper] Processing segment at 16:19.120
+01:42:20.124 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (19.705882 > 2.400000)
+01:42:22.415 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (19.705882 > 2.400000)
+01:42:24.039 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.705882 > 2.400000)
+01:42:25.259 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (19.705882 > 2.400000)
+01:42:26.659 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (26.428571 > 2.400000)
+01:42:27.011 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.067116 < -1.000000)
+01:42:27.031 [faster_whisper] Processing segment at 16:40.440
+01:42:28.634 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (26.619048 > 2.400000)
+01:42:28.774 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.165791 < -1.000000)
+01:42:29.976 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (26.619048 > 2.400000)
+01:42:31.213 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (29.733333 > 2.400000)
+01:42:32.053 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (39.294118 > 2.400000)
+01:42:32.249 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.072498 < -1.000000)
+01:42:32.257 [faster_whisper] Processing segment at 17:10.440
+01:42:33.872 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:42:36.098 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+01:42:37.531 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+01:42:39.311 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (27.875000 > 2.400000)
+01:42:40.455 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (5.157895 > 2.400000)
+01:42:40.722 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.433142 < -1.000000)
+01:42:40.740 [faster_whisper] Processing segment at 17:30.440
+01:42:42.453 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (8.606061 > 2.400000)
+01:42:44.152 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (7.700000 > 2.400000)
+01:42:45.172 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (10.976190 > 2.400000)
+01:42:45.565 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.622876 < -1.000000)
+01:42:46.537 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (8.983051 > 2.400000)
+01:42:46.941 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.538212 < -1.000000)
+01:42:46.948 [faster_whisper] Processing segment at 18:00.440
+01:42:48.529 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:42:48.915 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (3.309524 > 2.400000)
+01:42:49.931 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (26.066667 > 2.400000)
+01:42:51.227 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (29.733333 > 2.400000)
+01:42:52.327 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (27.875000 > 2.400000)
+01:42:52.478 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.878955 < -1.000000)
+01:42:52.536 [faster_whisper] Processing segment at 18:23.700
+01:42:54.140 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (26.619048 > 2.400000)
+01:42:55.572 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (26.619048 > 2.400000)
+01:42:57.334 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (26.619048 > 2.400000)
+01:42:58.723 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (12.083333 > 2.400000)
+01:42:59.417 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.845353 < -1.000000)
+01:42:59.846 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.252969 < -1.000000)
+01:42:59.859 [faster_whisper] Processing segment at 18:51.420
+01:43:01.477 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (23.473684 > 2.400000)
+01:43:02.524 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (13.264706 > 2.400000)
+01:43:03.632 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (17.684211 > 2.400000)
+01:43:04.155 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (2.630435 > 2.400000)
+01:43:04.155 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.397800 < -1.000000)
+01:43:05.491 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (19.171429 > 2.400000)
+01:43:05.758 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.121655 < -1.000000)
+01:43:05.771 [faster_whisper] Processing segment at 19:10.540
+01:43:07.324 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (19.705882 > 2.400000)
+01:43:08.304 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (5.645833 > 2.400000)
+01:43:09.349 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (22.300000 > 2.400000)
+01:43:09.678 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.555746 < -1.000000)
+01:43:10.813 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (8.537037 > 2.400000)
+01:43:11.698 [faster_whisper] Compression ratio threshold is not met with temperature 1.0 (7.930233 > 2.400000)
+01:43:11.730 [faster_whisper] Processing segment at 19:29.100
+01:43:12.459 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (5.950000 > 2.400000)
+01:43:13.771 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.909091 > 2.400000)
+01:43:15.090 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+01:43:15.359 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.453866 < -1.000000)
+01:43:15.755 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.562655 < -1.000000)
+01:43:15.982 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.716580 < -1.000000)
+01:43:16.011 [faster_whisper] Processing segment at 19:57.020
+01:43:17.618 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:43:19.799 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+01:43:20.906 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.705882 > 2.400000)
+01:43:22.057 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (19.434783 > 2.400000)
+01:43:23.160 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (8.072727 > 2.400000)
+01:43:23.677 [faster_whisper] Compression ratio threshold is not met with temperature 1.0 (3.088235 > 2.400000)
+01:43:23.677 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.379760 < -1.000000)
+01:43:23.705 [faster_whisper] Processing segment at 20:27.020
+01:43:25.340 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (22.300000 > 2.400000)
+01:43:27.304 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (22.300000 > 2.400000)
+01:43:29.026 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (22.300000 > 2.400000)
+01:43:30.227 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (22.300000 > 2.400000)
+01:43:31.393 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (27.875000 > 2.400000)
+01:43:31.720 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.662944 < -1.000000)
+01:43:31.734 [faster_whisper] Processing segment at 20:57.020
+01:43:33.421 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:43:35.365 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (23.103448 > 2.400000)
+01:43:36.650 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (43.166667 > 2.400000)
+01:43:38.345 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (19.718750 > 2.400000)
+01:43:39.401 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (21.238095 > 2.400000)
+01:43:39.737 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.817993 < -1.000000)
+01:43:39.737 [faster_whisper] No speech threshold is met (0.632129 > 0.600000)
+01:43:39.737 [faster_whisper] Processing segment at 21:27.020
+01:43:41.437 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (22.300000 > 2.400000)
+01:43:43.085 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (22.300000 > 2.400000)
+01:43:44.821 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (22.300000 > 2.400000)
+01:43:45.764 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (23.473684 > 2.400000)
+01:43:46.087 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-2.262669 < -1.000000)
+01:43:46.281 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.411096 < -1.000000)
+01:43:46.288 [faster_whisper] Processing segment at 21:57.020
+01:43:47.529 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (4.037500 > 2.400000)
+01:43:49.306 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (4.938272 > 2.400000)
+01:43:51.215 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (5.423913 > 2.400000)
+01:43:52.884 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (5.155556 > 2.400000)
+01:43:53.844 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.689936 < -1.000000)
+01:43:54.175 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.595751 < -1.000000)
+01:43:54.198 [faster_whisper] Processing segment at 22:26.980
+01:43:55.799 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+01:43:56.512 [faster_whisper] Processing segment at 22:54.980
+01:43:57.446 [faster_whisper] Processing segment at 23:24.980
+01:43:59.168 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (9.369231 > 2.400000)
+01:44:00.635 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (7.683544 > 2.400000)
+01:44:02.197 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (8.623529 > 2.400000)
+01:44:03.047 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.061060 < -1.000000)
+01:44:03.850 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.699828 < -1.000000)
+01:44:04.561 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.670601 < -1.000000)
+01:44:04.573 [faster_whisper] Processing segment at 23:52.980
+01:44:05.783 [faster_whisper] Processing segment at 24:18.980
+01:44:06.845 [transcriber] 动态阈值: rms_var gap=0.008631 默认=0.000500 → 动态=0.044559 (ratio=5152)
+01:44:06.845 [transcriber] 动态阈值: cent_mean 单峰分布(ratio=4.9), 使用默认值 1200.000000
+01:44:06.845 [transcriber] 动态阈值: zcr_mean gap=0.080044 默认=0.060000 → 动态=0.388942 (ratio=16)
+01:44:06.845 [transcriber] 最终阈值: nsp=0.60 rms=0.044559 cent=1200 zcr=0.3889 kurt=1.5
+01:44:06.845 [transcriber] seg[0] KEEP [?] start=0.00 end=6.48 nsp=0.0968 music=1 DISPUTE  text='ТРЕВОЖНАЯ МУЗЫКА'
+01:44:06.845 [transcriber] seg[0] DROP L2   start=0.00 end=6.48 nsp=0.0968  text='ТРЕВОЖНАЯ МУЗЫКА'
+01:44:06.845 [transcriber] seg[1] KEEP [?] start=6.48 end=9.08 nsp=0.0968 music=1 DISPUTE  text='Саш, я тебя. Я хотела.'
+01:44:06.845 [transcriber] seg[1] KEEP      start=6.48 end=9.08 nsp=0.0968  text='Саш, я тебя. Я хотела.'
+01:44:06.845 [transcriber] seg[3] KEEP [?] start=9.08 end=11.84 nsp=0.0968 music=1 DISPUTE  text='А тебе стучаться не ущили?'
+01:44:06.845 [transcriber] seg[3] KEEP      start=9.08 end=11.84 nsp=0.0968  text='А тебе стучаться не ущили?'
+01:44:06.845 [transcriber] seg[5] KEEP [?] start=11.84 end=14.84 nsp=0.0968 music=1 DISPUTE  text='Куда я стучаться, вы лучше отферить даже меня?'
+01:44:06.845 [transcriber] seg[5] KEEP      start=11.84 end=14.84 nsp=0.0968  text='Куда я стучаться, вы лучше отферить даже меня?'
+01:44:06.845 [transcriber] seg[7] KEEP [?] start=14.84 end=18.12 nsp=0.0968 music=1 DISPUTE  text='Ладно, по голове ему стучала.'
+01:44:06.845 [transcriber] seg[7] KEEP      start=14.84 end=18.12 nsp=0.0968  text='Ладно, по голове ему стучала.'
+01:44:06.845 [transcriber] seg[9] KEEP [?] start=18.12 end=20.08 nsp=0.0968 music=1 DISPUTE  text='Ладно, я тебя поделала. Может, не пожалуйста,'
+01:44:06.845 [transcriber] seg[9] KEEP      start=18.12 end=20.08 nsp=0.0968  text='Ладно, я тебя поделала. Может, не пожалуйста,'
+01:44:06.845 [transcriber] seg[11] KEEP [?] start=20.08 end=23.60 nsp=0.0968 music=1 DISPUTE  text='это денег в долг вообще не на долг, а на час и на два буквально?'
+01:44:06.845 [transcriber] seg[11] KEEP      start=20.08 end=23.60 nsp=0.0968  text='это денег в долг вообще не на долг, а на час и на два буквально?'
+01:44:06.845 [transcriber] seg[13] KEEP [?] start=23.60 end=24.60 nsp=0.0968 music=1 DISPUTE  text='Нет.'
+01:44:06.845 [transcriber] seg[13] KEEP      start=23.60 end=24.60 nsp=0.0968  text='Нет.'
+01:44:06.845 [transcriber] seg[15] KEEP [?] start=24.60 end=25.60 nsp=0.0968 music=1 DISPUTE  text='Почему?'
+01:44:06.845 [transcriber] seg[15] KEEP      start=24.60 end=25.60 nsp=0.0968  text='Почему?'
+01:44:06.845 [transcriber] seg[17] KEEP [?] start=25.60 end=30.08 nsp=0.0810 music=1 DISPUTE  text='Дяна, сколько раз я утяжет денег, давал тренировать, когда предыдущие вернёшь, т'
+01:44:06.845 [transcriber] seg[17] KEEP      start=25.60 end=30.08 nsp=0.0810  text='Дяна, сколько раз я утяжет денег, давал тренировать, когда предыдущие вернёшь, т'
+01:44:06.845 [transcriber] seg[19] KEEP [?] start=30.08 end=34.72 nsp=0.0810 music=1 DISPUTE  text='Слушай, ну что, я с водной сестра, ну что-то, как-то проявишь, ко мне какой-то ч'
+01:44:06.845 [transcriber] seg[19] KEEP      start=30.08 end=34.72 nsp=0.0810  text='Слушай, ну что, я с водной сестра, ну что-то, как-то проявишь, ко мне какой-то ч'
+01:44:06.845 [transcriber] seg[21] KEEP [?] start=34.72 end=37.04 nsp=0.0810 music=1 DISPUTE  text='С конце концов, я на доброе дело хочу.'
+01:44:06.845 [transcriber] seg[21] KEEP      start=34.72 end=37.04 nsp=0.0810  text='С конце концов, я на доброе дело хочу.'
+01:44:06.845 [transcriber] seg[23] KEEP [?] start=37.04 end=38.24 nsp=0.0810 music=1 DISPUTE  text='На какой доброе дело?'
+01:44:06.846 [transcriber] seg[23] KEEP      start=37.04 end=38.24 nsp=0.0810  text='На какой доброе дело?'
+01:44:06.846 [transcriber] seg[25] KEEP [?] start=38.24 end=39.84 nsp=0.0810 music=1 DISPUTE  text='Собачек, надо покормить.'
+01:44:06.846 [transcriber] seg[25] KEEP      start=38.24 end=39.84 nsp=0.0810  text='Собачек, надо покормить.'
+01:44:06.846 [transcriber] seg[27] KEEP [?] start=40.48 end=42.84 nsp=0.0810 music=1 DISPUTE  text='И в приюте я не к задонатить, конечно.'
+01:44:06.846 [transcriber] seg[27] KEEP      start=40.48 end=42.84 nsp=0.0810  text='И в приюте я не к задонатить, конечно.'
+01:44:06.846 [transcriber] seg[29] KEEP [?] start=42.84 end=44.72 nsp=0.0810 music=1 DISPUTE  text='Ну, не совсем.'
+01:44:06.846 [transcriber] seg[29] KEEP      start=42.84 end=44.72 nsp=0.0810  text='Ну, не совсем.'
+01:44:06.846 [transcriber] seg[31] KEEP [?] start=44.72 end=50.00 nsp=0.0810 music=1 DISPUTE  text='Просто надо покормить собачек, а то же на час на два я пергнусь очень быстро, че'
+01:44:06.846 [transcriber] seg[31] KEEP      start=44.72 end=50.00 nsp=0.0810  text='Просто надо покормить собачек, а то же на час на два я пергнусь очень быстро, че'
+01:44:06.846 [transcriber] seg[33] KEEP [?] start=50.40 end=51.40 nsp=0.0810 music=1 DISPUTE  text='Нет, тянный.'
+01:44:06.846 [transcriber] seg[33] KEEP      start=50.40 end=51.40 nsp=0.0810  text='Нет, тянный.'
+01:44:06.846 [transcriber] seg[35] KEEP [?] start=51.40 end=52.82 nsp=0.3461 music=1 DISPUTE  text='И немного нигде.'
+01:44:06.846 [transcriber] seg[35] KEEP      start=51.40 end=52.82 nsp=0.3461  text='И немного нигде.'
+01:44:06.846 [transcriber] seg[37] KEEP [?] start=52.82 end=53.42 nsp=0.3461 music=1 DISPUTE  text='Вы преднять?'
+01:44:06.846 [transcriber] seg[37] KEEP      start=52.82 end=53.42 nsp=0.3461  text='Вы преднять?'
+01:44:06.846 [transcriber] seg[39] KEEP [?] start=53.42 end=55.56 nsp=0.3461 music=1 DISPUTE  text='Да, какой приют, ты никуда не что-нибудьarnatего!'
+01:44:06.846 [transcriber] seg[39] KEEP      start=53.42 end=55.56 nsp=0.3461  text='Да, какой приют, ты никуда не что-нибудьarnatего!'
+01:44:06.846 [transcriber] seg[41] KEEP [?] start=55.56 end=59.26 nsp=0.3461 music=1 DISPUTE  text='Послушайте, я буду и честом на вас Дэп.'
+01:44:06.846 [transcriber] seg[41] KEEP      start=55.56 end=59.26 nsp=0.3461  text='Послушайте, я буду и честом на вас Дэп.'
+01:44:06.846 [transcriber] seg[43] KEEP [?] start=59.26 end=60.66 nsp=0.3461 music=1 DISPUTE  text='Как вы вас Дэп?'
+01:44:06.846 [transcriber] seg[43] KEEP      start=59.26 end=60.66 nsp=0.3461  text='Как вы вас Дэп?'
+01:44:06.846 [transcriber] seg[45] KEEP [?] start=60.66 end=61.90 nsp=0.3461 music=1 DISPUTE  text='Не ты же понимаешь.'
+01:44:06.846 [transcriber] seg[45] KEEP      start=60.66 end=61.90 nsp=0.3461  text='Не ты же понимаешь.'
+01:44:06.846 [transcriber] seg[47] KEEP [?] start=61.90 end=65.58 nsp=0.3461 music=1 DISPUTE  text='Ни, я понимаю, Идио.'
+01:44:06.846 [transcriber] seg[47] KEEP      start=61.90 end=65.58 nsp=0.3461  text='Ни, я понимаю, Идио.'
+01:44:06.846 [transcriber] seg[49] KEEP [?] start=65.58 end=68.16 nsp=0.3461 music=1 DISPUTE  text='Ну, оперок C-3.'
+01:44:06.846 [transcriber] seg[49] KEEP      start=65.58 end=68.16 nsp=0.3461  text='Ну, оперок C-3.'
+01:44:06.846 [transcriber] seg[51] KEEP [?] start=68.16 end=70.44 nsp=0.3461 music=1 DISPUTE  text='Лас Дэп надо быть как и первые, ды.'
+01:44:06.846 [transcriber] seg[51] KEEP      start=68.16 end=70.44 nsp=0.3461  text='Лас Дэп надо быть как и первые, ды.'
+01:44:06.846 [transcriber] seg[53] KEEP [?] start=70.44 end=72.74 nsp=0.3461 music=1 DISPUTE  text='Короче, эти неданы, сколько денег.'
+01:44:06.846 [transcriber] seg[53] KEEP      start=70.44 end=72.74 nsp=0.3461  text='Короче, эти неданы, сколько денег.'
+01:44:06.846 [transcriber] seg[55] KEEP [?] start=72.74 end=74.82 nsp=0.3461 music=1 DISPUTE  text='Ну, может быть, мы с тобой что-то придумаем.'
+01:44:06.846 [transcriber] seg[55] KEEP      start=72.74 end=74.82 nsp=0.3461  text='Ну, может быть, мы с тобой что-то придумаем.'
+01:44:06.846 [transcriber] seg[57] KEEP [?] start=74.82 end=77.02 nsp=0.3461 music=1 DISPUTE  text='Я много чего могу сделать.'
+01:44:06.846 [transcriber] seg[57] KEEP      start=74.82 end=77.02 nsp=0.3461  text='Я много чего могу сделать.'
+01:44:06.846 [transcriber] seg[59] KEEP [?] start=77.02 end=78.44 nsp=0.3461 music=1 DISPUTE  text='Всё, что года мне просто не очень.'
+01:44:06.846 [transcriber] seg[59] KEEP      start=77.02 end=78.44 nsp=0.3461  text='Всё, что года мне просто не очень.'
+01:44:06.846 [transcriber] seg[61] KEEP [?] start=78.44 end=81.44 nsp=0.3600 music=1 DISPUTE  text='Саш, понимаешь, ну вот прям сейчас, ну ты меня понимаешь?'
+01:44:06.846 [transcriber] seg[61] KEEP      start=78.44 end=81.44 nsp=0.3600  text='Саш, понимаешь, ну вот прям сейчас, ну ты меня понимаешь?'
+01:44:06.846 [transcriber] seg[63] KEEP [?] start=81.44 end=87.44 nsp=0.3600 music=1 DISPUTE  text='Ну я-то тебя понимаю, но я же хоть деньги зарабатывал, меня на это все есть, а в'
+01:44:06.846 [transcriber] seg[63] KEEP      start=81.44 end=87.44 nsp=0.3600  text='Ну я-то тебя понимаю, но я же хоть деньги зарабатывал, меня на это все есть, а в'
+01:44:06.846 [transcriber] seg[65] KEEP [?] start=87.44 end=94.44 nsp=0.3600 music=1 DISPUTE  text='Ну, саш, ну мне ну что мы тебе делали, ну я не знаю, ну мне очень нужно, ну это '
+01:44:06.846 [transcriber] seg[65] KEEP      start=87.44 end=94.44 nsp=0.3600  text='Ну, саш, ну мне ну что мы тебе делали, ну я не знаю, ну мне очень нужно, ну это '
+01:44:06.846 [transcriber] seg[67] KEEP [?] start=97.44 end=101.44 nsp=0.3600 music=1 DISPUTE  text='А ты слушай, а ты умеешь? Вами же секрет.'
+01:44:06.846 [transcriber] seg[67] KEEP      start=97.44 end=101.44 nsp=0.3600  text='А ты слушай, а ты умеешь? Вами же секрет.'
+01:44:06.846 [transcriber] seg[69] KEEP [?] start=101.44 end=104.44 nsp=0.3600 music=1 DISPUTE  text='Да, да, и всё, что такое мы делали?'
+01:44:06.846 [transcriber] seg[69] KEEP      start=101.44 end=104.44 nsp=0.3600  text='Да, да, и всё, что такое мы делали?'
+01:44:06.846 [transcriber] seg[71] KEEP [?] start=104.44 end=111.44 nsp=0.2365 music=1 DISPUTE  text='Ну, если ты умеешь хранить секреты, тогда давай между нами появятся один маленьк'
+01:44:06.846 [transcriber] seg[71] KEEP      start=104.44 end=111.44 nsp=0.2365  text='Ну, если ты умеешь хранить секреты, тогда давай между нами появятся один маленьк'
+01:44:06.846 [transcriber] seg[73] KEEP [?] start=111.44 end=113.44 nsp=0.2365 music=1 DISPUTE  text='Да, там я какой секрет будет.'
+01:44:06.846 [transcriber] seg[73] KEEP      start=111.44 end=113.44 nsp=0.2365  text='Да, там я какой секрет будет.'
+01:44:06.846 [transcriber] seg[75] KEEP [?] start=113.44 end=116.44 nsp=0.2365 music=1 DISPUTE  text='Ну, станет ролик.'
+01:44:06.846 [transcriber] seg[75] KEEP      start=113.44 end=116.44 nsp=0.2365  text='Ну, станет ролик.'
+01:44:06.846 [transcriber] seg[77] KEEP [?] start=117.44 end=122.44 nsp=0.2365 music=1 DISPUTE  text='Может, Юбка мне кажется, у тебя слишком длинный, а ну, как-то хлопок, кто ему не'
+01:44:06.846 [transcriber] seg[77] KEEP      start=117.44 end=122.44 nsp=0.2365  text='Может, Юбка мне кажется, у тебя слишком длинный, а ну, как-то хлопок, кто ему не'
+01:44:06.846 [transcriber] seg[79] KEEP [?] start=122.44 end=123.44 nsp=0.2365 music=1 DISPUTE  text='Да, я не знаю.'
+01:44:06.846 [transcriber] seg[79] KEEP      start=122.44 end=123.44 nsp=0.2365  text='Да, я не знаю.'
+01:44:06.846 [transcriber] seg[81] KEEP [?] start=123.44 end=126.44 nsp=0.2365 music=1 DISPUTE  text='Ну, вот петини ее чуть-чуть.'
+01:44:06.846 [transcriber] seg[81] KEEP      start=123.44 end=126.44 nsp=0.2365  text='Ну, вот петини ее чуть-чуть.'
+01:44:06.846 [transcriber] seg[83] KEEP [?] start=126.44 end=131.44 nsp=0.2365 music=1 DISPUTE  text='Ну, сейчас еще чуть-чуть-чуть-петини.'
+01:44:06.846 [transcriber] seg[83] KEEP      start=126.44 end=131.44 nsp=0.2365  text='Ну, сейчас еще чуть-чуть-чуть-петини.'
+01:44:06.846 [transcriber] seg[85] KEEP [?] start=131.44 end=133.84 nsp=0.2531 music=1 DISPUTE  text='И еще чуть-чуть-чуть-чуть-чень.'
+01:44:06.846 [transcriber] seg[85] KEEP      start=131.44 end=133.84 nsp=0.2531  text='И еще чуть-чуть-чуть-чуть-чень.'
+01:44:06.846 [transcriber] seg[87] KEEP [?] start=134.56 end=135.12 nsp=0.2531 music=1 DISPUTE  text='Да, потому что...'
+01:44:06.846 [transcriber] seg[87] KEEP      start=134.56 end=135.12 nsp=0.2531  text='Да, потому что...'
+01:44:06.846 [transcriber] seg[89] KEEP [?] start=135.12 end=138.00 nsp=0.2531 music=1 DISPUTE  text='А что она не может на роборах висеть, я вообще сейчас уже все видно будет,'
+01:44:06.846 [transcriber] seg[89] KEEP      start=135.12 end=138.00 nsp=0.2531  text='А что она не может на роборах висеть, я вообще сейчас уже все видно будет,'
+01:44:06.846 [transcriber] seg[91] KEEP [?] start=138.00 end=141.36 nsp=0.2531 music=1 DISPUTE  text='а кто мне кажется не очень, ее так носите вообще к чему это обсуждаю.'
+01:44:06.846 [transcriber] seg[91] KEEP      start=138.00 end=141.36 nsp=0.2531  text='а кто мне кажется не очень, ее так носите вообще к чему это обсуждаю.'
+01:44:06.846 [transcriber] seg[93] KEEP [?] start=141.88 end=142.88 nsp=0.2531 music=1 DISPUTE  text='Тогда поверись.'
+01:44:06.847 [transcriber] seg[93] KEEP      start=141.88 end=142.88 nsp=0.2531  text='Тогда поверись.'
+01:44:06.847 [transcriber] seg[95] KEEP [?] start=144.40 end=145.40 nsp=0.2531 music=1 DISPUTE  text='Пытай ли, пробуем уже.'
+01:44:06.847 [transcriber] seg[95] KEEP      start=144.40 end=145.40 nsp=0.2531  text='Пытай ли, пробуем уже.'
+01:44:06.847 [transcriber] seg[97] KEEP [?] start=146.96 end=148.12 nsp=0.2531 music=1 DISPUTE  text='Эмм...'
+01:44:06.847 [transcriber] seg[97] KEEP      start=146.96 end=148.12 nsp=0.2531  text='Эмм...'
+01:44:06.847 [transcriber] seg[99] KEEP [?] start=149.12 end=151.96 nsp=0.2531 music=1 DISPUTE  text='Ты что там делали будешь? Ты мне трахнуть хочешь?'
+01:44:06.847 [transcriber] seg[99] KEEP      start=149.12 end=151.96 nsp=0.2531  text='Ты что там делали будешь? Ты мне трахнуть хочешь?'
+01:44:06.847 [transcriber] seg[101] KEEP [?] start=153.88 end=154.60 nsp=0.2531 music=1 DISPUTE  text='Ну...'
+01:44:06.847 [transcriber] seg[101] KEEP      start=153.88 end=154.60 nsp=0.2531  text='Ну...'
+01:44:06.847 [transcriber] seg[103] KEEP [?] start=155.40 end=157.80 nsp=0.2531 music=1 DISPUTE  text='Ну ты же сказал, что ты уменьш про ненцикветов.'
+01:44:06.847 [transcriber] seg[103] KEEP      start=155.40 end=157.80 nsp=0.2531  text='Ну ты же сказал, что ты уменьш про ненцикветов.'
+01:44:06.847 [transcriber] seg[105] KEEP [?] start=157.80 end=160.48 nsp=0.2531 music=1 DISPUTE  text='Поэтому давай, между нами, появится секрет,'
+01:44:06.847 [transcriber] seg[105] KEEP      start=157.80 end=160.48 nsp=0.2531  text='Поэтому давай, между нами, появится секрет,'
+01:44:06.847 [transcriber] seg[107] KEEP [?] start=160.48 end=169.48 nsp=0.4591 music=1 DISPUTE  text='Я не думала, что ты хочешь мне тратать, это всё-таки уже что-то другой, и я не у'
+01:44:06.847 [transcriber] seg[107] KEEP      start=160.48 end=169.48 nsp=0.4591  text='Я не думала, что ты хочешь мне тратать, это всё-таки уже что-то другой, и я не у'
+01:44:06.847 [transcriber] seg[109] KEEP [?] start=169.48 end=171.48 nsp=0.4591 music=1 DISPUTE  text='Ну, не согласно, так не согласно.'
+01:44:06.847 [transcriber] seg[109] KEEP      start=169.48 end=171.48 nsp=0.4591  text='Ну, не согласно, так не согласно.'
+01:44:06.847 [transcriber] seg[111] KEEP [?] start=171.48 end=178.48 nsp=0.4591 music=1 DISPUTE  text='С другой стороны, это всё-таки на нужное дело, но просто проще, я же всё-таки не'
+01:44:06.847 [transcriber] seg[111] KEEP      start=171.48 end=178.48 nsp=0.4591  text='С другой стороны, это всё-таки на нужное дело, но просто проще, я же всё-таки не'
+01:44:06.847 [transcriber] seg[113] KEEP [?] start=178.48 end=182.48 nsp=0.4591 music=1 DISPUTE  text='Так ты не заденди, ты вон там придут донатить будешь?'
+01:44:06.847 [transcriber] seg[113] KEEP      start=178.48 end=182.48 nsp=0.4591  text='Так ты не заденди, ты вон там придут донатить будешь?'
+01:44:06.847 [transcriber] seg[115] KEEP [?] start=182.48 end=185.48 nsp=0.4591 music=1 DISPUTE  text='Да, не совсем.'
+01:44:06.847 [transcriber] seg[115] KEEP      start=182.48 end=185.48 nsp=0.4591  text='Да, не совсем.'
+01:44:06.847 [transcriber] seg[117] KEEP [?] start=185.48 end=189.72 nsp=0.3004 music=1 DISPUTE  text='Я не знаю, ты мне нормально дашь.'
+01:44:06.847 [transcriber] seg[117] KEEP      start=185.48 end=189.72 nsp=0.3004  text='Я не знаю, ты мне нормально дашь.'
+01:44:06.847 [transcriber] seg[119] KEEP [?] start=189.72 end=191.68 nsp=0.3004 music=1 DISPUTE  text='Да, вас деппатят?'
+01:44:06.847 [transcriber] seg[119] KEEP      start=189.72 end=191.68 nsp=0.3004  text='Да, вас деппатят?'
+01:44:06.847 [transcriber] seg[121] KEEP [?] start=191.68 end=193.12 nsp=0.3004 music=1 DISPUTE  text='Нас депп хватит.'
+01:44:06.847 [transcriber] seg[121] KEEP      start=191.68 end=193.12 nsp=0.3004  text='Нас депп хватит.'
+01:44:06.847 [transcriber] seg[123] KEEP [?] start=193.12 end=197.96 nsp=0.3004 music=1 DISPUTE  text='Ну, ну, ну, ну, или у нас еще few месты обознакомы, то уже давно'
+01:44:06.847 [transcriber] seg[123] KEEP      start=193.12 end=197.96 nsp=0.3004  text='Ну, ну, ну, ну, или у нас еще few месты обознакомы, то уже давно'
+01:44:06.847 [transcriber] seg[125] KEEP [?] start=197.96 end=199.92 nsp=0.3004 music=1 DISPUTE  text='это, и какой-то штуку, это я не буду.'
+01:44:06.847 [transcriber] seg[125] KEEP      start=197.96 end=199.92 nsp=0.3004  text='это, и какой-то штуку, это я не буду.'
+01:44:06.847 [transcriber] seg[127] KEEP [?] start=199.92 end=203.80 nsp=0.3004 music=1 DISPUTE  text='А ты это, подожди, а на все отлично просто давай подробимся.'
+01:44:06.847 [transcriber] seg[127] KEEP      start=199.92 end=203.80 nsp=0.3004  text='А ты это, подожди, а на все отлично просто давай подробимся.'
+01:44:06.847 [transcriber] seg[129] KEEP [?] start=203.80 end=206.58 nsp=0.3004 music=1 DISPUTE  text='Ну, ладно, с чего начать-то надо?'
+01:44:06.847 [transcriber] seg[129] KEEP      start=203.80 end=206.58 nsp=0.3004  text='Ну, ладно, с чего начать-то надо?'
+01:44:06.847 [transcriber] seg[131] KEEP [?] start=206.58 end=213.72 nsp=0.3004 music=1 DISPUTE  text='Ну, наверное я этого и сестей, как я был уже видел.'
+01:44:06.847 [transcriber] seg[131] KEEP      start=206.58 end=213.72 nsp=0.3004  text='Ну, наверное я этого и сестей, как я был уже видел.'
+01:44:06.847 [transcriber] seg[133] KEEP [?] start=213.72 end=214.72 nsp=0.2827 music=1 DISPUTE  text='их видела как.'
+01:44:06.847 [transcriber] seg[133] KEEP      start=213.72 end=214.72 nsp=0.2827  text='их видела как.'
+01:44:06.847 [transcriber] seg[135] KEEP [?] start=214.72 end=216.72 nsp=0.2827 music=1 DISPUTE  text='Ты за напад клядывал где-то штули.'
+01:44:06.847 [transcriber] seg[135] KEEP      start=214.72 end=216.72 nsp=0.2827  text='Ты за напад клядывал где-то штули.'
+01:44:06.847 [transcriber] seg[137] KEEP [?] start=216.72 end=217.72 nsp=0.2827 music=1 DISPUTE  text='Нет, я.'
+01:44:06.847 [transcriber] seg[137] KEEP      start=216.72 end=217.72 nsp=0.2827  text='Нет, я.'
+01:44:06.847 [transcriber] seg[139] KEEP [?] start=217.72 end=220.72 nsp=0.2827 music=1 DISPUTE  text='Во-первых, просто не надо отсылать средства и голые фотки'
+01:44:06.847 [transcriber] seg[139] KEEP      start=217.72 end=220.72 nsp=0.2827  text='Во-первых, просто не надо отсылать средства и голые фотки'
+01:44:06.847 [transcriber] seg[141] KEEP [?] start=220.72 end=224.32 nsp=0.2827 music=1 DISPUTE  text='всякими сунь додиками, которые потом раскинули'
+01:44:06.847 [transcriber] seg[141] KEEP      start=220.72 end=224.32 nsp=0.2827  text='всякими сунь додиками, которые потом раскинули'
+01:44:06.847 [transcriber] seg[143] KEEP [?] start=224.32 end=225.32 nsp=0.2827 music=1 DISPUTE  text='эти фотки.'
+01:44:06.847 [transcriber] seg[143] KEEP      start=224.32 end=225.32 nsp=0.2827  text='эти фотки.'
+01:44:06.847 [transcriber] seg[145] KEEP [?] start=225.32 end=227.72 nsp=0.2827 music=1 DISPUTE  text='Но, я бы посмотрел на них живу, если честно.'
+01:44:06.847 [transcriber] seg[145] KEEP      start=225.32 end=227.72 nsp=0.2827  text='Но, я бы посмотрел на них живу, если честно.'
+01:44:06.847 [transcriber] seg[147] KEEP [?] start=227.72 end=229.72 nsp=0.2827 music=1 DISPUTE  text='Ну, ну, случаясь такие их сцессы.'
+01:44:06.847 [transcriber] seg[147] KEEP      start=227.72 end=229.72 nsp=0.2827  text='Ну, ну, случаясь такие их сцессы.'
+01:44:06.847 [transcriber] seg[149] KEEP [?] start=229.72 end=230.72 nsp=0.2827 music=1 DISPUTE  text='Ну, мальше.'
+01:44:06.847 [transcriber] seg[149] KEEP      start=229.72 end=230.72 nsp=0.2827  text='Ну, мальше.'
+01:44:06.847 [transcriber] seg[151] KEEP [?] start=235.72 end=237.72 nsp=0.2827 music=1 DISPUTE  text='Вот зачем там фотка?'
+01:44:06.847 [transcriber] seg[151] KEEP      start=235.72 end=237.72 nsp=0.2827  text='Вот зачем там фотка?'
+01:44:06.847 [transcriber] seg[153] KEEP [?] start=238.72 end=239.72 nsp=0.2827 music=1 DISPUTE  text='Да.'
+01:44:06.847 [transcriber] seg[153] KEEP      start=238.72 end=239.72 nsp=0.2827  text='Да.'
+01:44:06.847 [transcriber] seg[155] KEEP [?] start=239.72 end=241.72 nsp=0.2827 music=1 DISPUTE  text='А теперь все же предпринимение, почему, как я просила.'
+01:44:06.847 [transcriber] seg[155] KEEP      start=239.72 end=241.72 nsp=0.2827  text='А теперь все же предпринимение, почему, как я просила.'
+01:44:06.847 [transcriber] seg[157] KEEP [?] start=243.72 end=247.72 nsp=0.1765 music=1 DISPUTE  text='Ну, вообще шикарного видишь?'
+01:44:06.847 [transcriber] seg[157] KEEP      start=243.72 end=247.72 nsp=0.1765  text='Ну, вообще шикарного видишь?'
+01:44:06.847 [transcriber] seg[159] KEEP [?] start=247.72 end=249.72 nsp=0.1765 music=1 DISPUTE  text='В основе сестней.'
+01:44:06.847 [transcriber] seg[159] KEEP      start=247.72 end=249.72 nsp=0.1765  text='В основе сестней.'
+01:44:06.847 [transcriber] seg[161] KEEP [?] start=249.72 end=253.72 nsp=0.1765 music=1 DISPUTE  text='Да, ну давай уже быстрее начнем быстрее закончим все-таки.'
+01:44:06.847 [transcriber] seg[161] KEEP      start=249.72 end=253.72 nsp=0.1765  text='Да, ну давай уже быстрее начнем быстрее закончим все-таки.'
+01:44:06.847 [transcriber] seg[163] KEEP [?] start=253.72 end=255.72 nsp=0.1765 music=1 DISPUTE  text='Я делаю лишь изменить.'
+01:44:06.847 [transcriber] seg[163] KEEP      start=253.72 end=255.72 nsp=0.1765  text='Я делаю лишь изменить.'
+01:44:06.847 [transcriber] seg[165] KEEP [?] start=255.72 end=257.72 nsp=0.1765 music=1 DISPUTE  text='В принципе, деньги отровает, да?'
+01:44:06.848 [transcriber] seg[165] KEEP      start=255.72 end=257.72 nsp=0.1765  text='В принципе, деньги отровает, да?'
+01:44:06.848 [transcriber] seg[167] KEEP [?] start=257.72 end=258.72 nsp=0.1765 music=1 DISPUTE  text='Да.'
+01:44:06.848 [transcriber] seg[167] KEEP      start=257.72 end=258.72 nsp=0.1765  text='Да.'
+01:44:06.848 [transcriber] seg[169] KEEP [?] start=258.72 end=259.72 nsp=0.1765 music=1 DISPUTE  text='Ну, давай, перестань.'
+01:44:06.848 [transcriber] seg[169] KEEP      start=258.72 end=259.72 nsp=0.1765  text='Ну, давай, перестань.'
+01:44:06.848 [transcriber] seg[171] KEEP [?] start=259.72 end=261.72 nsp=0.1765 music=1 DISPUTE  text='Только не так близко, вот это в кое-се.'
+01:44:06.848 [transcriber] seg[171] KEEP      start=259.72 end=261.72 nsp=0.1765  text='Только не так близко, вот это в кое-се.'
+01:44:06.848 [transcriber] seg[173] KEEP [?] start=266.72 end=269.72 nsp=0.1765 music=1 DISPUTE  text='Слушай, а че, но тебе очень даже не плохой.'
+01:44:06.848 [transcriber] seg[173] KEEP      start=266.72 end=269.72 nsp=0.1765  text='Слушай, а че, но тебе очень даже не плохой.'
+01:44:06.848 [transcriber] seg[175] DROP L1a  start=273.72 end=275.72 nsp=0.8784 music=1  text='А-а-а-а...'
+01:44:06.848 [transcriber] seg[176] KEEP [?] start=333.72 end=339.72 nsp=0.0212 music=1 DISPUTE  text='Ну что, может, я же к делу приступил?'
+01:44:06.848 [transcriber] seg[176] KEEP      start=333.72 end=339.72 nsp=0.0212  text='Ну что, может, я же к делу приступил?'
+01:44:06.848 [transcriber] seg[178] KEEP [?] start=339.72 end=341.72 nsp=0.0212 music=1 DISPUTE  text='Присаживайтесь?'
+01:44:06.848 [transcriber] seg[178] KEEP      start=339.72 end=341.72 nsp=0.0212  text='Присаживайтесь?'
+01:44:06.848 [transcriber] seg[180] KEEP [?] start=341.72 end=358.72 nsp=0.0212 music=1 DISPUTE  text='Да.'
+01:44:06.848 [transcriber] seg[180] KEEP      start=341.72 end=358.72 nsp=0.0212  text='Да.'
+01:44:06.848 [transcriber] seg[182] KEEP [?] start=358.72 end=360.72 nsp=0.2943 music=1 DISPUTE  text='Да.'
+01:44:06.848 [transcriber] seg[182] KEEP      start=358.72 end=360.72 nsp=0.2943  text='Да.'
+01:44:06.848 [transcriber] seg[184] KEEP [?] start=360.72 end=361.72 nsp=0.2943 music=1 DISPUTE  text='А, сайс?'
+01:44:06.848 [transcriber] seg[184] KEEP      start=360.72 end=361.72 nsp=0.2943  text='А, сайс?'
+01:44:06.848 [transcriber] seg[186] KEEP [?] start=361.72 end=362.72 nsp=0.2943 music=1 DISPUTE  text='Да.'
+01:44:06.848 [transcriber] seg[186] KEEP      start=361.72 end=362.72 nsp=0.2943  text='Да.'
+01:44:06.848 [transcriber] seg[188] KEEP [?] start=373.72 end=375.72 nsp=0.2943 music=1 DISPUTE  text='Да, да, да, да.'
+01:44:06.848 [transcriber] seg[188] KEEP      start=373.72 end=375.72 nsp=0.2943  text='Да, да, да, да.'
+01:44:06.848 [transcriber] seg[190] KEEP [?] start=383.72 end=385.72 nsp=0.2943 music=1 DISPUTE  text='О, вы же не говорите, я не могу.'
+01:44:06.848 [transcriber] seg[190] KEEP      start=383.72 end=385.72 nsp=0.2943  text='О, вы же не говорите, я не могу.'
+01:44:06.848 [transcriber] seg[192] KEEP [?] start=389.36 end=390.72 nsp=0.1078 music=1 DISPUTE  text='Ах...'
+01:44:06.848 [transcriber] seg[192] KEEP      start=389.36 end=390.72 nsp=0.1078  text='Ах...'
+01:44:06.848 [transcriber] seg[194] KEEP [?] start=391.02 end=393.18 nsp=0.1078 music=1 DISPUTE  text='Ох...'
+01:44:06.848 [transcriber] seg[194] KEEP      start=391.02 end=393.18 nsp=0.1078  text='Ох...'
+01:44:06.848 [transcriber] seg[196] KEEP [?] start=394.04 end=394.92 nsp=0.1078 music=1 DISPUTE  text='Ох...'
+01:44:06.848 [transcriber] seg[196] KEEP      start=394.04 end=394.92 nsp=0.1078  text='Ох...'
+01:44:06.848 [transcriber] seg[198] KEEP [?] start=394.96 end=395.96 nsp=0.1078 music=1 DISPUTE  text='Да, да, да.'
+01:44:06.848 [transcriber] seg[198] KEEP      start=394.96 end=395.96 nsp=0.1078  text='Да, да, да.'
+01:44:06.848 [transcriber] seg[200] KEEP [?] start=399.76 end=401.24 nsp=0.1078 music=1 DISPUTE  text='Ох...'
+01:44:06.848 [transcriber] seg[200] KEEP      start=399.76 end=401.24 nsp=0.1078  text='Ох...'
+01:44:06.848 [transcriber] seg[202] KEEP [?] start=401.28 end=402.26 nsp=0.1078 music=1 DISPUTE  text='Ужи-До.'
+01:44:06.848 [transcriber] seg[202] KEEP      start=401.28 end=402.26 nsp=0.1078  text='Ужи-До.'
+01:44:06.848 [transcriber] seg[204] KEEP [?] start=409.50 end=410.00 nsp=0.1078 music=1 DISPUTE  text='Ох...'
+01:44:06.848 [transcriber] seg[204] KEEP      start=409.50 end=410.00 nsp=0.1078  text='Ох...'
+01:44:06.848 [transcriber] seg[206] KEEP [?] start=410.20 end=412.18 nsp=0.1078 music=1 DISPUTE  text='Ох...'
+01:44:06.848 [transcriber] seg[206] KEEP      start=410.20 end=412.18 nsp=0.1078  text='Ох...'
+01:44:06.848 [transcriber] seg[208] KEEP [?] start=414.52 end=415.52 nsp=0.1078 music=1 DISPUTE  text='Ох...'
+01:44:06.848 [transcriber] seg[208] KEEP      start=414.52 end=415.52 nsp=0.1078  text='Ох...'
+01:44:06.848 [transcriber] seg[210] KEEP [?] start=416.52 end=418.00 nsp=0.1078 music=1 DISPUTE  text='Допgew...'
+01:44:06.848 [transcriber] seg[210] KEEP      start=416.52 end=418.00 nsp=0.1078  text='Допgew...'
+01:44:06.848 [transcriber] seg[212] KEEP [?] start=418.00 end=420.00 nsp=0.1515 music=1 DISPUTE  text='О!'
+01:44:06.848 [transcriber] seg[212] KEEP      start=418.00 end=420.00 nsp=0.1515  text='О!'
+01:44:06.848 [transcriber] seg[214] KEEP [?] start=423.00 end=425.00 nsp=0.1515 music=1 DISPUTE  text='Брюшка где-то выъем, да?'
+01:44:06.848 [transcriber] seg[214] KEEP      start=423.00 end=425.00 nsp=0.1515  text='Брюшка где-то выъем, да?'
+01:44:06.848 [transcriber] seg[216] KEEP [?] start=432.00 end=433.00 nsp=0.1515 music=1 DISPUTE  text='О, да!'
+01:44:06.848 [transcriber] seg[216] KEEP      start=432.00 end=433.00 nsp=0.1515  text='О, да!'
+01:44:06.848 [transcriber] seg[218] KEEP [?] start=448.00 end=450.00 nsp=0.3374 music=1 DISPUTE  text='Умя!'
+01:44:06.848 [transcriber] seg[218] KEEP      start=448.00 end=450.00 nsp=0.3374  text='Умя!'
+01:44:06.848 [transcriber] seg[220] KEEP [?] start=452.00 end=454.00 nsp=0.3374 music=1 DISPUTE  text='Умя!'
+01:44:06.848 [transcriber] seg[220] KEEP      start=452.00 end=454.00 nsp=0.3374  text='Умя!'
+01:44:06.848 [transcriber] seg[222] KEEP [?] start=454.00 end=456.00 nsp=0.3374 music=1 DISPUTE  text='Умя!'
+01:44:06.848 [transcriber] seg[222] KEEP      start=454.00 end=456.00 nsp=0.3374  text='Умя!'
+01:44:06.848 [transcriber] seg[224] KEEP [?] start=478.00 end=483.28 nsp=0.2810 music=1 DISPUTE  text='Where is the heater?'
+01:44:06.848 [transcriber] seg[224] KEEP      start=478.00 end=483.28 nsp=0.2810  text='Where is the heater?'
+01:44:06.848 [transcriber] seg[226] KEEP [?] start=485.78 end=491.08 nsp=0.2810 music=1 DISPUTE  text='Яberна, уходите.'
+01:44:06.848 [transcriber] seg[226] KEEP      start=485.78 end=491.08 nsp=0.2810  text='Яberна, уходите.'
+01:44:06.849 [transcriber] seg[228] KEEP [?] start=491.08 end=503.18 nsp=0.2067 music=1 DISPUTE  text='Ага, может быть это, ага, вставлюськой.'
+01:44:06.849 [transcriber] seg[228] KEEP      start=491.08 end=503.18 nsp=0.2067  text='Ага, может быть это, ага, вставлюськой.'
+01:44:06.849 [transcriber] seg[230] KEEP [?] start=507.42 end=509.06 nsp=0.2067 music=1 DISPUTE  text='Тота-ота-ота!'
+01:44:06.849 [transcriber] seg[230] KEEP      start=507.42 end=509.06 nsp=0.2067  text='Тота-ота-ота!'
+01:44:06.849 [transcriber] seg[232] KEEP [?] start=509.54 end=510.94 nsp=0.2067 music=1 DISPUTE  text='Вы что?'
+01:44:06.849 [transcriber] seg[232] KEEP      start=509.54 end=510.94 nsp=0.2067  text='Вы что?'
+01:44:06.849 [transcriber] seg[234] KEEP [?] start=511.02 end=514.68 nsp=0.2067 music=1 DISPUTE  text='Ух, да, как же, да у янатов.'
+01:44:06.849 [transcriber] seg[234] KEEP      start=511.02 end=514.68 nsp=0.2067  text='Ух, да, как же, да у янатов.'
+01:44:06.849 [transcriber] seg[236] KEEP [?] start=521.08 end=523.08 nsp=0.1430 music=1 DISPUTE  text='Давай, суждаю.'
+01:44:06.849 [transcriber] seg[236] KEEP      start=521.08 end=523.08 nsp=0.1430  text='Давай, суждаю.'
+01:44:06.849 [transcriber] seg[238] KEEP [?] start=535.08 end=537.08 nsp=0.1430 music=1 DISPUTE  text='Давай, давай, давай.'
+01:44:06.849 [transcriber] seg[238] KEEP      start=535.08 end=537.08 nsp=0.1430  text='Давай, давай, давай.'
+01:44:06.849 [transcriber] seg[240] KEEP [?] start=548.08 end=550.08 nsp=0.1430 music=1 DISPUTE  text='Давай, давай.'
+01:44:06.849 [transcriber] seg[240] KEEP      start=548.08 end=550.08 nsp=0.1430  text='Давай, давай.'
+01:44:06.849 [transcriber] seg[242] KEEP [?] start=551.08 end=557.00 nsp=0.5096 music=1 DISPUTE  text='Убожена.'
+01:44:06.849 [transcriber] seg[242] KEEP      start=551.08 end=557.00 nsp=0.5096  text='Убожена.'
+01:44:06.849 [transcriber] seg[244] KEEP [?] start=557.00 end=563.94 nsp=0.5096 music=1 DISPUTE  text='Убожена.'
+01:44:06.849 [transcriber] seg[244] KEEP      start=557.00 end=563.94 nsp=0.5096  text='Убожена.'
+01:44:06.849 [transcriber] seg[246] KEEP [?] start=563.94 end=573.58 nsp=0.5096 music=1 DISPUTE  text='Убожена.'
+01:44:06.849 [transcriber] seg[246] KEEP      start=563.94 end=573.58 nsp=0.5096  text='Убожена.'
+01:44:06.849 [transcriber] seg[248] KEEP [?] start=574.36 end=576.12 nsp=0.1692 music=1 DISPUTE  text='Kim иrei'
+01:44:06.849 [transcriber] seg[248] KEEP      start=574.36 end=576.12 nsp=0.1692  text='Kim иrei'
+01:44:06.849 [transcriber] seg[250] KEEP      start=576.12 end=576.38 nsp=0.1692  text='Чёрт'
+01:44:06.849 [transcriber] seg[251] KEEP [?] start=576.54 end=577.80 nsp=0.1692 music=1 DISPUTE  text='Капочки'
+01:44:06.849 [transcriber] seg[251] KEEP      start=576.54 end=577.80 nsp=0.1692  text='Капочки'
+01:44:06.849 [transcriber] seg[253] KEEP [?] start=577.80 end=578.40 nsp=0.1692 music=1 DISPUTE  text='Чёрт'
+01:44:06.849 [transcriber] seg[253] KEEP      start=577.80 end=578.40 nsp=0.1692  text='Чёрт'
+01:44:06.849 [transcriber] seg[255] KEEP [?] start=578.40 end=583.82 nsp=0.1692 music=1 DISPUTE  text='Он больше ма 뛰ен'
+01:44:06.849 [transcriber] seg[255] KEEP      start=578.40 end=583.82 nsp=0.1692  text='Он больше ма 뛰ен'
+01:44:06.849 [transcriber] seg[257] KEEP [?] start=583.82 end=589.46 nsp=0.1692 music=1 DISPUTE  text='Мы were'
+01:44:06.849 [transcriber] seg[257] KEEP      start=583.82 end=589.46 nsp=0.1692  text='Мы were'
+01:44:06.849 [transcriber] seg[259] KEEP [?] start=590.98 end=592.98 nsp=0.1692 music=1 DISPUTE  text='Поли мне'
+01:44:06.849 [transcriber] seg[259] KEEP      start=590.98 end=592.98 nsp=0.1692  text='Поли мне'
+01:44:06.849 [transcriber] seg[261] KEEP [?] start=597.58 end=599.72 nsp=0.1692 music=1 DISPUTE  text='сыret'
+01:44:06.849 [transcriber] seg[261] KEEP      start=597.58 end=599.72 nsp=0.1692  text='сыret'
+01:44:06.849 [transcriber] seg[263] KEEP [?] start=599.74 end=600.88 nsp=0.1692 music=1 DISPUTE  text='令и a поfectив'
+01:44:06.849 [transcriber] seg[263] KEEP      start=599.74 end=600.88 nsp=0.1692  text='令и a поfectив'
+01:44:06.849 [transcriber] seg[265] KEEP [?] start=600.88 end=602.68 nsp=0.1692 music=1 DISPUTE  text='Чёрт'
+01:44:06.849 [transcriber] seg[265] KEEP      start=600.88 end=602.68 nsp=0.1692  text='Чёрт'
+01:44:06.849 [transcriber] seg[267] KEEP [?] start=602.68 end=632.68 nsp=0.3678 music=1 DISPUTE  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+01:44:06.849 [transcriber] seg[267] KEEP      start=602.68 end=632.68 nsp=0.3678  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+01:44:06.849 [transcriber] seg[269] KEEP [?] start=632.68 end=637.78 nsp=0.2351 music=1 DISPUTE  text='О да, трёхнет, не дозаща, что давай-то!'
+01:44:06.849 [transcriber] seg[269] KEEP      start=632.68 end=637.78 nsp=0.2351  text='О да, трёхнет, не дозаща, что давай-то!'
+01:44:06.849 [transcriber] seg[271] KEEP [?] start=637.78 end=642.84 nsp=0.2351 music=1 DISPUTE  text='Да-да-да-да, пусть я конечно так хастать, а.'
+01:44:06.849 [transcriber] seg[271] KEEP      start=637.78 end=642.84 nsp=0.2351  text='Да-да-да-да, пусть я конечно так хастать, а.'
+01:44:06.849 [transcriber] seg[273] KEEP [?] start=642.84 end=649.68 nsp=0.2351 music=1 DISPUTE  text='А-а-а-а-а, а-а-а-а-а-а, да.'
+01:44:06.849 [transcriber] seg[273] DROP L2   start=642.84 end=649.68 nsp=0.2351  text='А-а-а-а-а, а-а-а-а-а-а, да.'
+01:44:06.849 [transcriber] seg[274] KEEP [?] start=649.68 end=652.68 nsp=0.2351 music=1 DISPUTE  text='А-а-а-а, а-а-а-а-а, а-а-а-а.'
+01:44:06.849 [transcriber] seg[274] DROP L2   start=649.68 end=652.68 nsp=0.2351  text='А-а-а-а, а-а-а-а-а, а-а-а-а.'
+01:44:06.849 [transcriber] seg[275] KEEP [?] start=652.68 end=655.68 nsp=0.2351 music=1 DISPUTE  text='А-а-а, а-а-а-а-а.'
+01:44:06.849 [transcriber] seg[275] DROP L2   start=652.68 end=655.68 nsp=0.2351  text='А-а-а, а-а-а-а-а.'
+01:44:06.849 [transcriber] seg[276] KEEP [?] start=655.68 end=658.68 nsp=0.2351 music=1 DISPUTE  text='А-а-а-а, а-а-а-а.'
+01:44:06.849 [transcriber] seg[276] DROP L2   start=655.68 end=658.68 nsp=0.2351  text='А-а-а-а, а-а-а-а.'
+01:44:06.849 [transcriber] seg[277] KEEP [?] start=658.68 end=660.68 nsp=0.2351 music=1 DISPUTE  text='А-а-а-а, а-а-а-а-а.'
+01:44:06.849 [transcriber] seg[277] DROP L2   start=658.68 end=660.68 nsp=0.2351  text='А-а-а-а, а-а-а-а-а.'
+01:44:06.849 [transcriber] seg[278] KEEP [?] start=660.68 end=661.68 nsp=0.2351 music=1 DISPUTE  text='А-а-а-а.'
+01:44:06.849 [transcriber] seg[278] KEEP      start=660.68 end=661.68 nsp=0.2351  text='А-а-а-а.'
+01:44:06.849 [transcriber] seg[280] KEEP [?] start=661.68 end=665.68 nsp=0.1777 music=1 DISPUTE  text='Да, да, да, да, да, да.'
+01:44:06.849 [transcriber] seg[280] DROP L2   start=661.68 end=665.68 nsp=0.1777  text='Да, да, да, да, да, да.'
+01:44:06.849 [transcriber] seg[281] KEEP [?] start=666.68 end=669.68 nsp=0.1777 music=1 DISPUTE  text='О-о, уже мы уже этот х sudah.'
+01:44:06.849 [transcriber] seg[281] KEEP      start=666.68 end=669.68 nsp=0.1777  text='О-о, уже мы уже этот х sudah.'
+01:44:06.850 [transcriber] seg[283] KEEP [?] start=670.68 end=673.68 nsp=0.1777 music=1 DISPUTE  text="А так what's your drive like."
+01:44:06.850 [transcriber] seg[283] KEEP      start=670.68 end=673.68 nsp=0.1777  text="А так what's your drive like."
+01:44:06.850 [transcriber] seg[285] KEEP [?] start=676.68 end=680.68 nsp=0.1777 music=1 DISPUTE  text="Два истории в�ают, учит't."
+01:44:06.850 [transcriber] seg[285] KEEP      start=676.68 end=680.68 nsp=0.1777  text="Два истории в�ают, учит't."
+01:44:06.850 [transcriber] seg[287] KEEP [?] start=680.70 end=682.38 nsp=0.3581 music=1 DISPUTE  text='Ох, а-а!'
+01:44:06.850 [transcriber] seg[287] KEEP      start=680.70 end=682.38 nsp=0.3581  text='Ох, а-а!'
+01:44:06.850 [transcriber] seg[289] KEEP [?] start=685.92 end=689.60 nsp=0.3581 music=1 DISPUTE  text='Ага, ну же как ж это кладwards!'
+01:44:06.850 [transcriber] seg[289] KEEP      start=685.92 end=689.60 nsp=0.3581  text='Ага, ну же как ж это кладwards!'
+01:44:06.850 [transcriber] seg[291] KEEP [?] start=703.20 end=704.00 nsp=0.3581 music=1 DISPUTE  text='Ага...'
+01:44:06.850 [transcriber] seg[291] KEEP      start=703.20 end=704.00 nsp=0.3581  text='Ага...'
+01:44:06.850 [transcriber] seg[293] KEEP [?] start=704.00 end=706.00 nsp=0.4332 music=1 DISPUTE  text=','
+01:44:06.850 [transcriber] seg[293] DROP L2   start=704.00 end=706.00 nsp=0.4332  text=','
+01:44:06.850 [transcriber] seg[294] KEEP [?] start=710.56 end=712.56 nsp=0.4332 music=1 DISPUTE  text=','
+01:44:06.850 [transcriber] seg[294] DROP L2   start=710.56 end=712.56 nsp=0.4332  text=','
+01:44:06.850 [transcriber] seg[295] KEEP [?] start=719.92 end=721.92 nsp=0.4332 music=1 DISPUTE  text=','
+01:44:06.850 [transcriber] seg[295] DROP L2   start=719.92 end=721.92 nsp=0.4332  text=','
+01:44:06.850 [transcriber] seg[296] KEEP [?] start=725.16 end=726.96 nsp=0.4332 music=1 DISPUTE  text=','
+01:44:06.850 [transcriber] seg[296] DROP L2   start=725.16 end=726.96 nsp=0.4332  text=','
+01:44:06.850 [transcriber] seg[297] KEEP [?] start=727.60 end=733.56 nsp=0.4332 music=1 DISPUTE  text=','
+01:44:06.850 [transcriber] seg[297] DROP L2   start=727.60 end=733.56 nsp=0.4332  text=','
+01:44:06.850 [transcriber] seg[298] KEEP [?] start=734.00 end=741.36 nsp=0.1779 music=1 DISPUTE  text='О, боже мой, сын.'
+01:44:06.850 [transcriber] seg[298] KEEP      start=734.00 end=741.36 nsp=0.1779  text='О, боже мой, сын.'
+01:44:06.850 [transcriber] seg[300] KEEP [?] start=741.36 end=747.24 nsp=0.1779 music=1 DISPUTE  text='Мга.'
+01:44:06.850 [transcriber] seg[300] KEEP      start=741.36 end=747.24 nsp=0.1779  text='Мга.'
+01:44:06.850 [transcriber] seg[302] KEEP [?] start=747.24 end=750.72 nsp=0.3975 music=1 DISPUTE  text='как же классно больше?'
+01:44:06.850 [transcriber] seg[302] KEEP      start=747.24 end=750.72 nsp=0.3975  text='как же классно больше?'
+01:44:06.850 [transcriber] seg[304] KEEP [?] start=753.72 end=755.98 nsp=0.3975 music=1 DISPUTE  text='Как же классно больше?'
+01:44:06.850 [transcriber] seg[304] KEEP      start=753.72 end=755.98 nsp=0.3975  text='Как же классно больше?'
+01:44:06.850 [transcriber] seg[306] KEEP [?] start=757.56 end=759.06 nsp=0.3975 music=1 DISPUTE  text='А-а...'
+01:44:06.850 [transcriber] seg[306] KEEP      start=757.56 end=759.06 nsp=0.3975  text='А-а...'
+01:44:06.850 [transcriber] seg[308] KEEP [?] start=759.06 end=760.44 nsp=0.3975 music=1 DISPUTE  text='moltой же.'
+01:44:06.850 [transcriber] seg[308] KEEP      start=759.06 end=760.44 nsp=0.3975  text='moltой же.'
+01:44:06.850 [transcriber] seg[310] KEEP [?] start=760.44 end=761.20 nsp=0.3975 music=1 DISPUTE  text='Что есть?'
+01:44:06.850 [transcriber] seg[310] KEEP      start=760.44 end=761.20 nsp=0.3975  text='Что есть?'
+01:44:06.850 [transcriber] seg[312] KEEP [?] start=761.20 end=762.30 nsp=0.3975 music=1 DISPUTE  text='Как бы в ситуации?'
+01:44:06.850 [transcriber] seg[312] KEEP      start=761.20 end=762.30 nsp=0.3975  text='Как бы в ситуации?'
+01:44:06.850 [transcriber] seg[314] KEEP [?] start=762.36 end=763.06 nsp=0.3975 music=1 DISPUTE  text='Какие?'
+01:44:06.850 [transcriber] seg[314] KEEP      start=762.36 end=763.06 nsp=0.3975  text='Какие?'
+01:44:06.850 [transcriber] seg[316] KEEP [?] start=763.06 end=764.28 nsp=0.3975 music=1 DISPUTE  text='Как положено.'
+01:44:06.850 [transcriber] seg[316] KEEP      start=763.06 end=764.28 nsp=0.3975  text='Как положено.'
+01:44:06.850 [transcriber] seg[318] KEEP [?] start=764.28 end=767.48 nsp=0.3975 music=1 DISPUTE  text='Даか ending, и д customize и ем тебе кое-pur.'
+01:44:06.850 [transcriber] seg[318] KEEP      start=764.28 end=767.48 nsp=0.3975  text='Даか ending, и д customize и ем тебе кое-pur.'
+01:44:06.850 [transcriber] seg[320] KEEP [?] start=767.54 end=770.46 nsp=0.3975 music=1 DISPUTE  text='Ну, да.'
+01:44:06.850 [transcriber] seg[320] KEEP      start=767.54 end=770.46 nsp=0.3975  text='Ну, да.'
+01:44:06.850 [transcriber] seg[322] KEEP [?] start=770.48 end=771.78 nsp=0.3975 music=1 DISPUTE  text='Будешь konuşность.'
+01:44:06.850 [transcriber] seg[322] KEEP      start=770.48 end=771.78 nsp=0.3975  text='Будешь konuşность.'
+01:44:06.850 [transcriber] seg[324] KEEP [?] start=773.06 end=774.16 nsp=0.3975 music=1 DISPUTE  text='Может.'
+01:44:06.850 [transcriber] seg[324] KEEP      start=773.06 end=774.16 nsp=0.3975  text='Может.'
+01:44:06.850 [transcriber] seg[326] KEEP [?] start=774.16 end=776.16 nsp=0.4652 music=1 DISPUTE  text='Закой, что?'
+01:44:06.850 [transcriber] seg[326] KEEP      start=774.16 end=776.16 nsp=0.4652  text='Закой, что?'
+01:44:06.850 [transcriber] seg[328] KEEP [?] start=776.16 end=778.16 nsp=0.4652 music=1 DISPUTE  text='А, что тебе надо?'
+01:44:06.850 [transcriber] seg[328] KEEP      start=776.16 end=778.16 nsp=0.4652  text='А, что тебе надо?'
+01:44:06.850 [transcriber] seg[330] KEEP [?] start=778.16 end=779.16 nsp=0.4652 music=1 DISPUTE  text='Шоколада.'
+01:44:06.850 [transcriber] seg[330] KEEP      start=778.16 end=779.16 nsp=0.4652  text='Шоколада.'
+01:44:06.850 [transcriber] seg[332] KEEP [?] start=779.16 end=781.16 nsp=0.4652 music=1 DISPUTE  text='В смысле?'
+01:44:06.850 [transcriber] seg[332] KEEP      start=779.16 end=781.16 nsp=0.4652  text='В смысле?'
+01:44:06.850 [transcriber] seg[334] KEEP [?] start=781.16 end=783.16 nsp=0.4652 music=1 DISPUTE  text='Ну, в смысле, анал?'
+01:44:06.850 [transcriber] seg[334] KEEP      start=781.16 end=783.16 nsp=0.4652  text='Ну, в смысле, анал?'
+01:44:06.850 [transcriber] seg[336] KEEP [?] start=783.16 end=785.16 nsp=0.4652 music=1 DISPUTE  text='Анал, сожный, я не знаю.'
+01:44:06.850 [transcriber] seg[336] KEEP      start=783.16 end=785.16 nsp=0.4652  text='Анал, сожный, я не знаю.'
+01:44:06.850 [transcriber] seg[338] KEEP [?] start=785.16 end=788.16 nsp=0.4652 music=1 DISPUTE  text='Мне это первый раз будет как-то...'
+01:44:06.850 [transcriber] seg[338] KEEP      start=785.16 end=788.16 nsp=0.4652  text='Мне это первый раз будет как-то...'
+01:44:06.850 [transcriber] seg[340] KEEP [?] start=788.16 end=790.16 nsp=0.4652 music=1 DISPUTE  text='Я буду, зато.'
+01:44:06.850 [transcriber] seg[340] KEEP      start=788.16 end=790.16 nsp=0.4652  text='Я буду, зато.'
+01:44:06.850 [transcriber] seg[342] KEEP [?] start=790.16 end=792.16 nsp=0.4652 music=1 DISPUTE  text='Вот так видно, да? Да, да.'
+01:44:06.850 [transcriber] seg[342] KEEP      start=790.16 end=792.16 nsp=0.4652  text='Вот так видно, да? Да, да.'
+01:44:06.850 [transcriber] seg[344] KEEP [?] start=792.16 end=795.16 nsp=0.4652 music=1 DISPUTE  text='Слушай, ну, звучит, конечно, классно,'
+01:44:06.850 [transcriber] seg[344] KEEP      start=792.16 end=795.16 nsp=0.4652  text='Слушай, ну, звучит, конечно, классно,'
+01:44:06.850 [transcriber] seg[346] KEEP [?] start=795.16 end=796.16 nsp=0.4652 music=1 DISPUTE  text='но только в будь есть дороже.'
+01:44:06.850 [transcriber] seg[346] KEEP      start=795.16 end=796.16 nsp=0.4652  text='но только в будь есть дороже.'
+01:44:06.850 [transcriber] seg[348] KEEP [?] start=796.16 end=798.16 nsp=0.4652 music=1 DISPUTE  text='Ладно, это мой первый раз все-таки.'
+01:44:06.850 [transcriber] seg[348] KEEP      start=796.16 end=798.16 nsp=0.4652  text='Ладно, это мой первый раз все-таки.'
+01:44:06.850 [transcriber] seg[350] KEEP [?] start=798.16 end=799.16 nsp=0.4652 music=1 DISPUTE  text='Ну, ты сставляешь?'
+01:44:06.850 [transcriber] seg[350] KEEP      start=798.16 end=799.16 nsp=0.4652  text='Ну, ты сставляешь?'
+01:44:06.851 [transcriber] seg[352] KEEP [?] start=799.16 end=800.16 nsp=0.4652 music=1 DISPUTE  text='Ну, да.'
+01:44:06.851 [transcriber] seg[352] KEEP      start=799.16 end=800.16 nsp=0.4652  text='Ну, да.'
+01:44:06.851 [transcriber] seg[354] KEEP [?] start=800.16 end=801.16 nsp=0.4652 music=1 DISPUTE  text='Ты готова?'
+01:44:06.851 [transcriber] seg[354] KEEP      start=800.16 end=801.16 nsp=0.4652  text='Ты готова?'
+01:44:06.851 [transcriber] seg[356] KEEP [?] start=801.16 end=802.16 nsp=0.4652 music=1 DISPUTE  text='Ну, да.'
+01:44:06.851 [transcriber] seg[356] KEEP      start=801.16 end=802.16 nsp=0.4652  text='Ну, да.'
+01:44:06.851 [transcriber] seg[358] KEEP [?] start=802.16 end=804.16 nsp=0.1736 music=1 DISPUTE  text='Да, только спрашка расченька.'
+01:44:06.851 [transcriber] seg[358] KEEP      start=802.16 end=804.16 nsp=0.1736  text='Да, только спрашка расченька.'
+01:44:06.851 [transcriber] seg[360] KEEP [?] start=811.16 end=813.16 nsp=0.1736 music=1 DISPUTE  text='Ух, уже ты потоку больше света.'
+01:44:06.851 [transcriber] seg[360] KEEP      start=811.16 end=813.16 nsp=0.1736  text='Ух, уже ты потоку больше света.'
+01:44:06.851 [transcriber] seg[362] KEEP [?] start=815.16 end=817.16 nsp=0.1736 music=1 DISPUTE  text='Ух, ты потоку больше света.'
+01:44:06.851 [transcriber] seg[362] KEEP      start=815.16 end=817.16 nsp=0.1736  text='Ух, ты потоку больше света.'
+01:44:06.851 [transcriber] seg[364] KEEP [?] start=827.16 end=829.16 nsp=0.1736 music=1 DISPUTE  text='О, боже, да.'
+01:44:06.851 [transcriber] seg[364] KEEP      start=827.16 end=829.16 nsp=0.1736  text='О, боже, да.'
+01:44:06.851 [transcriber] seg[366] KEEP [?] start=859.16 end=862.76 nsp=0.5999 music=1 DISPUTE  text='Долго, гео colаново!'
+01:44:06.851 [transcriber] seg[366] KEEP      start=859.16 end=862.76 nsp=0.5999  text='Долго, гео colаново!'
+01:44:06.851 [transcriber] seg[368] KEEP [?] start=866.24 end=867.96 nsp=0.5999 music=1 DISPUTE  text='Долго!'
+01:44:06.851 [transcriber] seg[368] KEEP      start=866.24 end=867.96 nsp=0.5999  text='Долго!'
+01:44:06.851 [transcriber] seg[370] KEEP [?] start=869.96 end=870.80 nsp=0.5999 music=1 DISPUTE  text='Сто!'
+01:44:06.851 [transcriber] seg[370] KEEP      start=869.96 end=870.80 nsp=0.5999  text='Сто!'
+01:44:06.851 [transcriber] seg[372] KEEP [?] start=871.84 end=873.12 nsp=0.5999 music=1 DISPUTE  text='Ко-а!'
+01:44:06.851 [transcriber] seg[372] KEEP      start=871.84 end=873.12 nsp=0.5999  text='Ко-а!'
+01:44:06.851 [transcriber] seg[374] KEEP [?] start=874.72 end=876.84 nsp=0.5999 music=1 DISPUTE  text='Долго, гео, гео!'
+01:44:06.851 [transcriber] seg[374] KEEP      start=874.72 end=876.84 nsp=0.5999  text='Долго, гео, гео!'
+01:44:06.851 [transcriber] seg[376] KEEP [?] start=880.12 end=881.12 nsp=0.5999 music=1 DISPUTE  text='Долго!'
+01:44:06.851 [transcriber] seg[376] KEEP      start=880.12 end=881.12 nsp=0.5999  text='Долго!'
+01:44:06.851 [transcriber] seg[378] KEEP [?] start=882.40 end=884.12 nsp=0.5999 music=1 DISPUTE  text='Долго, гео.'
+01:44:06.851 [transcriber] seg[378] KEEP      start=882.40 end=884.12 nsp=0.5999  text='Долго, гео.'
+01:44:06.851 [transcriber] seg[380] KEEP [?] start=884.12 end=887.12 nsp=0.2716 music=1 DISPUTE  text='О, я все ж, это хьен.'
+01:44:06.851 [transcriber] seg[380] KEEP      start=884.12 end=887.12 nsp=0.2716  text='О, я все ж, это хьен.'
+01:44:06.851 [transcriber] seg[382] KEEP [?] start=887.12 end=889.12 nsp=0.2716 music=1 DISPUTE  text='Убожит.'
+01:44:06.851 [transcriber] seg[382] KEEP      start=887.12 end=889.12 nsp=0.2716  text='Убожит.'
+01:44:06.851 [transcriber] seg[384] KEEP [?] start=899.12 end=901.12 nsp=0.2716 music=1 DISPUTE  text='Убожит.'
+01:44:06.851 [transcriber] seg[384] KEEP      start=899.12 end=901.12 nsp=0.2716  text='Убожит.'
+01:44:06.851 [transcriber] seg[386] KEEP [?] start=914.12 end=944.12 nsp=0.1572 music=1 DISPUTE  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+01:44:06.851 [transcriber] seg[386] KEEP      start=914.12 end=944.12 nsp=0.1572  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+01:44:06.851 [transcriber] seg[388] KEEP [?] start=944.12 end=949.08 nsp=0.5502 music=1 DISPUTE  text='А-а-на-на-на-на-на ?'
+01:44:06.851 [transcriber] seg[388] DROP L2   start=944.12 end=949.08 nsp=0.5502  text='А-а-на-на-на-на-на ?'
+01:44:06.851 [transcriber] seg[389] KEEP [?] start=953.60 end=956.60 nsp=0.5502 music=1 DISPUTE  text='Да!'
+01:44:06.851 [transcriber] seg[389] KEEP      start=953.60 end=956.60 nsp=0.5502  text='Да!'
+01:44:06.851 [transcriber] seg[391] KEEP [?] start=957.04 end=957.84 nsp=0.4731 music=1 DISPUTE  text='А!'
+01:44:06.851 [transcriber] seg[391] KEEP      start=957.04 end=957.84 nsp=0.4731  text='А!'
+01:44:06.851 [transcriber] seg[393] KEEP [?] start=961.16 end=963.28 nsp=0.4731 music=1 DISPUTE  text='А-а-а-а!'
+01:44:06.851 [transcriber] seg[393] KEEP      start=961.16 end=963.28 nsp=0.4731  text='А-а-а-а!'
+01:44:06.851 [transcriber] seg[395] KEEP [?] start=964.84 end=966.68 nsp=0.4731 music=1 DISPUTE  text='Ну, ты чё, я讓 так пухуudiscenes надо'
+01:44:06.851 [transcriber] seg[395] KEEP      start=964.84 end=966.68 nsp=0.4731  text='Ну, ты чё, я讓 так пухуudiscenes надо'
+01:44:06.851 [transcriber] seg[397] KEEP [?] start=968.08 end=968.84 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[397] DROP L2   start=968.08 end=968.84 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[398] KEEP [?] start=969.20 end=969.84 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[398] DROP L2   start=969.20 end=969.84 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[399] DROP L2   start=970.00 end=970.04 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[400] DROP L2   start=970.20 end=970.44 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[401] KEEP [?] start=970.64 end=971.08 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[401] DROP L2   start=970.64 end=971.08 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[402] DROP L2   start=971.84 end=971.88 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[403] DROP L2   start=972.00 end=972.12 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[404] DROP L2   start=972.16 end=972.28 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[405] DROP L2   start=972.40 end=972.68 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[406] KEEP [?] start=972.80 end=973.96 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[406] DROP L2   start=972.80 end=973.96 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[407] DROP L2   start=974.12 end=974.40 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[408] KEEP [?] start=974.40 end=975.52 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[408] DROP L2   start=974.40 end=975.52 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[409] KEEP [?] start=975.60 end=976.00 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[409] DROP L2   start=975.60 end=976.00 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[410] KEEP [?] start=976.08 end=976.60 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[410] DROP L2   start=976.08 end=976.60 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[411] KEEP [?] start=976.68 end=977.40 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[411] DROP L2   start=976.68 end=977.40 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[412] DROP L2   start=977.92 end=977.96 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[413] KEEP [?] start=978.40 end=979.12 nsp=0.4731 music=1 DISPUTE  text='…'
+01:44:06.851 [transcriber] seg[413] DROP L2   start=978.40 end=979.12 nsp=0.4731  text='…'
+01:44:06.851 [transcriber] seg[414] KEEP [?] start=979.12 end=984.24 nsp=0.4287 music=1 DISPUTE  text='Ой odorСję.'
+01:44:06.851 [transcriber] seg[414] KEEP      start=979.12 end=984.24 nsp=0.4287  text='Ой odorСję.'
+01:44:06.851 [transcriber] seg[416] KEEP [?] start=984.24 end=987.68 nsp=0.4287 music=1 DISPUTE  text='Вааа...'
+01:44:06.852 [transcriber] seg[416] KEEP      start=984.24 end=987.68 nsp=0.4287  text='Вааа...'
+01:44:06.852 [transcriber] seg[418] KEEP [?] start=987.68 end=989.40 nsp=0.4287 music=1 DISPUTE  text='Ага...'
+01:44:06.852 [transcriber] seg[418] KEEP      start=987.68 end=989.40 nsp=0.4287  text='Ага...'
+01:44:06.852 [transcriber] seg[420] KEEP [?] start=989.40 end=991.28 nsp=0.4287 music=1 DISPUTE  text='Ага...'
+01:44:06.852 [transcriber] seg[420] KEEP      start=989.40 end=991.28 nsp=0.4287  text='Ага...'
+01:44:06.852 [transcriber] seg[422] KEEP [?] start=991.28 end=994.40 nsp=0.4287 music=1 DISPUTE  text='habя, ого dejar толькоiously.'
+01:44:06.852 [transcriber] seg[422] KEEP      start=991.28 end=994.40 nsp=0.4287  text='habя, ого dejar толькоiously.'
+01:44:06.852 [transcriber] seg[424] KEEP [?] start=995.40 end=997.28 nsp=0.4287 music=1 DISPUTE  text='Ода, Сарда...'
+01:44:06.852 [transcriber] seg[424] KEEP      start=995.40 end=997.28 nsp=0.4287  text='Ода, Сарда...'
+01:44:06.852 [transcriber] seg[426] KEEP [?] start=997.28 end=999.40 nsp=0.4287 music=1 DISPUTE  text='...аа.'
+01:44:06.852 [transcriber] seg[426] KEEP      start=997.28 end=999.40 nsp=0.4287  text='...аа.'
+01:44:06.852 [transcriber] seg[428] KEEP [?] start=999.40 end=1000.44 nsp=0.4287 music=1 DISPUTE  text='Ясно там...'
+01:44:06.852 [transcriber] seg[428] KEEP      start=999.40 end=1000.44 nsp=0.4287  text='Ясно там...'
+01:44:06.852 [transcriber] seg[430] KEEP [?] start=1000.44 end=1007.44 nsp=0.2849 music=1 DISPUTE  text='Удер, да, да.'
+01:44:06.852 [transcriber] seg[430] KEEP      start=1000.44 end=1007.44 nsp=0.2849  text='Удер, да, да.'
+01:44:06.852 [transcriber] seg[432] KEEP [?] start=1012.44 end=1015.44 nsp=0.2849 music=1 DISPUTE  text='Удер.'
+01:44:06.852 [transcriber] seg[432] KEEP      start=1012.44 end=1015.44 nsp=0.2849  text='Удер.'
+01:44:06.852 [transcriber] seg[434] KEEP [?] start=1030.44 end=1050.44 nsp=0.4172 music=1 DISPUTE  text='Что?'
+01:44:06.852 [transcriber] seg[434] KEEP      start=1030.44 end=1050.44 nsp=0.4172  text='Что?'
+01:44:06.852 [transcriber] seg[436] KEEP [?] start=1050.44 end=1053.92 nsp=0.2984 music=1 DISPUTE  text='Да, знаешь, как бы же там уехать?'
+01:44:06.852 [transcriber] seg[436] KEEP      start=1050.44 end=1053.92 nsp=0.2984  text='Да, знаешь, как бы же там уехать?'
+01:44:06.852 [transcriber] seg[438] KEEP [?] start=1070.96 end=1073.68 nsp=0.2984 music=1 DISPUTE  text='Ну, запля себе туда флосный сар?'
+01:44:06.852 [transcriber] seg[438] KEEP      start=1070.96 end=1073.68 nsp=0.2984  text='Ну, запля себе туда флосный сар?'
+01:44:06.852 [transcriber] seg[440] KEEP [?] start=1080.44 end=1103.70 nsp=0.3218 music=1 DISPUTE  text='Вы же мы died.'
+01:44:06.852 [transcriber] seg[440] KEEP      start=1080.44 end=1103.70 nsp=0.3218  text='Вы же мы died.'
+01:44:06.852 [transcriber] seg[442] KEEP [?] start=1103.70 end=1105.70 nsp=0.4124 music=1 DISPUTE  text='Да, да, д...'
+01:44:06.852 [transcriber] seg[442] KEEP      start=1103.70 end=1105.70 nsp=0.4124  text='Да, да, д...'
+01:44:06.852 [transcriber] seg[444] KEEP [?] start=1111.06 end=1112.46 nsp=0.4124 music=1 DISPUTE  text='Да-да-да, да-да-да'
+01:44:06.852 [transcriber] seg[444] DROP L2   start=1111.06 end=1112.46 nsp=0.4124  text='Да-да-да, да-да-да'
+01:44:06.852 [transcriber] seg[445] KEEP [?] start=1117.50 end=1120.50 nsp=0.4124 music=1 DISPUTE  text='Сады-даду'
+01:44:06.852 [transcriber] seg[445] KEEP      start=1117.50 end=1120.50 nsp=0.4124  text='Сады-даду'
+01:44:06.852 [transcriber] seg[447] KEEP [?] start=1121.90 end=1123.42 nsp=0.4124 music=1 DISPUTE  text='Аааааа'
+01:44:06.852 [transcriber] seg[447] DROP L2   start=1121.90 end=1123.42 nsp=0.4124  text='Аааааа'
+01:44:06.852 [transcriber] seg[448] KEEP [?] start=1124.46 end=1125.54 nsp=0.4124 music=1 DISPUTE  text='Окужей, мойда'
+01:44:06.852 [transcriber] seg[448] KEEP      start=1124.46 end=1125.54 nsp=0.4124  text='Окужей, мойда'
+01:44:06.852 [transcriber] seg[450] KEEP [?] start=1126.18 end=1128.18 nsp=0.4124 music=1 DISPUTE  text='Остань, очень защитил'
+01:44:06.852 [transcriber] seg[450] KEEP      start=1126.18 end=1128.18 nsp=0.4124  text='Остань, очень защитил'
+01:44:06.852 [transcriber] seg[452] KEEP [?] start=1129.46 end=1131.42 nsp=0.4124 music=1 DISPUTE  text='Уда-да-да-да, да-да-да-да'
+01:44:06.852 [transcriber] seg[452] DROP L2   start=1129.46 end=1131.42 nsp=0.4124  text='Уда-да-да-да, да-да-да-да'
+01:44:06.852 [transcriber] seg[453] KEEP [?] start=1131.42 end=1139.12 nsp=0.2610 music=1 DISPUTE  text='Ой, вот это этот'
+01:44:06.852 [transcriber] seg[453] KEEP      start=1131.42 end=1139.12 nsp=0.2610  text='Ой, вот это этот'
+01:44:06.852 [transcriber] seg[455] KEEP [?] start=1144.82 end=1150.54 nsp=0.2610 music=1 DISPUTE  text='Боже мой добавок'
+01:44:06.852 [transcriber] seg[455] KEEP      start=1144.82 end=1150.54 nsp=0.2610  text='Боже мой добавок'
+01:44:06.852 [transcriber] seg[457] KEEP [?] start=1150.54 end=1154.90 nsp=0.3046 music=1 DISPUTE  text='О, Бойщик!'
+01:44:06.852 [transcriber] seg[457] KEEP      start=1150.54 end=1154.90 nsp=0.3046  text='О, Бойщик!'
+01:44:06.852 [transcriber] seg[459] KEEP [?] start=1154.90 end=1158.26 nsp=0.3046 music=1 DISPUTE  text='А, Бойщик!'
+01:44:06.852 [transcriber] seg[459] KEEP      start=1154.90 end=1158.26 nsp=0.3046  text='А, Бойщик!'
+01:44:06.852 [transcriber] seg[461] KEEP [?] start=1158.26 end=1163.90 nsp=0.3046 music=1 DISPUTE  text='Да, Дэплеш!'
+01:44:06.852 [transcriber] seg[461] KEEP      start=1158.26 end=1163.90 nsp=0.3046  text='Да, Дэплеш!'
+01:44:06.852 [transcriber] seg[463] KEEP [?] start=1163.90 end=1169.10 nsp=0.3046 music=1 DISPUTE  text='О, Дэплеш!'
+01:44:06.852 [transcriber] seg[463] KEEP      start=1163.90 end=1169.10 nsp=0.3046  text='О, Дэплеш!'
+01:44:06.852 [transcriber] seg[465] KEEP [?] start=1169.10 end=1184.54 nsp=0.1279 music=1 DISPUTE  text='АПОКОЙНАЯ МУЗЫКА'
+01:44:06.852 [transcriber] seg[465] DROP L2   start=1169.10 end=1184.54 nsp=0.1279  text='АПОКОЙНАЯ МУЗЫКА'
+01:44:06.852 [transcriber] seg[466] KEEP [?] start=1184.54 end=1186.98 nsp=0.1279 music=1 DISPUTE  text='У-у-у...'
+01:44:06.852 [transcriber] seg[466] KEEP      start=1184.54 end=1186.98 nsp=0.1279  text='У-у-у...'
+01:44:06.852 [transcriber] seg[468] KEEP [?] start=1188.18 end=1189.78 nsp=0.1279 music=1 DISPUTE  text='У-у-у, дадо...'
+01:44:06.852 [transcriber] seg[468] KEEP      start=1188.18 end=1189.78 nsp=0.1279  text='У-у-у, дадо...'
+01:44:06.852 [transcriber] seg[470] KEEP [?] start=1189.78 end=1194.62 nsp=0.1279 music=1 DISPUTE  text='У-у...'
+01:44:06.852 [transcriber] seg[470] KEEP      start=1189.78 end=1194.62 nsp=0.1279  text='У-у...'
+01:44:06.852 [transcriber] seg[472] KEEP [?] start=1194.62 end=1197.02 nsp=0.1279 music=1 DISPUTE  text='У-у-у...'
+01:44:06.852 [transcriber] seg[472] KEEP      start=1194.62 end=1197.02 nsp=0.1279  text='У-у-у...'
+01:44:06.852 [transcriber] seg[474] KEEP [?] start=1197.02 end=1227.02 nsp=0.1466 music=1 DISPUTE  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+01:44:06.852 [transcriber] seg[474] KEEP      start=1197.02 end=1227.02 nsp=0.1466  text='Аааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа'
+01:44:06.852 [transcriber] seg[476] KEEP [?] start=1227.02 end=1230.94 nsp=0.2011 music=1 DISPUTE  text='Ух..'
+01:44:06.852 [transcriber] seg[476] KEEP      start=1227.02 end=1230.94 nsp=0.2011  text='Ух..'
+01:44:06.852 [transcriber] seg[478] KEEP [?] start=1233.14 end=1237.14 nsp=0.2011 music=1 DISPUTE  text='Ух..'
+01:44:06.852 [transcriber] seg[478] KEEP      start=1233.14 end=1237.14 nsp=0.2011  text='Ух..'
+01:44:06.852 [transcriber] seg[480] KEEP [?] start=1239.88 end=1242.16 nsp=0.2011 music=1 DISPUTE  text='Опа, пожалуйста...'
+01:44:06.852 [transcriber] seg[480] KEEP      start=1239.88 end=1242.16 nsp=0.2011  text='Опа, пожалуйста...'
+01:44:06.852 [transcriber] seg[482] KEEP [?] start=1248.24 end=1250.22 nsp=0.2011 music=1 DISPUTE  text='Ух..'
+01:44:06.852 [transcriber] seg[482] KEEP      start=1248.24 end=1250.22 nsp=0.2011  text='Ух..'
+01:44:06.852 [transcriber] seg[484] KEEP [?] start=1287.02 end=1291.48 nsp=0.3765 music=1 DISPUTE  text='У! У! У! outer, outer, outer!'
+01:44:06.852 [transcriber] seg[484] KEEP      start=1287.02 end=1291.48 nsp=0.3765  text='У! У! У! outer, outer, outer!'
+01:44:06.852 [transcriber] seg[486] KEEP [?] start=1305.66 end=1307.68 nsp=0.3765 music=1 DISPUTE  text='Убужи.'
+01:44:06.852 [transcriber] seg[486] KEEP      start=1305.66 end=1307.68 nsp=0.3765  text='Убужи.'
+01:44:06.853 [transcriber] seg[488] KEEP [?] start=1317.02 end=1319.22 nsp=0.1935 music=1 DISPUTE  text='Но за nueva下面 уже..'
+01:44:06.853 [transcriber] seg[488] KEEP      start=1317.02 end=1319.22 nsp=0.1935  text='Но за nueva下面 уже..'
+01:44:06.853 [transcriber] seg[490] KEEP [?] start=1319.22 end=1321.02 nsp=0.1935 music=1 DISPUTE  text='Давай, и прочее...'
+01:44:06.853 [transcriber] seg[490] KEEP      start=1319.22 end=1321.02 nsp=0.1935  text='Давай, и прочее...'
+01:44:06.853 [transcriber] seg[492] KEEP [?] start=1321.02 end=1323.18 nsp=0.1935 music=1 DISPUTE  text='Даже с такой точек удаа...'
+01:44:06.853 [transcriber] seg[492] KEEP      start=1321.02 end=1323.18 nsp=0.1935  text='Даже с такой точек удаа...'
+01:44:06.853 [transcriber] seg[494] KEEP [?] start=1323.26 end=1326.06 nsp=0.1935 music=1 DISPUTE  text='Можно стоить за..'
+01:44:06.853 [transcriber] seg[494] KEEP      start=1323.26 end=1326.06 nsp=0.1935  text='Можно стоить за..'
+01:44:06.853 [transcriber] seg[496] KEEP [?] start=1329.86 end=1330.82 nsp=0.1935 music=1 DISPUTE  text='Ahahaha!'
+01:44:06.853 [transcriber] seg[496] KEEP      start=1329.86 end=1330.82 nsp=0.1935  text='Ahahaha!'
+01:44:06.853 [transcriber] seg[498] KEEP [?] start=1330.82 end=1332.82 nsp=0.1935 music=1 DISPUTE  text='Маааааааа...'
+01:44:06.853 [transcriber] seg[498] DROP L2   start=1330.82 end=1332.82 nsp=0.1935  text='Маааааааа...'
+01:44:06.853 [transcriber] seg[499] KEEP [?] start=1332.86 end=1334.18 nsp=0.1935 music=1 DISPUTE  text='Ой, соль!'
+01:44:06.853 [transcriber] seg[499] KEEP      start=1332.86 end=1334.18 nsp=0.1935  text='Ой, соль!'
+01:44:06.853 [transcriber] seg[501] KEEP [?] start=1334.94 end=1336.34 nsp=0.1935 music=1 DISPUTE  text='Аааааааа!'
+01:44:06.853 [transcriber] seg[501] DROP L2   start=1334.94 end=1336.34 nsp=0.1935  text='Аааааааа!'
+01:44:06.853 [transcriber] seg[502] KEEP [?] start=1336.46 end=1337.76 nsp=0.1935 music=1 DISPUTE  text='Аааааааааа!'
+01:44:06.853 [transcriber] seg[502] DROP L2   start=1336.46 end=1337.76 nsp=0.1935  text='Аааааааааа!'
+01:44:06.853 [transcriber] seg[503] KEEP [?] start=1338.46 end=1342.84 nsp=0.1935 music=1 DISPUTE  text='Ааааааааааааааааааааааааааа...'
+01:44:06.853 [transcriber] seg[503] DROP L2   start=1338.46 end=1342.84 nsp=0.1935  text='Ааааааааааааааааааааааааааа...'
+01:44:06.853 [transcriber] seg[504] KEEP [?] start=1343.62 end=1345.62 nsp=0.1935 music=1 DISPUTE  text='Аааааааааа...'
+01:44:06.853 [transcriber] seg[504] DROP L2   start=1343.62 end=1345.62 nsp=0.1935  text='Аааааааааа...'
+01:44:06.853 [transcriber] seg[505] KEEP [?] start=1345.62 end=1346.98 nsp=0.1935 music=1 DISPUTE  text='Ааааааа...'
+01:44:06.853 [transcriber] seg[505] DROP L2   start=1345.62 end=1346.98 nsp=0.1935  text='Ааааааа...'
+01:44:06.853 [transcriber] seg[506] KEEP [?] start=1346.98 end=1348.98 nsp=0.0822 music=1 DISPUTE  text='Ага.'
+01:44:06.853 [transcriber] seg[506] KEEP      start=1346.98 end=1348.98 nsp=0.0822  text='Ага.'
+01:44:06.853 [transcriber] seg[508] KEEP [?] start=1348.98 end=1350.98 nsp=0.0822 music=1 DISPUTE  text='Ага.'
+01:44:06.853 [transcriber] seg[508] KEEP      start=1348.98 end=1350.98 nsp=0.0822  text='Ага.'
+01:44:06.853 [transcriber] seg[510] KEEP [?] start=1350.98 end=1352.98 nsp=0.0822 music=1 DISPUTE  text='Ага.'
+01:44:06.853 [transcriber] seg[510] KEEP      start=1350.98 end=1352.98 nsp=0.0822  text='Ага.'
+01:44:06.853 [transcriber] seg[512] KEEP [?] start=1352.98 end=1354.98 nsp=0.0822 music=1 DISPUTE  text='Ага.'
+01:44:06.853 [transcriber] seg[512] KEEP      start=1352.98 end=1354.98 nsp=0.0822  text='Ага.'
+01:44:06.853 [transcriber] seg[514] KEEP [?] start=1354.98 end=1356.98 nsp=0.0822 music=1 DISPUTE  text='Ага.'
+01:44:06.853 [transcriber] seg[514] KEEP      start=1354.98 end=1356.98 nsp=0.0822  text='Ага.'
+01:44:06.853 [transcriber] seg[516] KEEP [?] start=1362.98 end=1364.98 nsp=0.0822 music=1 DISPUTE  text='Ну.'
+01:44:06.853 [transcriber] seg[516] KEEP      start=1362.98 end=1364.98 nsp=0.0822  text='Ну.'
+01:44:06.853 [transcriber] seg[518] KEEP [?] start=1364.98 end=1367.98 nsp=0.0822 music=1 DISPUTE  text='Ты там да свои денежки?'
+01:44:06.853 [transcriber] seg[518] KEEP      start=1364.98 end=1367.98 nsp=0.0822  text='Ты там да свои денежки?'
+01:44:06.853 [transcriber] seg[520] KEEP [?] start=1367.98 end=1371.98 nsp=0.0822 music=1 DISPUTE  text='Ну, видишь, она у не страшного, даже хорошо.'
+01:44:06.853 [transcriber] seg[520] KEEP      start=1367.98 end=1371.98 nsp=0.0822  text='Ну, видишь, она у не страшного, даже хорошо.'
+01:44:06.853 [transcriber] seg[522] KEEP [?] start=1371.98 end=1374.98 nsp=0.0822 music=1 DISPUTE  text='Ну, с тобой было не страшно, действительно.'
+01:44:06.853 [transcriber] seg[522] KEEP      start=1371.98 end=1374.98 nsp=0.0822  text='Ну, с тобой было не страшно, действительно.'
+01:44:06.853 [transcriber] seg[524] KEEP [?] start=1374.98 end=1378.98 nsp=0.1532 music=1 DISPUTE  text='Все, тогда сейчас эти на карту закинул, так что можешь идти передеваться.'
+01:44:06.853 [transcriber] seg[524] KEEP      start=1374.98 end=1378.98 nsp=0.1532  text='Все, тогда сейчас эти на карту закинул, так что можешь идти передеваться.'
+01:44:06.853 [transcriber] seg[526] KEEP [?] start=1378.98 end=1379.98 nsp=0.1532 music=1 DISPUTE  text='Хорошо.'
+01:44:06.853 [transcriber] seg[526] KEEP      start=1378.98 end=1379.98 nsp=0.1532  text='Хорошо.'
+01:44:06.853 [transcriber] seg[528] KEEP [?] start=1379.98 end=1381.98 nsp=0.1532 music=1 DISPUTE  text='И помнит наш стабую секретик.'
+01:44:06.853 [transcriber] seg[528] KEEP      start=1379.98 end=1381.98 nsp=0.1532  text='И помнит наш стабую секретик.'
+01:44:06.853 [transcriber] seg[530] KEEP [?] start=1381.98 end=1382.98 nsp=0.1532 music=1 DISPUTE  text='Да, да.'
+01:44:06.853 [transcriber] seg[530] KEEP      start=1381.98 end=1382.98 nsp=0.1532  text='Да, да.'
+01:44:06.853 [transcriber] seg[532] KEEP [?] start=1382.98 end=1384.98 nsp=0.1532 music=1 DISPUTE  text='Так же, как и продвиг в собак.'
+01:44:06.853 [transcriber] seg[532] KEEP      start=1382.98 end=1384.98 nsp=0.1532  text='Так же, как и продвиг в собак.'
+01:44:06.853 [transcriber] seg[534] KEEP [?] start=1384.98 end=1385.98 nsp=0.1532 music=1 DISPUTE  text='Да, да.'
+01:44:06.853 [transcriber] seg[534] KEEP      start=1384.98 end=1385.98 nsp=0.1532  text='Да, да.'
+01:44:06.853 [transcriber] seg[536] KEEP [?] start=1385.98 end=1389.98 nsp=0.1532 music=1 DISPUTE  text='Заимные секреты я это не нравится, что сейчас ждут это денежку и пойду.'
+01:44:06.853 [transcriber] seg[536] KEEP      start=1385.98 end=1389.98 nsp=0.1532  text='Заимные секреты я это не нравится, что сейчас ждут это денежку и пойду.'
+01:44:06.853 [transcriber] seg[538] KEEP [?] start=1389.98 end=1393.98 nsp=0.1532 music=1 DISPUTE  text='И продолжу обокращаться играть.'
+01:44:06.853 [transcriber] seg[538] KEEP      start=1389.98 end=1393.98 nsp=0.1532  text='И продолжу обокращаться играть.'
+01:44:06.853 [transcriber] seg[540] KEEP [?] start=1393.98 end=1394.98 nsp=0.1532 music=1 DISPUTE  text='Ага.'
+01:44:06.853 [transcriber] seg[540] KEEP      start=1393.98 end=1394.98 nsp=0.1532  text='Ага.'
+01:44:06.853 [transcriber] seg[542] KEEP [?] start=1394.98 end=1396.98 nsp=0.1532 music=1 DISPUTE  text='Кормить собак. Давай.'
+01:44:06.853 [transcriber] seg[542] KEEP      start=1394.98 end=1396.98 nsp=0.1532  text='Кормить собак. Давай.'
+01:44:06.853 [transcriber] seg[544] KEEP [?] start=1404.98 end=1406.98 nsp=0.1696 music=1 DISPUTE  text='Но…'
+01:44:06.853 [transcriber] seg[544] KEEP      start=1404.98 end=1406.98 nsp=0.1696  text='Но…'
+01:44:06.853 [transcriber] seg[546] KEEP [?] start=1408.98 end=1410.98 nsp=0.1696 music=1 DISPUTE  text='Так у якцепат и либо она е...'
+01:44:06.853 [transcriber] seg[546] KEEP      start=1408.98 end=1410.98 nsp=0.1696  text='Так у якцепат и либо она е...'
+01:44:06.853 [transcriber] seg[548] KEEP [?] start=1420.98 end=1426.98 nsp=0.1696 music=1 DISPUTE  text='Саш! Слушай, что так мы делаем, мать! Ну, может, это оповторим? Ты что у нас был'
+01:44:06.853 [transcriber] seg[548] KEEP      start=1420.98 end=1426.98 nsp=0.1696  text='Саш! Слушай, что так мы делаем, мать! Ну, может, это оповторим? Ты что у нас был'
+01:44:06.853 [transcriber] seg[550] KEEP [?] start=1427.98 end=1429.98 nsp=0.1696 music=1 DISPUTE  text='Рыву по-вторых, где она? Тут ещё он для…'
+01:44:06.853 [transcriber] seg[550] KEEP      start=1427.98 end=1429.98 nsp=0.1696  text='Рыву по-вторых, где она? Тут ещё он для…'
+01:44:06.853 [transcriber] seg[552] KEEP [?] start=1430.98 end=1432.98 nsp=0.1696 music=1 DISPUTE  text='Спер мой жопы не высохов, потому что прошли...'
+01:44:06.853 [transcriber] seg[552] KEEP      start=1430.98 end=1432.98 nsp=0.1696  text='Спер мой жопы не высохов, потому что прошли...'
+01:44:06.853 [transcriber] seg[554] KEEP [?] start=1432.98 end=1439.98 nsp=0.4664 music=1 DISPUTE  text='Ну, ну, может быть, повторяно. Я ушко все, она как бы отстреля. Зачем повторяй-т'
+01:44:06.853 [transcriber] seg[554] KEEP      start=1432.98 end=1439.98 nsp=0.4664  text='Ну, ну, может быть, повторяно. Я ушко все, она как бы отстреля. Зачем повторяй-т'
+01:44:06.853 [transcriber] seg[556] KEEP [?] start=1439.98 end=1443.98 nsp=0.4664 music=1 DISPUTE  text='Ну, хочу, очень сильно. Так, подходит, слышно.'
+01:44:06.853 [transcriber] seg[556] KEEP      start=1439.98 end=1443.98 nsp=0.4664  text='Ну, хочу, очень сильно. Так, подходит, слышно.'
+01:44:06.853 [transcriber] seg[558] KEEP [?] start=1443.98 end=1445.98 nsp=0.4664 music=1 DISPUTE  text='Ну, давай покожайся, хочется, давай вечер.'
+01:44:06.853 [transcriber] seg[558] KEEP      start=1443.98 end=1445.98 nsp=0.4664  text='Ну, давай покожайся, хочется, давай вечер.'
+01:44:06.854 [transcriber] seg[560] KEEP [?] start=1445.98 end=1449.98 nsp=0.4664 music=1 DISPUTE  text='Ну, ну, может, просто мне было начестно говоря, ну, мне вот на ластов.'
+01:44:06.854 [transcriber] seg[560] KEEP      start=1445.98 end=1449.98 nsp=0.4664  text='Ну, ну, может, просто мне было начестно говоря, ну, мне вот на ластов.'
+01:44:06.854 [transcriber] seg[562] KEEP [?] start=1449.98 end=1451.98 nsp=0.4664 music=1 DISPUTE  text='Ой, нет, все, Дянь, все, давай.'
+01:44:06.854 [transcriber] seg[562] KEEP      start=1449.98 end=1451.98 nsp=0.4664  text='Ой, нет, все, Дянь, все, давай.'
+01:44:06.854 [transcriber] seg[564] KEEP [?] start=1451.98 end=1453.98 nsp=0.4664 music=1 DISPUTE  text='Саш, нет, ну почему?'
+01:44:06.854 [transcriber] seg[564] KEEP      start=1451.98 end=1453.98 nsp=0.4664  text='Саш, нет, ну почему?'
+01:44:06.854 [transcriber] seg[566] KEEP [?] start=1453.98 end=1458.98 nsp=0.4664 music=1 DISPUTE  text='Я тебе уже дал, и на ластов, и на ластов, ласт, ласт, ласт, на все ласты, все.'
+01:44:06.854 [transcriber] seg[566] KEEP      start=1453.98 end=1458.98 nsp=0.4664  text='Я тебе уже дал, и на ластов, и на ластов, ласт, ласт, ласт, на все ласты, все.'
+01:44:06.854 [transcriber] seg[568] KEEP [?] start=1458.98 end=1459.98 nsp=0.0806 music=1 DISPUTE  text='Нет.'
+01:44:06.854 [transcriber] seg[568] KEEP      start=1458.98 end=1459.98 nsp=0.0806  text='Нет.'
+01:44:06.854 [transcriber] seg[570] KEEP [?] start=1459.98 end=1460.98 nsp=0.0806 music=1 DISPUTE  text='Нет.'
+01:44:06.854 [transcriber] seg[570] KEEP      start=1459.98 end=1460.98 nsp=0.0806  text='Нет.'
+01:44:06.854 [transcriber] seg[572] KEEP [?] start=1460.98 end=1461.98 nsp=0.0806 music=1 DISPUTE  text='Нет.'
+01:44:06.854 [transcriber] seg[572] KEEP      start=1460.98 end=1461.98 nsp=0.0806  text='Нет.'
+01:44:06.854 [transcriber] seg[574] KEEP [?] start=1461.98 end=1462.98 nsp=0.0806 music=1 DISPUTE  text='Ну, собаки голодают.'
+01:44:06.854 [transcriber] seg[574] KEEP      start=1461.98 end=1462.98 nsp=0.0806  text='Ну, собаки голодают.'
+01:44:06.854 [transcriber] seg[576] KEEP [?] start=1462.98 end=1466.98 nsp=0.0806 music=1 DISPUTE  text='Дианы, если ты сейчас не останешь, сейчас всем расскажу каких-то собаков.'
+01:44:06.854 [transcriber] seg[576] KEEP      start=1462.98 end=1466.98 nsp=0.0806  text='Дианы, если ты сейчас не останешь, сейчас всем расскажу каких-то собаков.'
+01:44:06.854 [transcriber] seg[578] KEEP [?] start=1466.98 end=1467.98 nsp=0.0806 music=1 DISPUTE  text='Ждавай уходи.'
+01:44:06.854 [transcriber] seg[578] KEEP      start=1466.98 end=1467.98 nsp=0.0806  text='Ждавай уходи.'
+01:44:06.854 [transcriber] seg[580] KEEP [?] start=1467.98 end=1468.98 nsp=0.0806 music=1 DISPUTE  text='Нет.'
+01:44:06.854 [transcriber] seg[580] KEEP      start=1467.98 end=1468.98 nsp=0.0806  text='Нет.'
+01:44:06.854 [transcriber] seg[582] KEEP [?] start=1468.98 end=1469.98 nsp=0.0806 music=1 DISPUTE  text='Уходи.'
+01:44:06.854 [transcriber] seg[582] KEEP      start=1468.98 end=1469.98 nsp=0.0806  text='Уходи.'
+01:44:06.854 [transcriber] seg[584] KEEP [?] start=1469.98 end=1470.98 nsp=0.0806 music=1 DISPUTE  text='Уходи.'
+01:44:06.854 [transcriber] seg[584] KEEP      start=1469.98 end=1470.98 nsp=0.0806  text='Уходи.'
+01:44:06.854 [transcriber] seg[586] KEEP [?] start=1470.98 end=1471.98 nsp=0.0806 music=1 DISPUTE  text='Ну, давай еще.'
+01:44:06.854 [transcriber] seg[586] KEEP      start=1470.98 end=1471.98 nsp=0.0806  text='Ну, давай еще.'
+01:44:06.854 [transcriber] seg[588] KEEP [?] start=1471.98 end=1472.98 nsp=0.0806 music=1 DISPUTE  text='Уходи.'
+01:44:06.854 [transcriber] seg[588] KEEP      start=1471.98 end=1472.98 nsp=0.0806  text='Уходи.'
+01:44:06.854 [transcriber] seg[590] KEEP [?] start=1472.98 end=1473.98 nsp=0.0806 music=1 DISPUTE  text='Кыш.'
+01:44:06.854 [transcriber] seg[590] KEEP      start=1472.98 end=1473.98 nsp=0.0806  text='Кыш.'
+01:44:06.854 [transcriber] seg[592] KEEP [?] start=1473.98 end=1474.98 nsp=0.0806 music=1 DISPUTE  text='Ну, давай видно.'
+01:44:06.854 [transcriber] seg[592] KEEP      start=1473.98 end=1474.98 nsp=0.0806  text='Ну, давай видно.'
+01:44:06.854 [transcriber] seg[594] KEEP [?] start=1474.98 end=1475.98 nsp=0.0806 music=1 DISPUTE  text='Кыш.'
+01:44:06.854 [transcriber] seg[594] KEEP      start=1474.98 end=1475.98 nsp=0.0806  text='Кыш.'
+01:44:06.854 [transcriber] seg[596] KEEP [?] start=1475.98 end=1477.98 nsp=0.0806 music=1 DISPUTE  text='Я еще жопа, наверное, не затянулась.'
+01:44:06.854 [transcriber] seg[596] KEEP      start=1475.98 end=1477.98 nsp=0.0806  text='Я еще жопа, наверное, не затянулась.'
+01:44:06.854 [transcriber] seg[598] KEEP [?] start=1477.98 end=1479.98 nsp=0.0806 music=1 DISPUTE  text='Просто без чувства не человек.'
+01:44:06.854 [transcriber] seg[598] KEEP      start=1477.98 end=1479.98 nsp=0.0806  text='Просто без чувства не человек.'
+01:44:06.854 [transcriber] seg[600] KEEP [?] start=1479.98 end=1481.98 nsp=0.0806 music=1 DISPUTE  text='Давай, давай, давай, давай.'
+01:44:06.854 [transcriber] seg[600] DROP L2   start=1479.98 end=1481.98 nsp=0.0806  text='Давай, давай, давай, давай.'
+01:44:06.854 [transcriber] 过滤摘要: 总=322 保留=280 丢弃=42 (L1a=1 L2=41 L4=0) 存疑=279
+01:44:06.854 [transcriber] 说话人检测开始 (threshold=0.75)
+01:44:07.053 [transcriber] 说话人变化: seg[1] start=9.08 sim=0.423 < 0.75
+01:44:07.076 [transcriber] 说话人变化: seg[2] start=11.84 sim=0.524 < 0.75
+01:44:07.099 [transcriber] 说话人变化: seg[3] start=14.84 sim=0.599 < 0.75
+01:44:07.111 [transcriber] 说话人变化: seg[4] start=18.12 sim=0.592 < 0.75
+01:44:07.153 [transcriber] 说话人变化: seg[6] start=23.60 sim=0.432 < 0.75
+01:44:07.165 [transcriber] 说话人变化: seg[7] start=24.60 sim=0.547 < 0.75
+01:44:07.198 [transcriber] 说话人变化: seg[8] start=25.60 sim=0.414 < 0.75
+01:44:07.229 [transcriber] 说话人变化: seg[9] start=30.08 sim=0.537 < 0.75
+01:44:07.264 [transcriber] 说话人变化: seg[11] start=37.04 sim=0.429 < 0.75
+01:44:07.277 [transcriber] 说话人变化: seg[12] start=38.24 sim=0.390 < 0.75
+01:44:07.290 [transcriber] 说话人变化: seg[13] start=40.48 sim=0.488 < 0.75
+01:44:07.302 [transcriber] 说话人变化: seg[14] start=42.84 sim=0.424 < 0.75
+01:44:07.336 [transcriber] 说话人变化: seg[15] start=44.72 sim=0.729 < 0.75
+01:44:07.347 [transcriber] 说话人变化: seg[16] start=50.40 sim=0.349 < 0.75
+01:44:07.359 [transcriber] 说话人变化: seg[17] start=51.40 sim=0.734 < 0.75
+01:44:07.394 [transcriber] 说话人变化: seg[19] start=53.42 sim=0.457 < 0.75
+01:44:07.418 [transcriber] 说话人变化: seg[20] start=55.56 sim=0.531 < 0.75
+01:44:07.430 [transcriber] 说话人变化: seg[21] start=59.26 sim=0.422 < 0.75
+01:44:07.442 [transcriber] 说话人变化: seg[22] start=60.66 sim=0.484 < 0.75
+01:44:07.466 [transcriber] 说话人变化: seg[23] start=61.90 sim=0.482 < 0.75
+01:44:07.539 [transcriber] 说话人变化: seg[27] start=72.74 sim=0.422 < 0.75
+01:44:07.637 [transcriber] 说话人变化: seg[31] start=81.44 sim=0.531 < 0.75
+01:44:07.677 [transcriber] 说话人变化: seg[32] start=87.44 sim=0.624 < 0.75
+01:44:07.706 [transcriber] 说话人变化: seg[33] start=97.44 sim=0.557 < 0.75
+01:44:07.730 [transcriber] 说话人变化: seg[34] start=101.44 sim=0.523 < 0.75
+01:44:07.769 [transcriber] 说话人变化: seg[35] start=104.44 sim=0.564 < 0.75
+01:44:07.782 [transcriber] 说话人变化: seg[36] start=111.44 sim=0.552 < 0.75
+01:44:07.794 [transcriber] 说话人变化: seg[37] start=113.44 sim=0.424 < 0.75
+01:44:07.828 [transcriber] 说话人变化: seg[38] start=117.44 sim=0.727 < 0.75
+01:44:07.840 [transcriber] 说话人变化: seg[39] start=122.44 sim=0.331 < 0.75
+01:44:07.864 [transcriber] 说话人变化: seg[40] start=123.44 sim=0.445 < 0.75
+01:44:07.929 [transcriber] 说话人变化: seg[43] start=134.56 sim=0.611 < 0.75
+01:44:07.957 [transcriber] 说话人变化: seg[44] start=135.12 sim=0.263 < 0.75
+01:44:07.996 [transcriber] 说话人变化: seg[46] start=141.88 sim=0.346 < 0.75
+01:44:08.044 [transcriber] 说话人变化: seg[49] start=149.12 sim=0.330 < 0.75
+01:44:08.055 [transcriber] 说话人变化: seg[50] start=153.88 sim=0.314 < 0.75
+01:44:08.079 [transcriber] 说话人变化: seg[51] start=155.40 sim=0.332 < 0.75
+01:44:08.104 [transcriber] 说话人变化: seg[52] start=157.80 sim=0.741 < 0.75
+01:44:08.159 [transcriber] 说话人变化: seg[53] start=160.48 sim=0.688 < 0.75
+01:44:08.184 [transcriber] 说话人变化: seg[54] start=169.48 sim=0.657 < 0.75
+01:44:08.223 [transcriber] 说话人变化: seg[55] start=171.48 sim=0.533 < 0.75
+01:44:08.252 [transcriber] 说话人变化: seg[56] start=178.48 sim=0.459 < 0.75
+01:44:08.265 [transcriber] 说话人变化: seg[57] start=182.48 sim=0.457 < 0.75
+01:44:08.294 [transcriber] 说话人变化: seg[58] start=185.48 sim=0.662 < 0.75
+01:44:08.306 [transcriber] 说话人变化: seg[59] start=189.72 sim=0.556 < 0.75
+01:44:08.318 [transcriber] 说话人变化: seg[60] start=191.68 sim=0.599 < 0.75
+01:44:08.352 [transcriber] 说话人变化: seg[61] start=193.12 sim=0.521 < 0.75
+01:44:08.364 [transcriber] 说话人变化: seg[62] start=197.96 sim=0.725 < 0.75
+01:44:08.392 [transcriber] 说话人变化: seg[63] start=199.92 sim=0.461 < 0.75
+01:44:08.405 [transcriber] 说话人变化: seg[64] start=203.80 sim=0.395 < 0.75
+01:44:08.441 [transcriber] 说话人变化: seg[65] start=206.58 sim=0.475 < 0.75
+01:44:08.453 [transcriber] 说话人变化: seg[66] start=213.72 sim=0.393 < 0.75
+01:44:08.465 [transcriber] 说话人变化: seg[67] start=214.72 sim=0.473 < 0.75
+01:44:08.477 [transcriber] 说话人变化: seg[68] start=216.72 sim=0.297 < 0.75
+01:44:08.505 [transcriber] 说话人变化: seg[69] start=217.72 sim=0.558 < 0.75
+01:44:08.545 [transcriber] 说话人变化: seg[71] start=224.32 sim=0.612 < 0.75
+01:44:08.568 [transcriber] 说话人变化: seg[72] start=225.32 sim=0.575 < 0.75
+01:44:08.580 [transcriber] 说话人变化: seg[73] start=227.72 sim=0.526 < 0.75
+01:44:08.592 [transcriber] 说话人变化: seg[74] start=229.72 sim=0.422 < 0.75
+01:44:08.605 [transcriber] 说话人变化: seg[75] start=235.72 sim=0.656 < 0.75
+01:44:08.616 [transcriber] 说话人变化: seg[76] start=238.72 sim=0.442 < 0.75
+01:44:08.628 [transcriber] 说话人变化: seg[77] start=239.72 sim=0.501 < 0.75
+01:44:08.653 [transcriber] 说话人变化: seg[78] start=243.72 sim=0.699 < 0.75
+01:44:08.665 [transcriber] 说话人变化: seg[79] start=247.72 sim=0.690 < 0.75
+01:44:08.696 [transcriber] 说话人变化: seg[80] start=249.72 sim=0.366 < 0.75
+01:44:08.708 [transcriber] 说话人变化: seg[81] start=253.72 sim=0.579 < 0.75
+01:44:08.720 [transcriber] 说话人变化: seg[82] start=255.72 sim=0.282 < 0.75
+01:44:08.731 [transcriber] 说话人变化: seg[83] start=257.72 sim=0.375 < 0.75
+01:44:08.743 [transcriber] 说话人变化: seg[84] start=258.72 sim=0.733 < 0.75
+01:44:08.755 [transcriber] 说话人变化: seg[85] start=259.72 sim=0.691 < 0.75
+01:44:08.780 [transcriber] 说话人变化: seg[86] start=266.72 sim=0.522 < 0.75
+01:44:08.824 [transcriber] 说话人变化: seg[88] start=339.72 sim=0.395 < 0.75
+01:44:08.882 [transcriber] 说话人变化: seg[89] start=341.72 sim=0.380 < 0.75
+01:44:08.894 [transcriber] 说话人变化: seg[90] start=358.72 sim=0.555 < 0.75
+01:44:08.905 [transcriber] 说话人变化: seg[91] start=360.72 sim=0.606 < 0.75
+01:44:08.917 [transcriber] 说话人变化: seg[92] start=361.72 sim=0.479 < 0.75
+01:44:08.929 [transcriber] 说话人变化: seg[93] start=373.72 sim=0.244 < 0.75
+01:44:08.942 [transcriber] 说话人变化: seg[94] start=383.72 sim=0.691 < 0.75
+01:44:08.954 [transcriber] 说话人变化: seg[95] start=389.36 sim=0.360 < 0.75
+01:44:08.966 [transcriber] 说话人变化: seg[96] start=391.02 sim=0.446 < 0.75
+01:44:08.976 [transcriber] 说话人变化: seg[97] start=394.04 sim=0.554 < 0.75
+01:44:08.987 [transcriber] 说话人变化: seg[98] start=394.96 sim=0.679 < 0.75
+01:44:08.999 [transcriber] 说话人变化: seg[99] start=399.76 sim=0.671 < 0.75
+01:44:09.010 [transcriber] 说话人变化: seg[100] start=401.28 sim=0.452 < 0.75
+01:44:09.020 [transcriber] 说话人变化: seg[101] start=409.50 sim=0.656 < 0.75
+01:44:09.032 [transcriber] 说话人变化: seg[102] start=410.20 sim=0.451 < 0.75
+01:44:09.044 [transcriber] 说话人变化: seg[103] start=414.52 sim=0.543 < 0.75
+01:44:09.055 [transcriber] 说话人变化: seg[104] start=416.52 sim=0.713 < 0.75
+01:44:09.067 [transcriber] 说话人变化: seg[105] start=418.00 sim=0.699 < 0.75
+01:44:09.080 [transcriber] 说话人变化: seg[106] start=423.00 sim=0.561 < 0.75
+01:44:09.091 [transcriber] 说话人变化: seg[107] start=432.00 sim=0.463 < 0.75
+01:44:09.103 [transcriber] 说话人变化: seg[108] start=448.00 sim=0.410 < 0.75
+01:44:09.115 [transcriber] 说话人变化: seg[109] start=452.00 sim=0.489 < 0.75
+01:44:09.127 [transcriber] 说话人变化: seg[110] start=454.00 sim=0.495 < 0.75
+01:44:09.158 [transcriber] 说话人变化: seg[111] start=478.00 sim=0.543 < 0.75
+01:44:09.260 [transcriber] 说话人变化: seg[114] start=507.42 sim=0.715 < 0.75
+01:44:09.272 [transcriber] 说话人变化: seg[115] start=509.54 sim=0.592 < 0.75
+01:44:09.301 [transcriber] 说话人变化: seg[116] start=511.02 sim=0.539 < 0.75
+01:44:09.314 [transcriber] 说话人变化: seg[117] start=521.08 sim=0.721 < 0.75
+01:44:09.327 [transcriber] 说话人变化: seg[118] start=535.08 sim=0.668 < 0.75
+01:44:09.339 [transcriber] 说话人变化: seg[119] start=548.08 sim=0.660 < 0.75
+01:44:09.370 [transcriber] 说话人变化: seg[120] start=551.08 sim=0.672 < 0.75
+01:44:09.469 [transcriber] 说话人变化: seg[123] start=574.36 sim=0.543 < 0.75
+01:44:09.480 [transcriber] 说话人变化: seg[125] start=576.54 sim=0.701 < 0.75
+01:44:09.491 [transcriber] 说话人变化: seg[126] start=577.80 sim=0.615 < 0.75
+01:44:09.524 [transcriber] 说话人变化: seg[127] start=578.40 sim=0.501 < 0.75
+01:44:09.584 [transcriber] 说话人变化: seg[130] start=597.58 sim=0.694 < 0.75
+01:44:09.596 [transcriber] 说话人变化: seg[131] start=599.74 sim=0.343 < 0.75
+01:44:09.608 [transcriber] 说话人变化: seg[132] start=600.88 sim=0.506 < 0.75
+01:44:09.759 [transcriber] 说话人变化: seg[133] start=602.68 sim=0.709 < 0.75
+01:44:09.836 [transcriber] 说话人变化: seg[136] start=660.68 sim=0.493 < 0.75
+01:44:09.862 [transcriber] 说话人变化: seg[137] start=666.68 sim=0.476 < 0.75
+01:44:09.875 [transcriber] 说话人变化: seg[138] start=670.68 sim=0.640 < 0.75
+01:44:09.902 [transcriber] 说话人变化: seg[139] start=676.68 sim=0.708 < 0.75
+01:44:09.915 [transcriber] 说话人变化: seg[140] start=680.70 sim=0.638 < 0.75
+01:44:09.943 [transcriber] 说话人变化: seg[141] start=685.92 sim=0.646 < 0.75
+01:44:09.955 [transcriber] 说话人变化: seg[142] start=703.20 sim=0.451 < 0.75
+01:44:09.991 [transcriber] 说话人变化: seg[143] start=734.00 sim=0.387 < 0.75
+01:44:10.064 [transcriber] 说话人变化: seg[146] start=753.72 sim=0.726 < 0.75
+01:44:10.075 [transcriber] 说话人变化: seg[147] start=757.56 sim=0.401 < 0.75
+01:44:10.087 [transcriber] 说话人变化: seg[148] start=759.06 sim=0.505 < 0.75
+01:44:10.098 [transcriber] 说话人变化: seg[149] start=760.44 sim=0.692 < 0.75
+01:44:10.120 [transcriber] 说话人变化: seg[151] start=762.36 sim=0.482 < 0.75
+01:44:10.132 [transcriber] 说话人变化: seg[152] start=763.06 sim=0.480 < 0.75
+01:44:10.157 [transcriber] 说话人变化: seg[153] start=764.28 sim=0.577 < 0.75
+01:44:10.181 [transcriber] 说话人变化: seg[154] start=767.54 sim=0.531 < 0.75
+01:44:10.192 [transcriber] 说话人变化: seg[155] start=770.48 sim=0.338 < 0.75
+01:44:10.203 [transcriber] 说话人变化: seg[156] start=773.06 sim=0.617 < 0.75
+01:44:10.215 [transcriber] 说话人变化: seg[157] start=774.16 sim=0.445 < 0.75
+01:44:10.227 [transcriber] 说话人变化: seg[158] start=776.16 sim=0.428 < 0.75
+01:44:10.238 [transcriber] 说话人变化: seg[159] start=778.16 sim=0.615 < 0.75
+01:44:10.250 [transcriber] 说话人变化: seg[160] start=779.16 sim=0.649 < 0.75
+01:44:10.262 [transcriber] 说话人变化: seg[161] start=781.16 sim=0.370 < 0.75
+01:44:10.275 [transcriber] 说话人变化: seg[162] start=783.16 sim=0.545 < 0.75
+01:44:10.300 [transcriber] 说话人变化: seg[163] start=785.16 sim=0.719 < 0.75
+01:44:10.312 [transcriber] 说话人变化: seg[164] start=788.16 sim=0.538 < 0.75
+01:44:10.324 [transcriber] 说话人变化: seg[165] start=790.16 sim=0.521 < 0.75
+01:44:10.348 [transcriber] 说话人变化: seg[166] start=792.16 sim=0.445 < 0.75
+01:44:10.359 [transcriber] 说话人变化: seg[167] start=795.16 sim=0.450 < 0.75
+01:44:10.383 [transcriber] 说话人变化: seg[168] start=796.16 sim=0.662 < 0.75
+01:44:10.394 [transcriber] 说话人变化: seg[169] start=798.16 sim=0.425 < 0.75
+01:44:10.406 [transcriber] 说话人变化: seg[170] start=799.16 sim=0.441 < 0.75
+01:44:10.417 [transcriber] 说话人变化: seg[171] start=800.16 sim=0.693 < 0.75
+01:44:10.428 [transcriber] 说话人变化: seg[172] start=801.16 sim=0.681 < 0.75
+01:44:10.440 [transcriber] 说话人变化: seg[173] start=802.16 sim=0.385 < 0.75
+01:44:10.452 [transcriber] 说话人变化: seg[174] start=811.16 sim=0.580 < 0.75
+01:44:10.475 [transcriber] 说话人变化: seg[175] start=815.16 sim=0.669 < 0.75
+01:44:10.487 [transcriber] 说话人变化: seg[176] start=827.16 sim=0.620 < 0.75
+01:44:10.516 [transcriber] 说话人变化: seg[177] start=859.16 sim=0.550 < 0.75
+01:44:10.539 [transcriber] 说话人变化: seg[179] start=869.96 sim=0.339 < 0.75
+01:44:10.563 [transcriber] 说话人变化: seg[181] start=874.72 sim=0.749 < 0.75
+01:44:10.574 [transcriber] 说话人变化: seg[182] start=880.12 sim=0.615 < 0.75
+01:44:10.585 [transcriber] 说话人变化: seg[183] start=882.40 sim=0.492 < 0.75
+01:44:10.610 [transcriber] 说话人变化: seg[184] start=884.12 sim=0.651 < 0.75
+01:44:10.622 [transcriber] 说话人变化: seg[185] start=887.12 sim=0.695 < 0.75
+01:44:10.635 [transcriber] 说话人变化: seg[186] start=899.12 sim=0.709 < 0.75
+01:44:10.783 [transcriber] 说话人变化: seg[187] start=914.12 sim=0.737 < 0.75
+01:44:10.821 [transcriber] 说话人变化: seg[189] start=957.04 sim=0.610 < 0.75
+01:44:10.844 [transcriber] 说话人变化: seg[190] start=961.16 sim=0.615 < 0.75
+01:44:10.856 [transcriber] 说话人变化: seg[191] start=964.84 sim=0.717 < 0.75
+01:44:10.891 [transcriber] 说话人变化: seg[192] start=979.12 sim=0.716 < 0.75
+01:44:10.927 [transcriber] 说话人变化: seg[194] start=987.68 sim=0.673 < 0.75
+01:44:10.939 [transcriber] 说话人变化: seg[195] start=989.40 sim=0.599 < 0.75
+01:44:10.964 [transcriber] 说话人变化: seg[196] start=991.28 sim=0.588 < 0.75
+01:44:10.976 [transcriber] 说话人变化: seg[197] start=995.40 sim=0.631 < 0.75
+01:44:10.988 [transcriber] 说话人变化: seg[198] start=997.28 sim=0.639 < 0.75
+01:44:11.000 [transcriber] 说话人变化: seg[199] start=999.40 sim=0.625 < 0.75
+01:44:11.039 [transcriber] 说话人变化: seg[200] start=1000.44 sim=0.658 < 0.75
+01:44:11.213 [transcriber] 说话人变化: seg[204] start=1070.96 sim=0.633 < 0.75
+01:44:11.318 [transcriber] 说话人变化: seg[205] start=1080.44 sim=0.732 < 0.75
+01:44:11.366 [transcriber] 说话人变化: seg[208] start=1124.46 sim=0.492 < 0.75
+01:44:11.378 [transcriber] 说话人变化: seg[209] start=1126.18 sim=0.424 < 0.75
+01:44:11.420 [transcriber] 说话人变化: seg[210] start=1131.42 sim=0.738 < 0.75
+01:44:11.482 [transcriber] 说话人变化: seg[212] start=1150.54 sim=0.715 < 0.75
+01:44:11.509 [transcriber] 说话人变化: seg[213] start=1154.90 sim=0.718 < 0.75
+01:44:11.583 [transcriber] 说话人变化: seg[216] start=1184.54 sim=0.548 < 0.75
+01:44:11.596 [transcriber] 说话人变化: seg[217] start=1188.18 sim=0.673 < 0.75
+01:44:11.621 [transcriber] 说话人变化: seg[218] start=1189.78 sim=0.514 < 0.75
+01:44:11.633 [transcriber] 说话人变化: seg[219] start=1194.62 sim=0.712 < 0.75
+01:44:11.899 [transcriber] 说话人变化: seg[225] start=1287.02 sim=0.742 < 0.75
+01:44:11.911 [transcriber] 说话人变化: seg[226] start=1305.66 sim=0.503 < 0.75
+01:44:11.934 [transcriber] 说话人变化: seg[227] start=1317.02 sim=0.409 < 0.75
+01:44:11.946 [transcriber] 说话人变化: seg[228] start=1319.22 sim=0.704 < 0.75
+01:44:11.959 [transcriber] 说话人变化: seg[229] start=1321.02 sim=0.633 < 0.75
+01:44:11.983 [transcriber] 说话人变化: seg[230] start=1323.26 sim=0.711 < 0.75
+01:44:11.994 [transcriber] 说话人变化: seg[231] start=1329.86 sim=0.493 < 0.75
+01:44:12.006 [transcriber] 说话人变化: seg[232] start=1332.86 sim=0.532 < 0.75
+01:44:12.029 [transcriber] 说话人变化: seg[234] start=1348.98 sim=0.636 < 0.75
+01:44:12.065 [transcriber] 说话人变化: seg[237] start=1354.98 sim=0.586 < 0.75
+01:44:12.091 [transcriber] 说话人变化: seg[239] start=1364.98 sim=0.445 < 0.75
+01:44:12.118 [transcriber] 说话人变化: seg[240] start=1367.98 sim=0.532 < 0.75
+01:44:12.142 [transcriber] 说话人变化: seg[241] start=1371.98 sim=0.398 < 0.75
+01:44:12.172 [transcriber] 说话人变化: seg[242] start=1374.98 sim=0.449 < 0.75
+01:44:12.183 [transcriber] 说话人变化: seg[243] start=1378.98 sim=0.429 < 0.75
+01:44:12.207 [transcriber] 说话人变化: seg[244] start=1379.98 sim=0.571 < 0.75
+01:44:12.218 [transcriber] 说话人变化: seg[245] start=1381.98 sim=0.526 < 0.75
+01:44:12.231 [transcriber] 说话人变化: seg[246] start=1382.98 sim=0.678 < 0.75
+01:44:12.242 [transcriber] 说话人变化: seg[247] start=1384.98 sim=0.535 < 0.75
+01:44:12.272 [transcriber] 说话人变化: seg[248] start=1385.98 sim=0.523 < 0.75
+01:44:12.308 [transcriber] 说话人变化: seg[250] start=1393.98 sim=0.273 < 0.75
+01:44:12.321 [transcriber] 说话人变化: seg[251] start=1394.98 sim=0.411 < 0.75
+01:44:12.333 [transcriber] 说话人变化: seg[252] start=1404.98 sim=0.336 < 0.75
+01:44:12.345 [transcriber] 说话人变化: seg[253] start=1408.98 sim=0.282 < 0.75
+01:44:12.393 [transcriber] 说话人变化: seg[255] start=1427.98 sim=0.490 < 0.75
+01:44:12.477 [transcriber] 说话人变化: seg[258] start=1439.98 sim=0.623 < 0.75
+01:44:12.500 [transcriber] 说话人变化: seg[259] start=1443.98 sim=0.515 < 0.75
+01:44:12.529 [transcriber] 说话人变化: seg[260] start=1445.98 sim=0.579 < 0.75
+01:44:12.542 [transcriber] 说话人变化: seg[261] start=1449.98 sim=0.486 < 0.75
+01:44:12.553 [transcriber] 说话人变化: seg[262] start=1451.98 sim=0.473 < 0.75
+01:44:12.586 [transcriber] 说话人变化: seg[263] start=1453.98 sim=0.507 < 0.75
+01:44:12.597 [transcriber] 说话人变化: seg[264] start=1458.98 sim=0.380 < 0.75
+01:44:12.631 [transcriber] 说话人变化: seg[267] start=1461.98 sim=0.732 < 0.75
+01:44:12.660 [transcriber] 说话人变化: seg[268] start=1462.98 sim=0.312 < 0.75
+01:44:12.672 [transcriber] 说话人变化: seg[269] start=1466.98 sim=0.537 < 0.75
+01:44:12.683 [transcriber] 说话人变化: seg[270] start=1467.98 sim=0.595 < 0.75
+01:44:12.694 [transcriber] 说话人变化: seg[271] start=1468.98 sim=0.704 < 0.75
+01:44:12.705 [transcriber] 说话人变化: seg[272] start=1469.98 sim=0.683 < 0.75
+01:44:12.716 [transcriber] 说话人变化: seg[273] start=1470.98 sim=0.520 < 0.75
+01:44:12.727 [transcriber] 说话人变化: seg[274] start=1471.98 sim=0.604 < 0.75
+01:44:12.750 [transcriber] 说话人变化: seg[276] start=1473.98 sim=0.552 < 0.75
+01:44:12.761 [transcriber] 说话人变化: seg[277] start=1474.98 sim=0.482 < 0.75
+01:44:12.773 [transcriber] 说话人变化: seg[278] start=1475.98 sim=0.535 < 0.75
+01:44:12.785 [transcriber] 说话人变化: seg[279] start=1477.98 sim=0.368 < 0.75
+01:44:12.785 [transcriber] 说话人检测完成: 223 处变化 (threshold=0.75)
+01:44:12.786 [transcriber] transcribe() 结束: 返回 280 段
+01:44:12.801 [translator] 翻译开始: 280 句 → 4 批 (每批上限 2000 字符)
+01:44:12.801 [translator] 批次 1/4: 49 句, 字符数=1965
+01:44:40.354 [translator] 批次 1/4: 49/49 成功 (第 1 次尝试)
+01:44:41.361 [translator] 批次 2/4: 84 句, 字符数=1954
+01:45:11.762 [translator] 批次 2/4: 84/84 成功 (第 1 次尝试)
+01:45:12.768 [translator] 批次 3/4: 87 句, 字符数=1864
+01:45:43.351 [translator] 批次 3/4: 87/87 成功 (第 1 次尝试)
+01:45:44.357 [translator] 批次 4/4: 60 句, 字符数=1670
+01:46:13.046 [translator] 批次 4/4: 60/60 成功 (第 1 次尝试)
+01:46:13.046 [translator] 翻译结束: 280/280 成功, 0 失败

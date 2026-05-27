@@ -1,0 +1,976 @@
+21:25:02.277 [cli] ===== video-subber debug log =====
+21:25:02.277 [cli] 视频: /Users/andy/Andy-agent/video-subtitle/v1/v1.1/test/test-video.ts
+21:25:02.277 [cli] 模型: medium | 语言: auto | 字幕: yes | VAD: 关
+21:25:09.970 [httpcore.connection] connect_tcp.started host='127.0.0.1' port=7890 local_address=None timeout=None socket_options=None
+21:25:09.971 [httpcore.connection] connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x11d555940>
+21:25:09.971 [httpcore.http11] send_request_headers.started request=<Request [b'CONNECT']>
+21:25:09.971 [httpcore.http11] send_request_headers.complete
+21:25:09.971 [httpcore.http11] send_request_body.started request=<Request [b'CONNECT']>
+21:25:09.971 [httpcore.http11] send_request_body.complete
+21:25:09.971 [httpcore.http11] receive_response_headers.started request=<Request [b'CONNECT']>
+21:25:09.971 [httpcore.http11] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'Connection established', [])
+21:25:09.971 [httpcore.proxy] start_tls.started ssl_context=<ssl.SSLContext object at 0x11d543a70> server_hostname='huggingface.co' timeout=None
+21:25:10.059 [httpcore.proxy] start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x11d4d9bd0>
+21:25:10.059 [httpcore.http11] send_request_headers.started request=<Request [b'GET']>
+21:25:10.059 [httpcore.http11] send_request_headers.complete
+21:25:10.059 [httpcore.http11] send_request_body.started request=<Request [b'GET']>
+21:25:10.059 [httpcore.http11] send_request_body.complete
+21:25:10.059 [httpcore.http11] receive_response_headers.started request=<Request [b'GET']>
+21:25:10.387 [httpcore.http11] receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Date', b'Wed, 20 May 2026 13:25:10 GMT'), (b'content-encoding', b'gzip'), (b'ETag', b'W/"996-a+QF8F6hlJAIMuPfL3tbiiA1AxY"'), (b'X-Powered-By', b'huggingface-moon'), (b'X-Request-Id', b'Root=1-6a0db636-7ffb772f01dc93113a638fed;fdf200b6-283d-4524-9b34-5ca8469eb6de'), (b'RateLimit', b'"api";r=499;t=102'), (b'RateLimit-Policy', b'"fixed window";"api";q=500;w=300'), (b'cross-origin-opener-policy', b'same-origin'), (b'Referrer-Policy', b'strict-origin-when-cross-origin'), (b'Access-Control-Max-Age', b'86400'), (b'Access-Control-Allow-Origin', b'https://huggingface.co'), (b'Vary', b'Origin'), (b'vary', b'Accept-Encoding'), (b'Access-Control-Expose-Headers', b'X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash'), (b'X-Cache', b'Miss from cloudfront'), (b'Via', b'1.1 c09ac2ca4c9ff108eb1cd78177168cde.cloudfront.net (CloudFront)'), (b'X-Amz-Cf-Pop', b'SIN2-P7'), (b'X-Amz-Cf-Id', b'fn5h3wHz0EiI8k4wEldp4omet14XXwbhDHG0sDskYkDnh5kutwCnfQ==')])
+21:25:10.388 [httpx] HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-medium/revision/main "HTTP/1.1 200 OK"
+21:25:10.388 [httpcore.http11] receive_response_body.started request=<Request [b'GET']>
+21:25:10.389 [httpcore.http11] receive_response_body.complete
+21:25:10.389 [httpcore.http11] response_closed.started
+21:25:10.389 [httpcore.http11] response_closed.complete
+21:25:11.713 [faster_whisper] Processing audio with duration 24:43.894
+21:25:14.159 [faster_whisper] Detected language 'ru' with probability 0.97
+21:25:14.161 [faster_whisper] Processing segment at 00:00.000
+21:25:22.860 [faster_whisper] Processing segment at 00:26.720
+21:25:35.013 [faster_whisper] Processing segment at 00:54.600
+21:25:45.078 [faster_whisper] Processing segment at 01:20.360
+21:25:55.543 [faster_whisper] Processing segment at 01:50.080
+21:26:04.964 [faster_whisper] Processing segment at 02:14.960
+21:26:14.547 [faster_whisper] Processing segment at 02:43.360
+21:26:23.992 [faster_whisper] Processing segment at 03:08.040
+21:26:32.023 [faster_whisper] Processing segment at 03:33.940
+21:26:40.246 [faster_whisper] Processing segment at 03:59.460
+21:26:49.207 [faster_whisper] Processing segment at 04:29.460
+21:26:55.204 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (3.965517 > 2.400000)
+21:27:02.928 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (9.611111 > 2.400000)
+21:27:13.531 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (11.550000 > 2.400000)
+21:27:20.511 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (4.454545 > 2.400000)
+21:27:26.086 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-2.536116 < -1.000000)
+21:27:26.087 [faster_whisper] No speech threshold is met (0.831711 > 0.600000)
+21:27:26.087 [faster_whisper] Processing segment at 04:59.460
+21:27:33.556 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (4.261905 > 2.400000)
+21:27:41.470 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (6.961538 > 2.400000)
+21:27:47.665 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (6.961538 > 2.400000)
+21:28:00.275 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (8.968750 > 2.400000)
+21:28:03.814 [faster_whisper] Processing segment at 05:17.180
+21:28:07.293 [faster_whisper] Processing segment at 05:42.300
+21:28:24.502 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (42.285714 > 2.400000)
+21:28:26.415 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.026404 < -1.000000)
+21:28:30.124 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (3.282051 > 2.400000)
+21:28:33.846 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.248830 < -1.000000)
+21:28:37.594 [faster_whisper] Processing segment at 05:45.300
+21:28:54.861 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+21:28:57.219 [faster_whisper] Processing segment at 06:10.300
+21:29:08.398 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (19.095238 > 2.400000)
+21:29:20.177 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (15.242424 > 2.400000)
+21:29:41.739 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (23.473684 > 2.400000)
+21:29:50.182 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (13.346154 > 2.400000)
+21:29:52.387 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.691792 < -1.000000)
+21:29:55.413 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.802380 < -1.000000)
+21:29:55.413 [faster_whisper] Processing segment at 06:21.360
+21:30:12.575 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (30.454545 > 2.400000)
+21:30:32.007 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (24.647059 > 2.400000)
+21:30:47.067 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (24.647059 > 2.400000)
+21:30:58.406 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (23.473684 > 2.400000)
+21:31:01.950 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.784132 < -1.000000)
+21:31:04.362 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.998275 < -1.000000)
+21:31:04.363 [faster_whisper] Processing segment at 06:51.360
+21:31:21.024 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (5.966667 > 2.400000)
+21:31:31.166 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+21:31:41.538 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (24.647059 > 2.400000)
+21:31:45.620 [faster_whisper] Processing segment at 07:19.480
+21:31:51.083 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (8.789474 > 2.400000)
+21:31:52.414 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.009093 < -1.000000)
+21:31:53.443 [faster_whisper] Log probability threshold is not met with temperature 0.4 (-1.057569 < -1.000000)
+21:32:01.586 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (29.733333 > 2.400000)
+21:32:03.001 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.055520 < -1.000000)
+21:32:04.299 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.256356 < -1.000000)
+21:32:04.299 [faster_whisper] Processing segment at 07:43.480
+21:32:13.585 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (19.150000 > 2.400000)
+21:32:23.432 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.708333 > 2.400000)
+21:32:32.920 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+21:32:43.449 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (9.311111 > 2.400000)
+21:32:47.432 [faster_whisper] Processing segment at 08:09.480
+21:33:00.670 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+21:33:17.708 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+21:33:32.545 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (27.875000 > 2.400000)
+21:33:42.589 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (22.400000 > 2.400000)
+21:33:48.740 [faster_whisper] Processing segment at 08:38.860
+21:33:57.888 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (17.650000 > 2.400000)
+21:34:14.974 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.454545 > 2.400000)
+21:34:24.508 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (3.096154 > 2.400000)
+21:34:32.494 [faster_whisper] Processing segment at 09:08.500
+21:34:36.810 [faster_whisper] Processing segment at 09:32.500
+21:34:45.853 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (16.432432 > 2.400000)
+21:35:06.201 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.454545 > 2.400000)
+21:35:21.632 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (30.454545 > 2.400000)
+21:35:34.589 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (10.951220 > 2.400000)
+21:35:45.931 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (12.339623 > 2.400000)
+21:35:52.280 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.517403 < -1.000000)
+21:35:52.280 [faster_whisper] Processing segment at 10:02.500
+21:36:05.340 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (29.733333 > 2.400000)
+21:36:19.455 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (29.733333 > 2.400000)
+21:36:36.208 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (29.733333 > 2.400000)
+21:36:49.989 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (29.733333 > 2.400000)
+21:37:05.371 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (29.733333 > 2.400000)
+21:37:07.795 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.512025 < -1.000000)
+21:37:07.796 [faster_whisper] Processing segment at 10:32.500
+21:37:20.904 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (9.676056 > 2.400000)
+21:37:28.497 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (5.013158 > 2.400000)
+21:37:33.509 [faster_whisper] Processing segment at 10:59.500
+21:37:37.378 [faster_whisper] Processing segment at 11:18.500
+21:37:41.141 [faster_whisper] Processing segment at 11:48.500
+21:37:51.928 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (7.890625 > 2.400000)
+21:37:55.527 [faster_whisper] Processing segment at 12:18.500
+21:38:00.351 [faster_whisper] Processing segment at 12:47.940
+21:38:09.739 [faster_whisper] Processing segment at 13:16.620
+21:38:15.140 [faster_whisper] Processing segment at 13:46.620
+21:38:29.521 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (31.904762 > 2.400000)
+21:38:47.892 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.454545 > 2.400000)
+21:39:00.609 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (30.454545 > 2.400000)
+21:39:11.026 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (31.904762 > 2.400000)
+21:39:18.326 [faster_whisper] Processing segment at 14:16.140
+21:39:32.702 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+21:39:34.824 [faster_whisper] Processing segment at 14:36.140
+21:39:48.965 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (30.454545 > 2.400000)
+21:40:07.282 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (24.666667 > 2.400000)
+21:40:11.819 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (2.444444 > 2.400000)
+21:40:25.938 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (30.454545 > 2.400000)
+21:40:29.555 [faster_whisper] Processing segment at 15:04.140
+21:40:37.080 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (17.631579 > 2.400000)
+21:40:49.365 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (24.647059 > 2.400000)
+21:41:02.470 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (31.904762 > 2.400000)
+21:41:11.202 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (5.781250 > 2.400000)
+21:41:19.404 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (19.705882 > 2.400000)
+21:41:21.181 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-4.246358 < -1.000000)
+21:41:21.181 [faster_whisper] Processing segment at 15:22.860
+21:41:25.239 [faster_whisper] Processing segment at 15:52.860
+21:41:39.445 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (20.212121 > 2.400000)
+21:41:56.651 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (20.212121 > 2.400000)
+21:42:11.886 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (20.212121 > 2.400000)
+21:42:22.698 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (19.676471 > 2.400000)
+21:42:30.533 [faster_whisper] Processing segment at 16:22.860
+21:42:41.286 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (25.526316 > 2.400000)
+21:42:58.016 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.454545 > 2.400000)
+21:43:07.507 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (30.454545 > 2.400000)
+21:43:17.965 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (35.680000 > 2.400000)
+21:43:21.461 [faster_whisper] Processing segment at 16:52.860
+21:43:24.664 [faster_whisper] Log probability threshold is not met with temperature 0.0 (-1.031356 < -1.000000)
+21:43:26.702 [faster_whisper] Log probability threshold is not met with temperature 0.2 (-1.039613 < -1.000000)
+21:43:28.580 [faster_whisper] Log probability threshold is not met with temperature 0.4 (-1.180408 < -1.000000)
+21:43:30.459 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.119107 < -1.000000)
+21:43:32.311 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.302110 < -1.000000)
+21:43:33.801 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.488377 < -1.000000)
+21:43:33.801 [faster_whisper] Processing segment at 17:22.860
+21:43:38.482 [faster_whisper] Processing segment at 17:49.420
+21:43:53.195 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (9.591549 > 2.400000)
+21:44:01.082 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (2.875000 > 2.400000)
+21:44:10.742 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (2.740260 > 2.400000)
+21:44:19.460 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (3.141593 > 2.400000)
+21:44:23.488 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.215923 < -1.000000)
+21:44:26.618 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-2.034740 < -1.000000)
+21:44:26.618 [faster_whisper] Processing segment at 18:17.060
+21:44:41.525 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (31.904762 > 2.400000)
+21:44:55.068 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (30.454545 > 2.400000)
+21:45:07.012 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (30.454545 > 2.400000)
+21:45:17.713 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (48.434783 > 2.400000)
+21:45:29.274 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (39.785714 > 2.400000)
+21:45:31.533 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.306319 < -1.000000)
+21:45:31.533 [faster_whisper] Processing segment at 18:27.160
+21:45:44.888 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (30.454545 > 2.400000)
+21:45:48.796 [faster_whisper] Processing segment at 18:52.160
+21:46:01.411 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (30.454545 > 2.400000)
+21:46:12.319 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+21:46:16.639 [faster_whisper] Processing segment at 19:20.160
+21:46:26.090 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (21.571429 > 2.400000)
+21:46:40.501 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (17.192308 > 2.400000)
+21:46:52.049 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (11.364706 > 2.400000)
+21:46:55.090 [faster_whisper] Log probability threshold is not met with temperature 0.6 (-1.442536 < -1.000000)
+21:47:01.401 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.469321 < -1.000000)
+21:47:02.803 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-3.407423 < -1.000000)
+21:47:02.803 [faster_whisper] Processing segment at 19:50.160
+21:47:08.993 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (4.261905 > 2.400000)
+21:47:16.473 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (6.961538 > 2.400000)
+21:47:24.775 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (6.961538 > 2.400000)
+21:47:35.074 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (9.184211 > 2.400000)
+21:47:40.981 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (3.543860 > 2.400000)
+21:47:42.991 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.702861 < -1.000000)
+21:47:42.991 [faster_whisper] Processing segment at 20:20.160
+21:47:50.652 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (18.550000 > 2.400000)
+21:48:02.948 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+21:48:10.004 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (2.416000 > 2.400000)
+21:48:19.137 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (3.482759 > 2.400000)
+21:48:28.394 [faster_whisper] Compression ratio threshold is not met with temperature 0.8 (2.871287 > 2.400000)
+21:48:32.567 [faster_whisper] Log probability threshold is not met with temperature 1.0 (-1.377572 < -1.000000)
+21:48:32.567 [faster_whisper] Processing segment at 20:44.200
+21:48:46.089 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+21:49:02.302 [faster_whisper] Compression ratio threshold is not met with temperature 0.2 (27.875000 > 2.400000)
+21:49:15.808 [faster_whisper] Compression ratio threshold is not met with temperature 0.4 (19.705882 > 2.400000)
+21:49:33.125 [faster_whisper] Compression ratio threshold is not met with temperature 0.6 (29.733333 > 2.400000)
+21:49:35.647 [faster_whisper] Log probability threshold is not met with temperature 0.8 (-1.144248 < -1.000000)
+21:49:35.647 [faster_whisper] No speech threshold is met (0.620729 > 0.600000)
+21:49:35.647 [faster_whisper] Processing segment at 21:14.200
+21:49:39.032 [faster_whisper] Processing segment at 21:44.200
+21:49:53.388 [faster_whisper] Compression ratio threshold is not met with temperature 0.0 (27.875000 > 2.400000)
+21:49:58.826 [faster_whisper] Processing segment at 22:13.200
+21:50:01.391 [faster_whisper] Log probability threshold is not met with temperature 0.0 (-1.193675 < -1.000000)
+21:50:01.391 [faster_whisper] No speech threshold is met (0.669501 > 0.600000)
+21:50:01.391 [faster_whisper] Processing segment at 22:43.200
+21:50:09.964 [faster_whisper] Processing segment at 23:07.840
+21:50:14.360 [faster_whisper] Processing segment at 23:37.840
+21:50:22.865 [faster_whisper] Processing segment at 24:05.880
+21:50:33.159 [faster_whisper] Processing segment at 24:34.880
+21:50:38.158 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=1137)
+           2	RESUME(arg=0, lineno=1137)
+           4	LOAD_FAST(arg=0, lineno=1140)
+           6	LOAD_CONST(arg=1, lineno=1140)
+           8	BINARY_SUBSCR(arg=None, lineno=1140)
+          12	STORE_FAST(arg=3, lineno=1140)
+          14	LOAD_FAST(arg=1, lineno=1141)
+          16	UNARY_NEGATIVE(arg=None, lineno=1141)
+          18	LOAD_FAST(arg=3, lineno=1141)
+          20	SWAP(arg=2, lineno=1141)
+          22	COPY(arg=2, lineno=1141)
+          24	COMPARE_OP(arg=58, lineno=1141)
+          28	POP_JUMP_IF_FALSE(arg=6, lineno=1141)
+          32	LOAD_FAST(arg=1, lineno=1141)
+          34	COMPARE_OP(arg=58, lineno=1141)
+          38	POP_JUMP_IF_FALSE(arg=5, lineno=1141)
+          42	JUMP_FORWARD(arg=2, lineno=1141)
+>         44	POP_TOP(arg=None, lineno=1141)
+          46	JUMP_FORWARD(arg=2, lineno=1141)
+>         48	LOAD_CONST(arg=1, lineno=1142)
+          50	STORE_FAST(arg=3, lineno=1142)
+>         52	LOAD_FAST(arg=0, lineno=1144)
+          54	LOAD_CONST(arg=2, lineno=1144)
+          56	BINARY_SUBSCR(arg=None, lineno=1144)
+          60	STORE_FAST(arg=4, lineno=1144)
+          62	LOAD_FAST(arg=1, lineno=1145)
+          64	UNARY_NEGATIVE(arg=None, lineno=1145)
+          66	LOAD_FAST(arg=4, lineno=1145)
+          68	SWAP(arg=2, lineno=1145)
+          70	COPY(arg=2, lineno=1145)
+          72	COMPARE_OP(arg=58, lineno=1145)
+          76	POP_JUMP_IF_FALSE(arg=6, lineno=1145)
+          80	LOAD_FAST(arg=1, lineno=1145)
+          82	COMPARE_OP(arg=58, lineno=1145)
+          86	POP_JUMP_IF_FALSE(arg=5, lineno=1145)
+          90	JUMP_FORWARD(arg=2, lineno=1145)
+>         92	POP_TOP(arg=None, lineno=1145)
+          94	JUMP_FORWARD(arg=2, lineno=1145)
+>         96	LOAD_CONST(arg=1, lineno=1146)
+          98	STORE_FAST(arg=4, lineno=1146)
+>        100	LOAD_FAST(arg=2, lineno=1148)
+         102	TO_BOOL(arg=None, lineno=1148)
+         110	POP_JUMP_IF_FALSE(arg=45, lineno=1148)
+         114	LOAD_GLOBAL(arg=0, lineno=1149)
+         124	LOAD_ATTR(arg=2, lineno=1149)
+         144	PUSH_NULL(arg=None, lineno=1149)
+         146	LOAD_FAST(arg=3, lineno=1149)
+         148	CALL(arg=1, lineno=1149)
+         156	LOAD_GLOBAL(arg=0, lineno=1149)
+         166	LOAD_ATTR(arg=2, lineno=1149)
+         186	PUSH_NULL(arg=None, lineno=1149)
+         188	LOAD_FAST(arg=4, lineno=1149)
+         190	CALL(arg=1, lineno=1149)
+         198	COMPARE_OP(arg=103, lineno=1149)
+         202	RETURN_VALUE(arg=None, lineno=1149)
+>        204	LOAD_GLOBAL(arg=0, lineno=1151)
+         214	LOAD_ATTR(arg=4, lineno=1151)
+         234	PUSH_NULL(arg=None, lineno=1151)
+         236	LOAD_FAST(arg=3, lineno=1151)
+         238	CALL(arg=1, lineno=1151)
+         246	LOAD_GLOBAL(arg=0, lineno=1151)
+         256	LOAD_ATTR(arg=4, lineno=1151)
+         276	PUSH_NULL(arg=None, lineno=1151)
+         278	LOAD_FAST(arg=4, lineno=1151)
+         280	CALL(arg=1, lineno=1151)
+         288	COMPARE_OP(arg=103, lineno=1151)
+         292	RETURN_VALUE(arg=None, lineno=1151)
+21:50:38.158 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+21:50:38.158 [numba.core.byteflow] stack: []
+21:50:38.159 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+21:50:38.159 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=1137)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=1137)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=1140)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=1140)
+21:50:38.159 [numba.core.byteflow] stack ['$x4.0']
+21:50:38.159 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=1140)
+21:50:38.159 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+21:50:38.159 [numba.core.byteflow] dispatch pc=12, inst=STORE_FAST(arg=3, lineno=1140)
+21:50:38.159 [numba.core.byteflow] stack ['$8binary_subscr.2']
+21:50:38.159 [numba.core.byteflow] dispatch pc=14, inst=LOAD_FAST(arg=1, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] dispatch pc=16, inst=UNARY_NEGATIVE(arg=None, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$threshold14.3']
+21:50:38.159 [numba.core.byteflow] dispatch pc=18, inst=LOAD_FAST(arg=3, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$16unary_negative.4']
+21:50:38.159 [numba.core.byteflow] dispatch pc=20, inst=SWAP(arg=2, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$16unary_negative.4', '$x018.5']
+21:50:38.159 [numba.core.byteflow] dispatch pc=22, inst=COPY(arg=2, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$x018.5', '$16unary_negative.4']
+21:50:38.159 [numba.core.byteflow] dispatch pc=24, inst=COMPARE_OP(arg=58, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$x018.5', '$16unary_negative.4', '$x018.5']
+21:50:38.159 [numba.core.byteflow] dispatch pc=28, inst=POP_JUMP_IF_FALSE(arg=6, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$x018.5', '$24compare_op.6']
+21:50:38.159 [numba.core.byteflow] end state. edges=[Edge(pc=32, stack=('$x018.5',), blockstack=(), npush=0), Edge(pc=44, stack=('$x018.5',), blockstack=(), npush=0)]
+21:50:38.159 [numba.core.byteflow] pending: deque([State(pc_initial=32 nstack_initial=1), State(pc_initial=44 nstack_initial=1)])
+21:50:38.159 [numba.core.byteflow] stack: ['$phi32.0']
+21:50:38.159 [numba.core.byteflow] state.pc_initial: State(pc_initial=32 nstack_initial=1)
+21:50:38.159 [numba.core.byteflow] dispatch pc=32, inst=LOAD_FAST(arg=1, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$phi32.0']
+21:50:38.159 [numba.core.byteflow] dispatch pc=34, inst=COMPARE_OP(arg=58, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$phi32.0', '$threshold32.1']
+21:50:38.159 [numba.core.byteflow] dispatch pc=38, inst=POP_JUMP_IF_FALSE(arg=5, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$34compare_op.2']
+21:50:38.159 [numba.core.byteflow] end state. edges=[Edge(pc=42, stack=(), blockstack=(), npush=0), Edge(pc=52, stack=(), blockstack=(), npush=0)]
+21:50:38.159 [numba.core.byteflow] pending: deque([State(pc_initial=44 nstack_initial=1), State(pc_initial=42 nstack_initial=0), State(pc_initial=52 nstack_initial=0)])
+21:50:38.159 [numba.core.byteflow] stack: ['$phi44.0']
+21:50:38.159 [numba.core.byteflow] state.pc_initial: State(pc_initial=44 nstack_initial=1)
+21:50:38.159 [numba.core.byteflow] dispatch pc=44, inst=POP_TOP(arg=None, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack ['$phi44.0']
+21:50:38.159 [numba.core.byteflow] dispatch pc=46, inst=JUMP_FORWARD(arg=2, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] end state. edges=[Edge(pc=52, stack=(), blockstack=(), npush=0)]
+21:50:38.159 [numba.core.byteflow] pending: deque([State(pc_initial=42 nstack_initial=0), State(pc_initial=52 nstack_initial=0), State(pc_initial=52 nstack_initial=0)])
+21:50:38.159 [numba.core.byteflow] stack: []
+21:50:38.159 [numba.core.byteflow] state.pc_initial: State(pc_initial=42 nstack_initial=0)
+21:50:38.159 [numba.core.byteflow] dispatch pc=42, inst=JUMP_FORWARD(arg=2, lineno=1141)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] end state. edges=[Edge(pc=48, stack=(), blockstack=(), npush=0)]
+21:50:38.159 [numba.core.byteflow] pending: deque([State(pc_initial=52 nstack_initial=0), State(pc_initial=52 nstack_initial=0), State(pc_initial=48 nstack_initial=0)])
+21:50:38.159 [numba.core.byteflow] stack: []
+21:50:38.159 [numba.core.byteflow] state.pc_initial: State(pc_initial=52 nstack_initial=0)
+21:50:38.159 [numba.core.byteflow] dispatch pc=52, inst=LOAD_FAST(arg=0, lineno=1144)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] dispatch pc=54, inst=LOAD_CONST(arg=2, lineno=1144)
+21:50:38.159 [numba.core.byteflow] stack ['$x52.0']
+21:50:38.159 [numba.core.byteflow] dispatch pc=56, inst=BINARY_SUBSCR(arg=None, lineno=1144)
+21:50:38.159 [numba.core.byteflow] stack ['$x52.0', '$const54.1.2']
+21:50:38.159 [numba.core.byteflow] dispatch pc=60, inst=STORE_FAST(arg=4, lineno=1144)
+21:50:38.159 [numba.core.byteflow] stack ['$56binary_subscr.2']
+21:50:38.159 [numba.core.byteflow] dispatch pc=62, inst=LOAD_FAST(arg=1, lineno=1145)
+21:50:38.159 [numba.core.byteflow] stack []
+21:50:38.159 [numba.core.byteflow] dispatch pc=64, inst=UNARY_NEGATIVE(arg=None, lineno=1145)
+21:50:38.159 [numba.core.byteflow] stack ['$threshold62.3']
+21:50:38.159 [numba.core.byteflow] dispatch pc=66, inst=LOAD_FAST(arg=4, lineno=1145)
+21:50:38.159 [numba.core.byteflow] stack ['$64unary_negative.4']
+21:50:38.159 [numba.core.byteflow] dispatch pc=68, inst=SWAP(arg=2, lineno=1145)
+21:50:38.159 [numba.core.byteflow] stack ['$64unary_negative.4', '$x166.5']
+21:50:38.159 [numba.core.byteflow] dispatch pc=70, inst=COPY(arg=2, lineno=1145)
+21:50:38.159 [numba.core.byteflow] stack ['$x166.5', '$64unary_negative.4']
+21:50:38.160 [numba.core.byteflow] dispatch pc=72, inst=COMPARE_OP(arg=58, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack ['$x166.5', '$64unary_negative.4', '$x166.5']
+21:50:38.160 [numba.core.byteflow] dispatch pc=76, inst=POP_JUMP_IF_FALSE(arg=6, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack ['$x166.5', '$72compare_op.6']
+21:50:38.160 [numba.core.byteflow] end state. edges=[Edge(pc=80, stack=('$x166.5',), blockstack=(), npush=0), Edge(pc=92, stack=('$x166.5',), blockstack=(), npush=0)]
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=52 nstack_initial=0), State(pc_initial=48 nstack_initial=0), State(pc_initial=80 nstack_initial=1), State(pc_initial=92 nstack_initial=1)])
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=48 nstack_initial=0), State(pc_initial=80 nstack_initial=1), State(pc_initial=92 nstack_initial=1)])
+21:50:38.160 [numba.core.byteflow] stack: []
+21:50:38.160 [numba.core.byteflow] state.pc_initial: State(pc_initial=48 nstack_initial=0)
+21:50:38.160 [numba.core.byteflow] dispatch pc=48, inst=LOAD_CONST(arg=1, lineno=1142)
+21:50:38.160 [numba.core.byteflow] stack []
+21:50:38.160 [numba.core.byteflow] dispatch pc=50, inst=STORE_FAST(arg=3, lineno=1142)
+21:50:38.160 [numba.core.byteflow] stack ['$const48.0.1']
+21:50:38.160 [numba.core.byteflow] end state. edges=[Edge(pc=52, stack=(), blockstack=(), npush=0)]
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=80 nstack_initial=1), State(pc_initial=92 nstack_initial=1), State(pc_initial=52 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] stack: ['$phi80.0']
+21:50:38.160 [numba.core.byteflow] state.pc_initial: State(pc_initial=80 nstack_initial=1)
+21:50:38.160 [numba.core.byteflow] dispatch pc=80, inst=LOAD_FAST(arg=1, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack ['$phi80.0']
+21:50:38.160 [numba.core.byteflow] dispatch pc=82, inst=COMPARE_OP(arg=58, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack ['$phi80.0', '$threshold80.1']
+21:50:38.160 [numba.core.byteflow] dispatch pc=86, inst=POP_JUMP_IF_FALSE(arg=5, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack ['$82compare_op.2']
+21:50:38.160 [numba.core.byteflow] end state. edges=[Edge(pc=90, stack=(), blockstack=(), npush=0), Edge(pc=100, stack=(), blockstack=(), npush=0)]
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=92 nstack_initial=1), State(pc_initial=52 nstack_initial=0), State(pc_initial=90 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] stack: ['$phi92.0']
+21:50:38.160 [numba.core.byteflow] state.pc_initial: State(pc_initial=92 nstack_initial=1)
+21:50:38.160 [numba.core.byteflow] dispatch pc=92, inst=POP_TOP(arg=None, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack ['$phi92.0']
+21:50:38.160 [numba.core.byteflow] dispatch pc=94, inst=JUMP_FORWARD(arg=2, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack []
+21:50:38.160 [numba.core.byteflow] end state. edges=[Edge(pc=100, stack=(), blockstack=(), npush=0)]
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=52 nstack_initial=0), State(pc_initial=90 nstack_initial=0), State(pc_initial=100 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=90 nstack_initial=0), State(pc_initial=100 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] stack: []
+21:50:38.160 [numba.core.byteflow] state.pc_initial: State(pc_initial=90 nstack_initial=0)
+21:50:38.160 [numba.core.byteflow] dispatch pc=90, inst=JUMP_FORWARD(arg=2, lineno=1145)
+21:50:38.160 [numba.core.byteflow] stack []
+21:50:38.160 [numba.core.byteflow] end state. edges=[Edge(pc=96, stack=(), blockstack=(), npush=0)]
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=100 nstack_initial=0), State(pc_initial=100 nstack_initial=0), State(pc_initial=96 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] stack: []
+21:50:38.160 [numba.core.byteflow] state.pc_initial: State(pc_initial=100 nstack_initial=0)
+21:50:38.160 [numba.core.byteflow] dispatch pc=100, inst=LOAD_FAST(arg=2, lineno=1148)
+21:50:38.160 [numba.core.byteflow] stack []
+21:50:38.160 [numba.core.byteflow] dispatch pc=102, inst=TO_BOOL(arg=None, lineno=1148)
+21:50:38.160 [numba.core.byteflow] stack ['$zero_pos100.0']
+21:50:38.160 [numba.core.byteflow] dispatch pc=110, inst=POP_JUMP_IF_FALSE(arg=45, lineno=1148)
+21:50:38.160 [numba.core.byteflow] stack ['$102to_bool.1']
+21:50:38.160 [numba.core.byteflow] end state. edges=[Edge(pc=114, stack=(), blockstack=(), npush=0), Edge(pc=204, stack=(), blockstack=(), npush=0)]
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=100 nstack_initial=0), State(pc_initial=96 nstack_initial=0), State(pc_initial=114 nstack_initial=0), State(pc_initial=204 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=96 nstack_initial=0), State(pc_initial=114 nstack_initial=0), State(pc_initial=204 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] stack: []
+21:50:38.160 [numba.core.byteflow] state.pc_initial: State(pc_initial=96 nstack_initial=0)
+21:50:38.160 [numba.core.byteflow] dispatch pc=96, inst=LOAD_CONST(arg=1, lineno=1146)
+21:50:38.160 [numba.core.byteflow] stack []
+21:50:38.160 [numba.core.byteflow] dispatch pc=98, inst=STORE_FAST(arg=4, lineno=1146)
+21:50:38.160 [numba.core.byteflow] stack ['$const96.0.1']
+21:50:38.160 [numba.core.byteflow] end state. edges=[Edge(pc=100, stack=(), blockstack=(), npush=0)]
+21:50:38.160 [numba.core.byteflow] pending: deque([State(pc_initial=114 nstack_initial=0), State(pc_initial=204 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+21:50:38.160 [numba.core.byteflow] stack: []
+21:50:38.160 [numba.core.byteflow] state.pc_initial: State(pc_initial=114 nstack_initial=0)
+21:50:38.160 [numba.core.byteflow] dispatch pc=114, inst=LOAD_GLOBAL(arg=0, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack []
+21:50:38.160 [numba.core.byteflow] dispatch pc=124, inst=LOAD_ATTR(arg=2, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack ['$114load_global.0']
+21:50:38.160 [numba.core.byteflow] dispatch pc=144, inst=PUSH_NULL(arg=None, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack ['$124load_attr.1']
+21:50:38.160 [numba.core.byteflow] dispatch pc=146, inst=LOAD_FAST(arg=3, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack ['$124load_attr.1', '$null$144.2']
+21:50:38.160 [numba.core.byteflow] dispatch pc=148, inst=CALL(arg=1, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack ['$124load_attr.1', '$null$144.2', '$x0146.3']
+21:50:38.160 [numba.core.byteflow] dispatch pc=156, inst=LOAD_GLOBAL(arg=0, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack ['$148call.4']
+21:50:38.160 [numba.core.byteflow] dispatch pc=166, inst=LOAD_ATTR(arg=2, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack ['$148call.4', '$156load_global.5']
+21:50:38.160 [numba.core.byteflow] dispatch pc=186, inst=PUSH_NULL(arg=None, lineno=1149)
+21:50:38.160 [numba.core.byteflow] stack ['$148call.4', '$166load_attr.6']
+21:50:38.160 [numba.core.byteflow] dispatch pc=188, inst=LOAD_FAST(arg=4, lineno=1149)
+21:50:38.161 [numba.core.byteflow] stack ['$148call.4', '$166load_attr.6', '$null$186.7']
+21:50:38.161 [numba.core.byteflow] dispatch pc=190, inst=CALL(arg=1, lineno=1149)
+21:50:38.161 [numba.core.byteflow] stack ['$148call.4', '$166load_attr.6', '$null$186.7', '$x1188.8']
+21:50:38.161 [numba.core.byteflow] dispatch pc=198, inst=COMPARE_OP(arg=103, lineno=1149)
+21:50:38.161 [numba.core.byteflow] stack ['$148call.4', '$190call.9']
+21:50:38.161 [numba.core.byteflow] dispatch pc=202, inst=RETURN_VALUE(arg=None, lineno=1149)
+21:50:38.161 [numba.core.byteflow] stack ['$198compare_op.10']
+21:50:38.161 [numba.core.byteflow] end state. edges=[]
+21:50:38.161 [numba.core.byteflow] pending: deque([State(pc_initial=204 nstack_initial=0), State(pc_initial=100 nstack_initial=0)])
+21:50:38.161 [numba.core.byteflow] stack: []
+21:50:38.161 [numba.core.byteflow] state.pc_initial: State(pc_initial=204 nstack_initial=0)
+21:50:38.161 [numba.core.byteflow] dispatch pc=204, inst=LOAD_GLOBAL(arg=0, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack []
+21:50:38.161 [numba.core.byteflow] dispatch pc=214, inst=LOAD_ATTR(arg=4, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$204load_global.0']
+21:50:38.161 [numba.core.byteflow] dispatch pc=234, inst=PUSH_NULL(arg=None, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$214load_attr.1']
+21:50:38.161 [numba.core.byteflow] dispatch pc=236, inst=LOAD_FAST(arg=3, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$214load_attr.1', '$null$234.2']
+21:50:38.161 [numba.core.byteflow] dispatch pc=238, inst=CALL(arg=1, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$214load_attr.1', '$null$234.2', '$x0236.3']
+21:50:38.161 [numba.core.byteflow] dispatch pc=246, inst=LOAD_GLOBAL(arg=0, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$238call.4']
+21:50:38.161 [numba.core.byteflow] dispatch pc=256, inst=LOAD_ATTR(arg=4, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$238call.4', '$246load_global.5']
+21:50:38.161 [numba.core.byteflow] dispatch pc=276, inst=PUSH_NULL(arg=None, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$238call.4', '$256load_attr.6']
+21:50:38.161 [numba.core.byteflow] dispatch pc=278, inst=LOAD_FAST(arg=4, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$238call.4', '$256load_attr.6', '$null$276.7']
+21:50:38.161 [numba.core.byteflow] dispatch pc=280, inst=CALL(arg=1, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$238call.4', '$256load_attr.6', '$null$276.7', '$x1278.8']
+21:50:38.161 [numba.core.byteflow] dispatch pc=288, inst=COMPARE_OP(arg=103, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$238call.4', '$280call.9']
+21:50:38.161 [numba.core.byteflow] dispatch pc=292, inst=RETURN_VALUE(arg=None, lineno=1151)
+21:50:38.161 [numba.core.byteflow] stack ['$288compare_op.10']
+21:50:38.161 [numba.core.byteflow] end state. edges=[]
+21:50:38.161 [numba.core.byteflow] pending: deque([State(pc_initial=100 nstack_initial=0)])
+21:50:38.161 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+21:50:38.161 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>,
+            {State(pc_initial=0 nstack_initial=0): set(),
+             State(pc_initial=32 nstack_initial=1): {'$phi32.0'},
+             State(pc_initial=42 nstack_initial=0): set(),
+             State(pc_initial=44 nstack_initial=1): set(),
+             State(pc_initial=48 nstack_initial=0): set(),
+             State(pc_initial=52 nstack_initial=0): set(),
+             State(pc_initial=80 nstack_initial=1): {'$phi80.0'},
+             State(pc_initial=90 nstack_initial=0): set(),
+             State(pc_initial=92 nstack_initial=1): set(),
+             State(pc_initial=96 nstack_initial=0): set(),
+             State(pc_initial=100 nstack_initial=0): set(),
+             State(pc_initial=114 nstack_initial=0): set(),
+             State(pc_initial=204 nstack_initial=0): set()})
+21:50:38.161 [numba.core.byteflow] defmap: {'$phi32.0': State(pc_initial=0 nstack_initial=0),
+ '$phi44.0': State(pc_initial=0 nstack_initial=0),
+ '$phi80.0': State(pc_initial=52 nstack_initial=0),
+ '$phi92.0': State(pc_initial=52 nstack_initial=0)}
+21:50:38.161 [numba.core.byteflow] phismap: defaultdict(<class 'set'>,
+            {'$phi32.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi44.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi80.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))},
+             '$phi92.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))}})
+21:50:38.161 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>,
+            {'$phi32.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi44.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+             '$phi80.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))},
+             '$phi92.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))}})
+21:50:38.161 [numba.core.byteflow] keep phismap: {'$phi32.0': {('$x018.5', State(pc_initial=0 nstack_initial=0))},
+ '$phi80.0': {('$x166.5', State(pc_initial=52 nstack_initial=0))}}
+21:50:38.161 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>,
+            {State(pc_initial=0 nstack_initial=0): {'$phi32.0': '$x018.5'},
+             State(pc_initial=52 nstack_initial=0): {'$phi80.0': '$x166.5'}})
+21:50:38.161 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'value': '$8binary_subscr.2'}), (14, {'res': '$threshold14.3'}), (16, {'value': '$threshold14.3', 'res': '$16unary_negative.4'}), (18, {'res': '$x018.5'}), (24, {'lhs': '$16unary_negative.4', 'rhs': '$x018.5', 'res': '$24compare_op.6'}), (28, {'pred': '$24compare_op.6'})), outgoing_phis={'$phi32.0': '$x018.5'}, blockstack=(), active_try_block=None, outgoing_edgepushed={32: ('$x018.5',), 44: ('$x018.5',)})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=32 nstack_initial=1):
+AdaptBlockInfo(insts=((32, {'res': '$threshold32.1'}), (34, {'lhs': '$phi32.0', 'rhs': '$threshold32.1', 'res': '$34compare_op.2'}), (38, {'pred': '$34compare_op.2'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={42: (), 52: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=42 nstack_initial=0):
+AdaptBlockInfo(insts=((42, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={48: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=44 nstack_initial=1):
+AdaptBlockInfo(insts=((46, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={52: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=48 nstack_initial=0):
+AdaptBlockInfo(insts=((48, {'res': '$const48.0.1'}), (50, {'value': '$const48.0.1'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={52: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=52 nstack_initial=0):
+AdaptBlockInfo(insts=((52, {'res': '$x52.0'}), (54, {'res': '$const54.1.2'}), (56, {'index': '$const54.1.2', 'target': '$x52.0', 'res': '$56binary_subscr.2'}), (60, {'value': '$56binary_subscr.2'}), (62, {'res': '$threshold62.3'}), (64, {'value': '$threshold62.3', 'res': '$64unary_negative.4'}), (66, {'res': '$x166.5'}), (72, {'lhs': '$64unary_negative.4', 'rhs': '$x166.5', 'res': '$72compare_op.6'}), (76, {'pred': '$72compare_op.6'})), outgoing_phis={'$phi80.0': '$x166.5'}, blockstack=(), active_try_block=None, outgoing_edgepushed={80: ('$x166.5',), 92: ('$x166.5',)})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=80 nstack_initial=1):
+AdaptBlockInfo(insts=((80, {'res': '$threshold80.1'}), (82, {'lhs': '$phi80.0', 'rhs': '$threshold80.1', 'res': '$82compare_op.2'}), (86, {'pred': '$82compare_op.2'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={90: (), 100: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=90 nstack_initial=0):
+AdaptBlockInfo(insts=((90, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={96: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=92 nstack_initial=1):
+AdaptBlockInfo(insts=((94, {}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={100: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=96 nstack_initial=0):
+AdaptBlockInfo(insts=((96, {'res': '$const96.0.1'}), (98, {'value': '$const96.0.1'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={100: ()})
+21:50:38.161 [numba.core.byteflow] block_infos State(pc_initial=100 nstack_initial=0):
+AdaptBlockInfo(insts=((100, {'res': '$zero_pos100.0'}), (102, {'val': '$zero_pos100.0', 'res': '$102to_bool.1'}), (110, {'pred': '$102to_bool.1'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={114: (), 204: ()})
+21:50:38.162 [numba.core.byteflow] block_infos State(pc_initial=114 nstack_initial=0):
+AdaptBlockInfo(insts=((114, {'idx': 0, 'res': '$114load_global.0'}), (124, {'item': '$114load_global.0', 'res': '$124load_attr.1'}), (144, {}), (146, {'res': '$x0146.3'}), (148, {'func': '$124load_attr.1', 'args': ['$x0146.3'], 'kw_names': None, 'res': '$148call.4'}), (156, {'idx': 0, 'res': '$156load_global.5'}), (166, {'item': '$156load_global.5', 'res': '$166load_attr.6'}), (186, {}), (188, {'res': '$x1188.8'}), (190, {'func': '$166load_attr.6', 'args': ['$x1188.8'], 'kw_names': None, 'res': '$190call.9'}), (198, {'lhs': '$148call.4', 'rhs': '$190call.9', 'res': '$198compare_op.10'}), (202, {'retval': '$198compare_op.10', 'castval': '$202return_value.11'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+21:50:38.162 [numba.core.byteflow] block_infos State(pc_initial=204 nstack_initial=0):
+AdaptBlockInfo(insts=((204, {'idx': 0, 'res': '$204load_global.0'}), (214, {'item': '$204load_global.0', 'res': '$214load_attr.1'}), (234, {}), (236, {'res': '$x0236.3'}), (238, {'func': '$214load_attr.1', 'args': ['$x0236.3'], 'kw_names': None, 'res': '$238call.4'}), (246, {'idx': 0, 'res': '$246load_global.5'}), (256, {'item': '$246load_global.5', 'res': '$256load_attr.6'}), (276, {}), (278, {'res': '$x1278.8'}), (280, {'func': '$256load_attr.6', 'args': ['$x1278.8'], 'kw_names': None, 'res': '$280call.9'}), (288, {'lhs': '$238call.4', 'rhs': '$280call.9', 'res': '$288compare_op.10'}), (292, {'retval': '$288compare_op.10', 'castval': '$292return_value.11'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+21:50:38.162 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    threshold = arg(1, name=threshold)       ['threshold']
+    zero_pos = arg(2, name=zero_pos)         ['zero_pos']
+    $const6.1.1 = const(int, 0)              ['$const6.1.1']
+    x0 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$const6.1.1', 'x', 'x0']
+    $16unary_negative.4 = unary(fn=<built-in function neg>, value=threshold) ['$16unary_negative.4', 'threshold']
+    $24compare_op.6 = $16unary_negative.4 <= x0 ['$16unary_negative.4', '$24compare_op.6', 'x0']
+    $bool28 = global(bool: <class 'bool'>)   ['$bool28']
+    $28pred = call $bool28($24compare_op.6, func=$bool28, args=(Var($24compare_op.6, audio.py:1141),), kws=(), vararg=None, varkwarg=None, target=None) ['$24compare_op.6', '$28pred', '$bool28']
+    $phi32.0 = x0                            ['$phi32.0', 'x0']
+    branch $28pred, 32, 44                   ['$28pred']
+label 32:
+    $34compare_op.2 = $phi32.0 <= threshold  ['$34compare_op.2', '$phi32.0', 'threshold']
+    $bool38 = global(bool: <class 'bool'>)   ['$bool38']
+    $38pred = call $bool38($34compare_op.2, func=$bool38, args=(Var($34compare_op.2, audio.py:1141),), kws=(), vararg=None, varkwarg=None, target=None) ['$34compare_op.2', '$38pred', '$bool38']
+    branch $38pred, 42, 52                   ['$38pred']
+label 42:
+    jump 48                                  []
+label 44:
+    jump 52                                  []
+label 48:
+    x0 = const(int, 0)                       ['x0']
+    jump 52                                  []
+label 52:
+    $const54.1.2 = const(int, -1)            ['$const54.1.2']
+    x1 = getitem(value=x, index=$const54.1.2, fn=<built-in function getitem>) ['$const54.1.2', 'x', 'x1']
+    $64unary_negative.4 = unary(fn=<built-in function neg>, value=threshold) ['$64unary_negative.4', 'threshold']
+    $72compare_op.6 = $64unary_negative.4 <= x1 ['$64unary_negative.4', '$72compare_op.6', 'x1']
+    $bool76 = global(bool: <class 'bool'>)   ['$bool76']
+    $76pred = call $bool76($72compare_op.6, func=$bool76, args=(Var($72compare_op.6, audio.py:1145),), kws=(), vararg=None, varkwarg=None, target=None) ['$72compare_op.6', '$76pred', '$bool76']
+    $phi80.0 = x1                            ['$phi80.0', 'x1']
+    branch $76pred, 80, 92                   ['$76pred']
+label 80:
+    $82compare_op.2 = $phi80.0 <= threshold  ['$82compare_op.2', '$phi80.0', 'threshold']
+    $bool86 = global(bool: <class 'bool'>)   ['$bool86']
+    $86pred = call $bool86($82compare_op.2, func=$bool86, args=(Var($82compare_op.2, audio.py:1145),), kws=(), vararg=None, varkwarg=None, target=None) ['$82compare_op.2', '$86pred', '$bool86']
+    branch $86pred, 90, 100                  ['$86pred']
+label 90:
+    jump 96                                  []
+label 92:
+    jump 100                                 []
+label 96:
+    x1 = const(int, 0)                       ['x1']
+    jump 100                                 []
+label 100:
+    $bool110 = global(bool: <class 'bool'>)  ['$bool110']
+    $110pred = call $bool110(zero_pos, func=$bool110, args=(Var(zero_pos, audio.py:1137),), kws=(), vararg=None, varkwarg=None, target=None) ['$110pred', '$bool110', 'zero_pos']
+    branch $110pred, 114, 204                ['$110pred']
+label 114:
+    $114load_global.0 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$114load_global.0']
+    $124load_attr.1 = getattr(value=$114load_global.0, attr=signbit) ['$114load_global.0', '$124load_attr.1']
+    $148call.4 = call $124load_attr.1(x0, func=$124load_attr.1, args=[Var(x0, audio.py:1140)], kws=(), vararg=None, varkwarg=None, target=None) ['$124load_attr.1', '$148call.4', 'x0']
+    $156load_global.5 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$156load_global.5']
+    $166load_attr.6 = getattr(value=$156load_global.5, attr=signbit) ['$156load_global.5', '$166load_attr.6']
+    $190call.9 = call $166load_attr.6(x1, func=$166load_attr.6, args=[Var(x1, audio.py:1144)], kws=(), vararg=None, varkwarg=None, target=None) ['$166load_attr.6', '$190call.9', 'x1']
+    $198compare_op.10 = $148call.4 != $190call.9 ['$148call.4', '$190call.9', '$198compare_op.10']
+    $202return_value.11 = cast(value=$198compare_op.10) ['$198compare_op.10', '$202return_value.11']
+    return $202return_value.11               ['$202return_value.11']
+label 204:
+    $204load_global.0 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$204load_global.0']
+    $214load_attr.1 = getattr(value=$204load_global.0, attr=sign) ['$204load_global.0', '$214load_attr.1']
+    $238call.4 = call $214load_attr.1(x0, func=$214load_attr.1, args=[Var(x0, audio.py:1140)], kws=(), vararg=None, varkwarg=None, target=None) ['$214load_attr.1', '$238call.4', 'x0']
+    $246load_global.5 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$246load_global.5']
+    $256load_attr.6 = getattr(value=$246load_global.5, attr=sign) ['$246load_global.5', '$256load_attr.6']
+    $280call.9 = call $256load_attr.6(x1, func=$256load_attr.6, args=[Var(x1, audio.py:1144)], kws=(), vararg=None, varkwarg=None, target=None) ['$256load_attr.6', '$280call.9', 'x1']
+    $288compare_op.10 = $238call.4 != $280call.9 ['$238call.4', '$280call.9', '$288compare_op.10']
+    $292return_value.11 = cast(value=$288compare_op.10) ['$288compare_op.10', '$292return_value.11']
+    return $292return_value.11               ['$292return_value.11']
+
+21:50:38.511 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=1023)
+           2	RESUME(arg=0, lineno=1023)
+           4	LOAD_FAST(arg=0, lineno=1026)
+           6	LOAD_CONST(arg=1, lineno=1026)
+           8	BINARY_SUBSCR(arg=None, lineno=1026)
+          12	LOAD_FAST(arg=0, lineno=1026)
+          14	LOAD_CONST(arg=2, lineno=1026)
+          16	BINARY_SUBSCR(arg=None, lineno=1026)
+          20	COMPARE_OP(arg=132, lineno=1026)
+          24	LOAD_FAST(arg=0, lineno=1026)
+          26	LOAD_CONST(arg=1, lineno=1026)
+          28	BINARY_SUBSCR(arg=None, lineno=1026)
+          32	LOAD_FAST(arg=0, lineno=1026)
+          34	LOAD_CONST(arg=3, lineno=1026)
+          36	BINARY_SUBSCR(arg=None, lineno=1026)
+          40	COMPARE_OP(arg=172, lineno=1026)
+          44	BINARY_OP(arg=1, lineno=1026)
+          48	RETURN_VALUE(arg=None, lineno=1026)
+21:50:38.511 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+21:50:38.511 [numba.core.byteflow] stack: []
+21:50:38.511 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+21:50:38.511 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=1023)
+21:50:38.511 [numba.core.byteflow] stack []
+21:50:38.511 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=1023)
+21:50:38.511 [numba.core.byteflow] stack []
+21:50:38.511 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack []
+21:50:38.511 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$x4.0']
+21:50:38.511 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+21:50:38.511 [numba.core.byteflow] dispatch pc=12, inst=LOAD_FAST(arg=0, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$8binary_subscr.2']
+21:50:38.511 [numba.core.byteflow] dispatch pc=14, inst=LOAD_CONST(arg=2, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3']
+21:50:38.511 [numba.core.byteflow] dispatch pc=16, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3', '$const14.4.2']
+21:50:38.511 [numba.core.byteflow] dispatch pc=20, inst=COMPARE_OP(arg=132, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$8binary_subscr.2', '$16binary_subscr.5']
+21:50:38.511 [numba.core.byteflow] dispatch pc=24, inst=LOAD_FAST(arg=0, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6']
+21:50:38.511 [numba.core.byteflow] dispatch pc=26, inst=LOAD_CONST(arg=1, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7']
+21:50:38.511 [numba.core.byteflow] dispatch pc=28, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7', '$const26.8.1']
+21:50:38.511 [numba.core.byteflow] dispatch pc=32, inst=LOAD_FAST(arg=0, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9']
+21:50:38.511 [numba.core.byteflow] dispatch pc=34, inst=LOAD_CONST(arg=3, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10']
+21:50:38.511 [numba.core.byteflow] dispatch pc=36, inst=BINARY_SUBSCR(arg=None, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10', '$const34.11.3']
+21:50:38.511 [numba.core.byteflow] dispatch pc=40, inst=COMPARE_OP(arg=172, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$36binary_subscr.12']
+21:50:38.511 [numba.core.byteflow] dispatch pc=44, inst=BINARY_OP(arg=1, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$20compare_op.6', '$40compare_op.13']
+21:50:38.511 [numba.core.byteflow] dispatch pc=48, inst=RETURN_VALUE(arg=None, lineno=1026)
+21:50:38.511 [numba.core.byteflow] stack ['$binop_and_44.14']
+21:50:38.511 [numba.core.byteflow] end state. edges=[]
+21:50:38.511 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+21:50:38.511 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>, {State(pc_initial=0 nstack_initial=0): set()})
+21:50:38.512 [numba.core.byteflow] defmap: {}
+21:50:38.512 [numba.core.byteflow] phismap: defaultdict(<class 'set'>, {})
+21:50:38.512 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>, {})
+21:50:38.512 [numba.core.byteflow] keep phismap: {}
+21:50:38.512 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>, {})
+21:50:38.512 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+21:50:38.512 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'res': '$x12.3'}), (14, {'res': '$const14.4.2'}), (16, {'index': '$const14.4.2', 'target': '$x12.3', 'res': '$16binary_subscr.5'}), (20, {'lhs': '$8binary_subscr.2', 'rhs': '$16binary_subscr.5', 'res': '$20compare_op.6'}), (24, {'res': '$x24.7'}), (26, {'res': '$const26.8.1'}), (28, {'index': '$const26.8.1', 'target': '$x24.7', 'res': '$28binary_subscr.9'}), (32, {'res': '$x32.10'}), (34, {'res': '$const34.11.3'}), (36, {'index': '$const34.11.3', 'target': '$x32.10', 'res': '$36binary_subscr.12'}), (40, {'lhs': '$28binary_subscr.9', 'rhs': '$36binary_subscr.12', 'res': '$40compare_op.13'}), (44, {'op': '&', 'lhs': '$20compare_op.6', 'rhs': '$40compare_op.13', 'res': '$binop_and_44.14'}), (48, {'retval': '$binop_and_44.14', 'castval': '$48return_value.15'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+21:50:38.512 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    $const6.1.1 = const(int, 0)              ['$const6.1.1']
+    $8binary_subscr.2 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$8binary_subscr.2', '$const6.1.1', 'x']
+    $const14.4.2 = const(int, -1)            ['$const14.4.2']
+    $16binary_subscr.5 = getitem(value=x, index=$const14.4.2, fn=<built-in function getitem>) ['$16binary_subscr.5', '$const14.4.2', 'x']
+    $20compare_op.6 = $8binary_subscr.2 > $16binary_subscr.5 ['$16binary_subscr.5', '$20compare_op.6', '$8binary_subscr.2']
+    $const26.8.1 = const(int, 0)             ['$const26.8.1']
+    $28binary_subscr.9 = getitem(value=x, index=$const26.8.1, fn=<built-in function getitem>) ['$28binary_subscr.9', '$const26.8.1', 'x']
+    $const34.11.3 = const(int, 1)            ['$const34.11.3']
+    $36binary_subscr.12 = getitem(value=x, index=$const34.11.3, fn=<built-in function getitem>) ['$36binary_subscr.12', '$const34.11.3', 'x']
+    $40compare_op.13 = $28binary_subscr.9 >= $36binary_subscr.12 ['$28binary_subscr.9', '$36binary_subscr.12', '$40compare_op.13']
+    $binop_and_44.14 = $20compare_op.6 & $40compare_op.13 ['$20compare_op.6', '$40compare_op.13', '$binop_and_44.14']
+    $48return_value.15 = cast(value=$binop_and_44.14) ['$48return_value.15', '$binop_and_44.14']
+    return $48return_value.15                ['$48return_value.15']
+
+21:50:38.512 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=1029)
+           2	RESUME(arg=0, lineno=1029)
+           4	LOAD_FAST(arg=0, lineno=1032)
+           6	LOAD_CONST(arg=1, lineno=1032)
+           8	BINARY_SUBSCR(arg=None, lineno=1032)
+          12	LOAD_FAST(arg=0, lineno=1032)
+          14	LOAD_CONST(arg=2, lineno=1032)
+          16	BINARY_SUBSCR(arg=None, lineno=1032)
+          20	COMPARE_OP(arg=2, lineno=1032)
+          24	LOAD_FAST(arg=0, lineno=1032)
+          26	LOAD_CONST(arg=1, lineno=1032)
+          28	BINARY_SUBSCR(arg=None, lineno=1032)
+          32	LOAD_FAST(arg=0, lineno=1032)
+          34	LOAD_CONST(arg=3, lineno=1032)
+          36	BINARY_SUBSCR(arg=None, lineno=1032)
+          40	COMPARE_OP(arg=42, lineno=1032)
+          44	BINARY_OP(arg=1, lineno=1032)
+          48	RETURN_VALUE(arg=None, lineno=1032)
+21:50:38.512 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+21:50:38.512 [numba.core.byteflow] stack: []
+21:50:38.512 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+21:50:38.512 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=1029)
+21:50:38.512 [numba.core.byteflow] stack []
+21:50:38.512 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=1029)
+21:50:38.512 [numba.core.byteflow] stack []
+21:50:38.512 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=1032)
+21:50:38.512 [numba.core.byteflow] stack []
+21:50:38.512 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=1032)
+21:50:38.512 [numba.core.byteflow] stack ['$x4.0']
+21:50:38.512 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+21:50:38.512 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+21:50:38.512 [numba.core.byteflow] dispatch pc=12, inst=LOAD_FAST(arg=0, lineno=1032)
+21:50:38.512 [numba.core.byteflow] stack ['$8binary_subscr.2']
+21:50:38.513 [numba.core.byteflow] dispatch pc=14, inst=LOAD_CONST(arg=2, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3']
+21:50:38.513 [numba.core.byteflow] dispatch pc=16, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3', '$const14.4.2']
+21:50:38.513 [numba.core.byteflow] dispatch pc=20, inst=COMPARE_OP(arg=2, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$8binary_subscr.2', '$16binary_subscr.5']
+21:50:38.513 [numba.core.byteflow] dispatch pc=24, inst=LOAD_FAST(arg=0, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6']
+21:50:38.513 [numba.core.byteflow] dispatch pc=26, inst=LOAD_CONST(arg=1, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7']
+21:50:38.513 [numba.core.byteflow] dispatch pc=28, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6', '$x24.7', '$const26.8.1']
+21:50:38.513 [numba.core.byteflow] dispatch pc=32, inst=LOAD_FAST(arg=0, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9']
+21:50:38.513 [numba.core.byteflow] dispatch pc=34, inst=LOAD_CONST(arg=3, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10']
+21:50:38.513 [numba.core.byteflow] dispatch pc=36, inst=BINARY_SUBSCR(arg=None, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$x32.10', '$const34.11.3']
+21:50:38.513 [numba.core.byteflow] dispatch pc=40, inst=COMPARE_OP(arg=42, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6', '$28binary_subscr.9', '$36binary_subscr.12']
+21:50:38.513 [numba.core.byteflow] dispatch pc=44, inst=BINARY_OP(arg=1, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$20compare_op.6', '$40compare_op.13']
+21:50:38.513 [numba.core.byteflow] dispatch pc=48, inst=RETURN_VALUE(arg=None, lineno=1032)
+21:50:38.513 [numba.core.byteflow] stack ['$binop_and_44.14']
+21:50:38.513 [numba.core.byteflow] end state. edges=[]
+21:50:38.513 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+21:50:38.513 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>, {State(pc_initial=0 nstack_initial=0): set()})
+21:50:38.513 [numba.core.byteflow] defmap: {}
+21:50:38.513 [numba.core.byteflow] phismap: defaultdict(<class 'set'>, {})
+21:50:38.513 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>, {})
+21:50:38.513 [numba.core.byteflow] keep phismap: {}
+21:50:38.513 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>, {})
+21:50:38.513 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+21:50:38.513 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'res': '$x12.3'}), (14, {'res': '$const14.4.2'}), (16, {'index': '$const14.4.2', 'target': '$x12.3', 'res': '$16binary_subscr.5'}), (20, {'lhs': '$8binary_subscr.2', 'rhs': '$16binary_subscr.5', 'res': '$20compare_op.6'}), (24, {'res': '$x24.7'}), (26, {'res': '$const26.8.1'}), (28, {'index': '$const26.8.1', 'target': '$x24.7', 'res': '$28binary_subscr.9'}), (32, {'res': '$x32.10'}), (34, {'res': '$const34.11.3'}), (36, {'index': '$const34.11.3', 'target': '$x32.10', 'res': '$36binary_subscr.12'}), (40, {'lhs': '$28binary_subscr.9', 'rhs': '$36binary_subscr.12', 'res': '$40compare_op.13'}), (44, {'op': '&', 'lhs': '$20compare_op.6', 'rhs': '$40compare_op.13', 'res': '$binop_and_44.14'}), (48, {'retval': '$binop_and_44.14', 'castval': '$48return_value.15'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+21:50:38.513 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    $const6.1.1 = const(int, 0)              ['$const6.1.1']
+    $8binary_subscr.2 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$8binary_subscr.2', '$const6.1.1', 'x']
+    $const14.4.2 = const(int, -1)            ['$const14.4.2']
+    $16binary_subscr.5 = getitem(value=x, index=$const14.4.2, fn=<built-in function getitem>) ['$16binary_subscr.5', '$const14.4.2', 'x']
+    $20compare_op.6 = $8binary_subscr.2 < $16binary_subscr.5 ['$16binary_subscr.5', '$20compare_op.6', '$8binary_subscr.2']
+    $const26.8.1 = const(int, 0)             ['$const26.8.1']
+    $28binary_subscr.9 = getitem(value=x, index=$const26.8.1, fn=<built-in function getitem>) ['$28binary_subscr.9', '$const26.8.1', 'x']
+    $const34.11.3 = const(int, 1)            ['$const34.11.3']
+    $36binary_subscr.12 = getitem(value=x, index=$const34.11.3, fn=<built-in function getitem>) ['$36binary_subscr.12', '$const34.11.3', 'x']
+    $40compare_op.13 = $28binary_subscr.9 <= $36binary_subscr.12 ['$28binary_subscr.9', '$36binary_subscr.12', '$40compare_op.13']
+    $binop_and_44.14 = $20compare_op.6 & $40compare_op.13 ['$20compare_op.6', '$40compare_op.13', '$binop_and_44.14']
+    $48return_value.15 = cast(value=$binop_and_44.14) ['$48return_value.15', '$binop_and_44.14']
+    return $48return_value.15                ['$48return_value.15']
+
+21:50:38.662 [numba.core.byteflow] bytecode dump:
+>          0	NOP(arg=None, lineno=416)
+           2	RESUME(arg=0, lineno=416)
+           4	LOAD_FAST(arg=0, lineno=419)
+           6	LOAD_CONST(arg=1, lineno=419)
+           8	BINARY_SUBSCR(arg=None, lineno=419)
+          12	LOAD_FAST(arg=0, lineno=419)
+          14	LOAD_CONST(arg=2, lineno=419)
+          16	BINARY_SUBSCR(arg=None, lineno=419)
+          20	BINARY_OP(arg=0, lineno=419)
+          24	LOAD_CONST(arg=3, lineno=419)
+          26	LOAD_FAST(arg=0, lineno=419)
+          28	LOAD_CONST(arg=4, lineno=419)
+          30	BINARY_SUBSCR(arg=None, lineno=419)
+          34	BINARY_OP(arg=5, lineno=419)
+          38	BINARY_OP(arg=10, lineno=419)
+          42	STORE_FAST(arg=1, lineno=419)
+          44	LOAD_FAST(arg=0, lineno=420)
+          46	LOAD_CONST(arg=1, lineno=420)
+          48	BINARY_SUBSCR(arg=None, lineno=420)
+          52	LOAD_FAST(arg=0, lineno=420)
+          54	LOAD_CONST(arg=2, lineno=420)
+          56	BINARY_SUBSCR(arg=None, lineno=420)
+          60	BINARY_OP(arg=10, lineno=420)
+          64	LOAD_CONST(arg=3, lineno=420)
+          66	BINARY_OP(arg=11, lineno=420)
+          70	STORE_FAST(arg=2, lineno=420)
+          72	LOAD_GLOBAL(arg=0, lineno=422)
+          82	LOAD_ATTR(arg=2, lineno=422)
+         102	PUSH_NULL(arg=None, lineno=422)
+         104	LOAD_FAST(arg=2, lineno=422)
+         106	CALL(arg=1, lineno=422)
+         114	LOAD_GLOBAL(arg=0, lineno=422)
+         124	LOAD_ATTR(arg=2, lineno=422)
+         144	PUSH_NULL(arg=None, lineno=422)
+         146	LOAD_FAST(arg=1, lineno=422)
+         148	CALL(arg=1, lineno=422)
+         156	COMPARE_OP(arg=188, lineno=422)
+         160	POP_JUMP_IF_FALSE(arg=1, lineno=422)
+         164	RETURN_CONST(arg=4, lineno=425)
+>        166	LOAD_FAST(arg=2, lineno=427)
+         168	UNARY_NEGATIVE(arg=None, lineno=427)
+         170	LOAD_FAST(arg=1, lineno=427)
+         172	BINARY_OP(arg=11, lineno=427)
+         176	RETURN_VALUE(arg=None, lineno=427)
+21:50:38.662 [numba.core.byteflow] pending: deque([State(pc_initial=0 nstack_initial=0)])
+21:50:38.662 [numba.core.byteflow] stack: []
+21:50:38.662 [numba.core.byteflow] state.pc_initial: State(pc_initial=0 nstack_initial=0)
+21:50:38.662 [numba.core.byteflow] dispatch pc=0, inst=NOP(arg=None, lineno=416)
+21:50:38.662 [numba.core.byteflow] stack []
+21:50:38.662 [numba.core.byteflow] dispatch pc=2, inst=RESUME(arg=0, lineno=416)
+21:50:38.662 [numba.core.byteflow] stack []
+21:50:38.662 [numba.core.byteflow] dispatch pc=4, inst=LOAD_FAST(arg=0, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack []
+21:50:38.662 [numba.core.byteflow] dispatch pc=6, inst=LOAD_CONST(arg=1, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$x4.0']
+21:50:38.662 [numba.core.byteflow] dispatch pc=8, inst=BINARY_SUBSCR(arg=None, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$x4.0', '$const6.1.1']
+21:50:38.662 [numba.core.byteflow] dispatch pc=12, inst=LOAD_FAST(arg=0, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$8binary_subscr.2']
+21:50:38.662 [numba.core.byteflow] dispatch pc=14, inst=LOAD_CONST(arg=2, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3']
+21:50:38.662 [numba.core.byteflow] dispatch pc=16, inst=BINARY_SUBSCR(arg=None, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$8binary_subscr.2', '$x12.3', '$const14.4.2']
+21:50:38.662 [numba.core.byteflow] dispatch pc=20, inst=BINARY_OP(arg=0, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$8binary_subscr.2', '$16binary_subscr.5']
+21:50:38.662 [numba.core.byteflow] dispatch pc=24, inst=LOAD_CONST(arg=3, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$binop_add20.6']
+21:50:38.662 [numba.core.byteflow] dispatch pc=26, inst=LOAD_FAST(arg=0, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3']
+21:50:38.662 [numba.core.byteflow] dispatch pc=28, inst=LOAD_CONST(arg=4, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3', '$x26.8']
+21:50:38.662 [numba.core.byteflow] dispatch pc=30, inst=BINARY_SUBSCR(arg=None, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3', '$x26.8', '$const28.9.4']
+21:50:38.662 [numba.core.byteflow] dispatch pc=34, inst=BINARY_OP(arg=5, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$binop_add20.6', '$const24.7.3', '$30binary_subscr.10']
+21:50:38.662 [numba.core.byteflow] dispatch pc=38, inst=BINARY_OP(arg=10, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$binop_add20.6', '$binop_mul34.11']
+21:50:38.662 [numba.core.byteflow] dispatch pc=42, inst=STORE_FAST(arg=1, lineno=419)
+21:50:38.662 [numba.core.byteflow] stack ['$binop_sub38.12']
+21:50:38.662 [numba.core.byteflow] dispatch pc=44, inst=LOAD_FAST(arg=0, lineno=420)
+21:50:38.662 [numba.core.byteflow] stack []
+21:50:38.662 [numba.core.byteflow] dispatch pc=46, inst=LOAD_CONST(arg=1, lineno=420)
+21:50:38.662 [numba.core.byteflow] stack ['$x44.13']
+21:50:38.662 [numba.core.byteflow] dispatch pc=48, inst=BINARY_SUBSCR(arg=None, lineno=420)
+21:50:38.662 [numba.core.byteflow] stack ['$x44.13', '$const46.14.1']
+21:50:38.662 [numba.core.byteflow] dispatch pc=52, inst=LOAD_FAST(arg=0, lineno=420)
+21:50:38.662 [numba.core.byteflow] stack ['$48binary_subscr.15']
+21:50:38.662 [numba.core.byteflow] dispatch pc=54, inst=LOAD_CONST(arg=2, lineno=420)
+21:50:38.662 [numba.core.byteflow] stack ['$48binary_subscr.15', '$x52.16']
+21:50:38.662 [numba.core.byteflow] dispatch pc=56, inst=BINARY_SUBSCR(arg=None, lineno=420)
+21:50:38.663 [numba.core.byteflow] stack ['$48binary_subscr.15', '$x52.16', '$const54.17.2']
+21:50:38.663 [numba.core.byteflow] dispatch pc=60, inst=BINARY_OP(arg=10, lineno=420)
+21:50:38.663 [numba.core.byteflow] stack ['$48binary_subscr.15', '$56binary_subscr.18']
+21:50:38.663 [numba.core.byteflow] dispatch pc=64, inst=LOAD_CONST(arg=3, lineno=420)
+21:50:38.663 [numba.core.byteflow] stack ['$binop_sub60.19']
+21:50:38.663 [numba.core.byteflow] dispatch pc=66, inst=BINARY_OP(arg=11, lineno=420)
+21:50:38.663 [numba.core.byteflow] stack ['$binop_sub60.19', '$const64.20.3']
+21:50:38.663 [numba.core.byteflow] dispatch pc=70, inst=STORE_FAST(arg=2, lineno=420)
+21:50:38.663 [numba.core.byteflow] stack ['$binop_truediv66.21']
+21:50:38.663 [numba.core.byteflow] dispatch pc=72, inst=LOAD_GLOBAL(arg=0, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack []
+21:50:38.663 [numba.core.byteflow] dispatch pc=82, inst=LOAD_ATTR(arg=2, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$72load_global.22']
+21:50:38.663 [numba.core.byteflow] dispatch pc=102, inst=PUSH_NULL(arg=None, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$82load_attr.23']
+21:50:38.663 [numba.core.byteflow] dispatch pc=104, inst=LOAD_FAST(arg=2, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$82load_attr.23', '$null$102.24']
+21:50:38.663 [numba.core.byteflow] dispatch pc=106, inst=CALL(arg=1, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$82load_attr.23', '$null$102.24', '$b104.25']
+21:50:38.663 [numba.core.byteflow] dispatch pc=114, inst=LOAD_GLOBAL(arg=0, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$106call.26']
+21:50:38.663 [numba.core.byteflow] dispatch pc=124, inst=LOAD_ATTR(arg=2, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$106call.26', '$114load_global.27']
+21:50:38.663 [numba.core.byteflow] dispatch pc=144, inst=PUSH_NULL(arg=None, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$106call.26', '$124load_attr.28']
+21:50:38.663 [numba.core.byteflow] dispatch pc=146, inst=LOAD_FAST(arg=1, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$106call.26', '$124load_attr.28', '$null$144.29']
+21:50:38.663 [numba.core.byteflow] dispatch pc=148, inst=CALL(arg=1, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$106call.26', '$124load_attr.28', '$null$144.29', '$a146.30']
+21:50:38.663 [numba.core.byteflow] dispatch pc=156, inst=COMPARE_OP(arg=188, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$106call.26', '$148call.31']
+21:50:38.663 [numba.core.byteflow] dispatch pc=160, inst=POP_JUMP_IF_FALSE(arg=1, lineno=422)
+21:50:38.663 [numba.core.byteflow] stack ['$156compare_op.32']
+21:50:38.663 [numba.core.byteflow] end state. edges=[Edge(pc=164, stack=(), blockstack=(), npush=0), Edge(pc=166, stack=(), blockstack=(), npush=0)]
+21:50:38.663 [numba.core.byteflow] pending: deque([State(pc_initial=164 nstack_initial=0), State(pc_initial=166 nstack_initial=0)])
+21:50:38.663 [numba.core.byteflow] stack: []
+21:50:38.663 [numba.core.byteflow] state.pc_initial: State(pc_initial=164 nstack_initial=0)
+21:50:38.663 [numba.core.byteflow] dispatch pc=164, inst=RETURN_CONST(arg=4, lineno=425)
+21:50:38.663 [numba.core.byteflow] stack []
+21:50:38.663 [numba.core.byteflow] end state. edges=[]
+21:50:38.663 [numba.core.byteflow] pending: deque([State(pc_initial=166 nstack_initial=0)])
+21:50:38.663 [numba.core.byteflow] stack: []
+21:50:38.663 [numba.core.byteflow] state.pc_initial: State(pc_initial=166 nstack_initial=0)
+21:50:38.663 [numba.core.byteflow] dispatch pc=166, inst=LOAD_FAST(arg=2, lineno=427)
+21:50:38.663 [numba.core.byteflow] stack []
+21:50:38.663 [numba.core.byteflow] dispatch pc=168, inst=UNARY_NEGATIVE(arg=None, lineno=427)
+21:50:38.663 [numba.core.byteflow] stack ['$b166.0']
+21:50:38.663 [numba.core.byteflow] dispatch pc=170, inst=LOAD_FAST(arg=1, lineno=427)
+21:50:38.663 [numba.core.byteflow] stack ['$168unary_negative.1']
+21:50:38.663 [numba.core.byteflow] dispatch pc=172, inst=BINARY_OP(arg=11, lineno=427)
+21:50:38.663 [numba.core.byteflow] stack ['$168unary_negative.1', '$a170.2']
+21:50:38.663 [numba.core.byteflow] dispatch pc=176, inst=RETURN_VALUE(arg=None, lineno=427)
+21:50:38.663 [numba.core.byteflow] stack ['$binop_truediv172.3']
+21:50:38.663 [numba.core.byteflow] end state. edges=[]
+21:50:38.663 [numba.core.byteflow] -------------------------Prune PHIs-------------------------
+21:50:38.663 [numba.core.byteflow] Used_phis: defaultdict(<class 'set'>,
+            {State(pc_initial=0 nstack_initial=0): set(),
+             State(pc_initial=164 nstack_initial=0): set(),
+             State(pc_initial=166 nstack_initial=0): set()})
+21:50:38.663 [numba.core.byteflow] defmap: {}
+21:50:38.663 [numba.core.byteflow] phismap: defaultdict(<class 'set'>, {})
+21:50:38.663 [numba.core.byteflow] changing phismap: defaultdict(<class 'set'>, {})
+21:50:38.663 [numba.core.byteflow] keep phismap: {}
+21:50:38.663 [numba.core.byteflow] new_out: defaultdict(<class 'dict'>, {})
+21:50:38.663 [numba.core.byteflow] ----------------------DONE Prune PHIs-----------------------
+21:50:38.663 [numba.core.byteflow] block_infos State(pc_initial=0 nstack_initial=0):
+AdaptBlockInfo(insts=((0, {}), (2, {}), (4, {'res': '$x4.0'}), (6, {'res': '$const6.1.1'}), (8, {'index': '$const6.1.1', 'target': '$x4.0', 'res': '$8binary_subscr.2'}), (12, {'res': '$x12.3'}), (14, {'res': '$const14.4.2'}), (16, {'index': '$const14.4.2', 'target': '$x12.3', 'res': '$16binary_subscr.5'}), (20, {'op': '+', 'lhs': '$8binary_subscr.2', 'rhs': '$16binary_subscr.5', 'res': '$binop_add20.6'}), (24, {'res': '$const24.7.3'}), (26, {'res': '$x26.8'}), (28, {'res': '$const28.9.4'}), (30, {'index': '$const28.9.4', 'target': '$x26.8', 'res': '$30binary_subscr.10'}), (34, {'op': '*', 'lhs': '$const24.7.3', 'rhs': '$30binary_subscr.10', 'res': '$binop_mul34.11'}), (38, {'op': '-', 'lhs': '$binop_add20.6', 'rhs': '$binop_mul34.11', 'res': '$binop_sub38.12'}), (42, {'value': '$binop_sub38.12'}), (44, {'res': '$x44.13'}), (46, {'res': '$const46.14.1'}), (48, {'index': '$const46.14.1', 'target': '$x44.13', 'res': '$48binary_subscr.15'}), (52, {'res': '$x52.16'}), (54, {'res': '$const54.17.2'}), (56, {'index': '$const54.17.2', 'target': '$x52.16', 'res': '$56binary_subscr.18'}), (60, {'op': '-', 'lhs': '$48binary_subscr.15', 'rhs': '$56binary_subscr.18', 'res': '$binop_sub60.19'}), (64, {'res': '$const64.20.3'}), (66, {'op': '/', 'lhs': '$binop_sub60.19', 'rhs': '$const64.20.3', 'res': '$binop_truediv66.21'}), (70, {'value': '$binop_truediv66.21'}), (72, {'idx': 0, 'res': '$72load_global.22'}), (82, {'item': '$72load_global.22', 'res': '$82load_attr.23'}), (102, {}), (104, {'res': '$b104.25'}), (106, {'func': '$82load_attr.23', 'args': ['$b104.25'], 'kw_names': None, 'res': '$106call.26'}), (114, {'idx': 0, 'res': '$114load_global.27'}), (124, {'item': '$114load_global.27', 'res': '$124load_attr.28'}), (144, {}), (146, {'res': '$a146.30'}), (148, {'func': '$124load_attr.28', 'args': ['$a146.30'], 'kw_names': None, 'res': '$148call.31'}), (156, {'lhs': '$106call.26', 'rhs': '$148call.31', 'res': '$156compare_op.32'}), (160, {'pred': '$156compare_op.32'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={164: (), 166: ()})
+21:50:38.663 [numba.core.byteflow] block_infos State(pc_initial=164 nstack_initial=0):
+AdaptBlockInfo(insts=((164, {'retval': '$const164.0', 'castval': '$164return_const.1'}),), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+21:50:38.663 [numba.core.byteflow] block_infos State(pc_initial=166 nstack_initial=0):
+AdaptBlockInfo(insts=((166, {'res': '$b166.0'}), (168, {'value': '$b166.0', 'res': '$168unary_negative.1'}), (170, {'res': '$a170.2'}), (172, {'op': '/', 'lhs': '$168unary_negative.1', 'rhs': '$a170.2', 'res': '$binop_truediv172.3'}), (176, {'retval': '$binop_truediv172.3', 'castval': '$176return_value.4'})), outgoing_phis={}, blockstack=(), active_try_block=None, outgoing_edgepushed={})
+21:50:38.664 [numba.core.interpreter] label 0:
+    x = arg(0, name=x)                       ['x']
+    $const6.1.1 = const(int, 1)              ['$const6.1.1']
+    $8binary_subscr.2 = getitem(value=x, index=$const6.1.1, fn=<built-in function getitem>) ['$8binary_subscr.2', '$const6.1.1', 'x']
+    $const14.4.2 = const(int, -1)            ['$const14.4.2']
+    $16binary_subscr.5 = getitem(value=x, index=$const14.4.2, fn=<built-in function getitem>) ['$16binary_subscr.5', '$const14.4.2', 'x']
+    $binop_add20.6 = $8binary_subscr.2 + $16binary_subscr.5 ['$16binary_subscr.5', '$8binary_subscr.2', '$binop_add20.6']
+    $const24.7.3 = const(int, 2)             ['$const24.7.3']
+    $const28.9.4 = const(int, 0)             ['$const28.9.4']
+    $30binary_subscr.10 = getitem(value=x, index=$const28.9.4, fn=<built-in function getitem>) ['$30binary_subscr.10', '$const28.9.4', 'x']
+    $binop_mul34.11 = $const24.7.3 * $30binary_subscr.10 ['$30binary_subscr.10', '$binop_mul34.11', '$const24.7.3']
+    a = $binop_add20.6 - $binop_mul34.11     ['$binop_add20.6', '$binop_mul34.11', 'a']
+    $const46.14.1 = const(int, 1)            ['$const46.14.1']
+    $48binary_subscr.15 = getitem(value=x, index=$const46.14.1, fn=<built-in function getitem>) ['$48binary_subscr.15', '$const46.14.1', 'x']
+    $const54.17.2 = const(int, -1)           ['$const54.17.2']
+    $56binary_subscr.18 = getitem(value=x, index=$const54.17.2, fn=<built-in function getitem>) ['$56binary_subscr.18', '$const54.17.2', 'x']
+    $binop_sub60.19 = $48binary_subscr.15 - $56binary_subscr.18 ['$48binary_subscr.15', '$56binary_subscr.18', '$binop_sub60.19']
+    $const64.20.3 = const(int, 2)            ['$const64.20.3']
+    b = $binop_sub60.19 / $const64.20.3      ['$binop_sub60.19', '$const64.20.3', 'b']
+    $72load_global.22 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$72load_global.22']
+    $82load_attr.23 = getattr(value=$72load_global.22, attr=abs) ['$72load_global.22', '$82load_attr.23']
+    $106call.26 = call $82load_attr.23(b, func=$82load_attr.23, args=[Var(b, pitch.py:420)], kws=(), vararg=None, varkwarg=None, target=None) ['$106call.26', '$82load_attr.23', 'b']
+    $114load_global.27 = global(np: <module 'numpy' from '/Users/andy/Andy-agent/video-subtitle/.venv/lib/python3.13/site-packages/numpy/__init__.py'>) ['$114load_global.27']
+    $124load_attr.28 = getattr(value=$114load_global.27, attr=abs) ['$114load_global.27', '$124load_attr.28']
+    $148call.31 = call $124load_attr.28(a, func=$124load_attr.28, args=[Var(a, pitch.py:419)], kws=(), vararg=None, varkwarg=None, target=None) ['$124load_attr.28', '$148call.31', 'a']
+    $156compare_op.32 = $106call.26 >= $148call.31 ['$106call.26', '$148call.31', '$156compare_op.32']
+    $bool160 = global(bool: <class 'bool'>)  ['$bool160']
+    $160pred = call $bool160($156compare_op.32, func=$bool160, args=(Var($156compare_op.32, pitch.py:422),), kws=(), vararg=None, varkwarg=None, target=None) ['$156compare_op.32', '$160pred', '$bool160']
+    branch $160pred, 164, 166                ['$160pred']
+label 164:
+    $const164.0 = const(int, 0)              ['$const164.0']
+    $164return_const.1 = cast(value=$const164.0) ['$164return_const.1', '$const164.0']
+    return $164return_const.1                ['$164return_const.1']
+label 166:
+    $168unary_negative.1 = unary(fn=<built-in function neg>, value=b) ['$168unary_negative.1', 'b']
+    $binop_truediv172.3 = $168unary_negative.1 / a ['$168unary_negative.1', '$binop_truediv172.3', 'a']
+    $176return_value.4 = cast(value=$binop_truediv172.3) ['$176return_value.4', '$binop_truediv172.3']
+    return $176return_value.4                ['$176return_value.4']
+

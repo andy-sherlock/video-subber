@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video-subber"
+version = "1.1.0"
+description = "一键视频中文字幕生成工具"
+requires-python = ">=3.10"
+dependencies = [
+    "faster-whisper>=1.0",
+    "deep-translator>=1.11",
+]
+
+[project.optional-dependencies]
+diarize = [
+    "pyannote.audio>=3.1",
+]
+
+[project.scripts]
+video-subber = "video_subber.cli:main"
+video-subber-ui = "video_subber.ui:main"
