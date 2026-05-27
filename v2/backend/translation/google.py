@@ -1,5 +1,5 @@
 """Google Translate backend — free web API, per-segment only."""
-import json, time, urllib.request, urllib.parse
+import json, re, time, urllib.request, urllib.parse
 from .base import TranslationBackend, TranslationResult
 
 
@@ -34,10 +34,16 @@ class GoogleBackend(TranslationBackend):
             data = json.loads(resp.read().decode())
             translated_full = "".join([s[0] for s in data[0] if s[0]])
             parts = [p.strip() for p in translated_full.split(SEPARATOR)]
+            if len(parts) != len(non_empty):
+                parts = [p.strip() for p in re.split(r'\s*\|\|\|\s*', translated_full)]
+            if len(parts) != len(non_empty):
+                return TranslationResult(
+                    translated=["[翻译失败]"] * len(texts), backend_name=self.name,
+                    duration_ms=int((time.time() - t0) * 1000),
+                )
             for target_idx, part in enumerate(parts):
-                if target_idx < len(non_empty):
-                    original_idx = non_empty[target_idx][0]
-                    results[original_idx] = part if part else "[翻译失败]"
+                original_idx = non_empty[target_idx][0]
+                results[original_idx] = part if part else "[翻译失败]"
         except Exception:
             pass  # results already preset to "[翻译失败]"
 

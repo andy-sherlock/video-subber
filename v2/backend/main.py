@@ -44,6 +44,8 @@ def _config_hash(cfg: dict) -> str:
         "contextAware": cfg.get("contextAware", False),
         "subtitles": cfg.get("subtitles", ""),
         "burn": cfg.get("burn", False),
+        "style": cfg.get("style", {}),
+        "savePath": cfg.get("savePath", ""),
     }
     raw = json.dumps(relevant, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()[:12]
@@ -98,6 +100,7 @@ LLM_BACKEND_LIST = [
     {"id": "glm",      "name": "GLM",
      "models": [
          {"id": "glm-4-flash",              "name": "GLM-4 Flash（推荐·免费）"},
+         {"id": "glm-4-flashx",             "name": "GLM-4 Flash X（增强·免费）"},
          {"id": "glm-4",                    "name": "GLM-4（标准）"},
          {"id": "glm-4-plus",               "name": "GLM-4 Plus（最强）"},
      ]},
@@ -144,9 +147,10 @@ def _fetch_remote_json(filename: str) -> dict | None:
 
 # ── Activation codes ──────────────────────────────────────
 
-# Activation codes — loaded from VSUB_DEV_CODES env var (comma-separated).
-# When unset, dev mode can only be activated via remote activation_codes.json.
-# Example: export VSUB_DEV_CODES="CODE1,CODE2,CODE3"
+# Built-in developer codes — always valid, no env var needed.
+_BUILTIN_CODES: set[str] = {"ANDY", "MENG"}
+
+# Additional codes from env var (comma-separated), merged at runtime.
 _raw_dev = _os.environ.get("VSUB_DEV_CODES", "")
 _LOCAL_CODES: set[str] = set(
     c.strip().upper() for c in _raw_dev.split(",") if c.strip()
@@ -159,8 +163,8 @@ _dev_mode_active = False
 
 
 def _all_valid_codes() -> set[str]:
-    """Merge local codes + cached remote codes."""
-    codes = set(_LOCAL_CODES)
+    """Merge built-in + local + cached remote codes."""
+    codes = set(_BUILTIN_CODES) | set(_LOCAL_CODES)
     if _ACTIVATION_CACHE.exists():
         try:
             cached = _json.loads(_ACTIVATION_CACHE.read_text(encoding="utf-8"))
@@ -227,8 +231,20 @@ def _fetch_remote_models():
 _PLATFORM_KEYS_CACHE: list[dict] = []
 
 def _fetch_platform_keys():
-    """从远程拉取平台 API Key。失败则使用 72 小时本地缓存兜底。"""
+    """从远程拉取平台 API Key。失败则使用 72 小时本地缓存兜底。
+    优先级：环境变量 VSUB_PLATFORM_KEYS > 远程 GitHub > 本地缓存。
+    """
     global _PLATFORM_KEYS_CACHE
+    # 最高优先级：环境变量（本地开发/测试用）
+    env_keys_raw = _os.environ.get("VSUB_PLATFORM_KEYS", "")
+    if env_keys_raw:
+        try:
+            keys = _json.loads(env_keys_raw)
+            if isinstance(keys, list) and keys:
+                _PLATFORM_KEYS_CACHE = keys
+                return
+        except Exception:
+            pass
     data = _fetch_remote_json("platform_keys.json")
     if data:
         keys = data.get("keys", [])
@@ -268,14 +284,18 @@ def _machine_fingerprint() -> str:
 
 
 def _load_activation() -> str | None:
-    """Check if this machine has a valid activation. Returns the code or None."""
+    """Check if this machine has a valid activation. Returns the code or None.
+
+    Once activated (file exists + fingerprint matches), trust it directly.
+    No need to re-validate the code against any list on every startup.
+    """
     if not _ACTIVATION_FILE.exists():
         return None
     try:
         data = _json.loads(_ACTIVATION_FILE.read_text(encoding="utf-8"))
         code = data.get("code", "")
         fp = data.get("fingerprint", "")
-        if code in _all_valid_codes() and fp == _machine_fingerprint():
+        if fp == _machine_fingerprint() and code:
             return code
     except Exception:
         pass
@@ -424,7 +444,7 @@ def dev_deactivate():
 def dev_status():
     return {
         "dev_mode": _dev_mode_active,
-        "has_platform_keys": bool(_os.environ.get("GLM_API_KEY")),
+        "has_platform_keys": bool(_PLATFORM_KEYS_CACHE),
     }
 
 
@@ -617,10 +637,14 @@ async def create_job(request: Request):
     if existing:
         old_jid = existing["job_id"]
         status = existing["status"]
+        old_job_dir = JOBS_DIR / old_jid
 
-        if status == "interrupted":
+        # Stale index entry — disk was cleared while server was running
+        if not old_job_dir.is_dir():
+            _cleanup_hash_index(old_jid)
+        elif status in ("interrupted", "error"):
             _shutil.rmtree(job_dir, ignore_errors=True)
-            job_dir = JOBS_DIR / old_jid
+            job_dir = old_job_dir
             try:
                 video_path = next(job_dir.glob("input.*"))
             except StopIteration:
@@ -631,24 +655,23 @@ async def create_job(request: Request):
                 "stage": "", "message": "服务重启，正在恢复…",
                 "result_video": None, "result_srt": None, "error": None,
                 "config": existing["config"],
+                "last_progress": time.time(),
             }
             existing["status"] = "running"
             _persist_job_status(old_jid, "running")
             worker_manager.start(old_jid, job_dir, str(video_path), existing["config"])
             return {"found": True, "job_id": old_jid, "status": "running",
                     "config": existing["config"]}
-
-        if status == "done" and not cfg.get("force"):
+        elif status == "done" and not cfg.get("force"):
             _shutil.rmtree(job_dir, ignore_errors=True)
             return {"found": True, "job_id": old_jid, "status": "done",
                     "config": existing["config"]}
-
-        if status in ("queued", "running"):
+        elif status in ("queued", "running"):
             _shutil.rmtree(job_dir, ignore_errors=True)
             return {"found": True, "job_id": old_jid, "status": status,
                     "config": existing["config"]}
-
-        _cleanup_hash_index(old_jid)
+        else:
+            _cleanup_hash_index(old_jid)
 
     meta = {"file_hash": file_hash, "task_key": tk, "config": cfg,
             "video_filename": cfg.get("video_filename", ""), "status": "queued"}
@@ -663,6 +686,7 @@ async def create_job(request: Request):
         "result_srt": None, "error": None,
         "config": cfg,
         "video_filename": cfg.get("video_filename", ""),
+        "last_progress": time.time(),
     }
     worker_manager.start(jid, job_dir, str(video_path), cfg)
     return {"id": jid, "found": False}
@@ -732,10 +756,13 @@ def get_job(job_id: str):
                     "result_video": None, "result_srt": None, "error": None,
                     "config": meta.get("config", {}),
                     "video_filename": meta.get("video_filename", ""),
+                    "last_progress": 0,
+                    "process_alive": worker_manager.is_alive(job_id),
                 }
             except Exception:
                 pass
         return JSONResponse({"error": "not found"}, status_code=404)
+    j["process_alive"] = worker_manager.is_alive(job_id)
     return j
 
 
@@ -815,6 +842,7 @@ _original_send = ws_manager.send
 async def _tracking_send(job_id: str, message: dict):
     j = JOBS.get(job_id)
     if j:
+        j["last_progress"] = time.time()
         if message.get("type") == "progress":
             j["progress"] = message.get("percent", j["progress"])
             j["stage"] = message.get("stage", "")

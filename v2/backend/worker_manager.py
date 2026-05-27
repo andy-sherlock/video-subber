@@ -57,6 +57,10 @@ class WorkerManager:
         threading.Thread(target=self._read_stdout, args=(job_id, proc), daemon=True).start()
         threading.Thread(target=self._read_stderr, args=(job_id, proc), daemon=True).start()
 
+    def is_alive(self, job_id: str) -> bool:
+        proc = self._processes.get(job_id)
+        return proc is not None and proc.poll() is None
+
     def cancel(self, job_id: str):
         """Kill the worker process. Does NOT delete job_dir.
         Cache files (audio.wav, transcript.json, translated.json) are expensive
@@ -91,6 +95,19 @@ class WorkerManager:
                 "type": "error",
                 "message": "处理过程异常中断。可能原因：内存不足。建议选择更小的模型（如 small 或 base）后重试。",
             }
+            # Disk-first: persist error to meta.json regardless of server state
+            job_dir = self._job_dirs.get(job_id)
+            if job_dir:
+                meta_path = job_dir / "meta.json"
+                if meta_path.exists():
+                    try:
+                        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                        meta["status"] = "error"
+                        meta["error"] = error_msg["message"]
+                        meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+                    except Exception:
+                        pass
+            # Best-effort WebSocket broadcast
             if loop and loop.is_running():
                 asyncio.run_coroutine_threadsafe(
                     self._forward(job_id, error_msg), loop

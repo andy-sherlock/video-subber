@@ -42,7 +42,7 @@ def build_ass_styled(segments: list, output_path: str, alignment: int = 2,
     entries = _annotate_speaker_changes(entries_sp)
 
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n\n")
+        f.write("[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\n")
         f.write("[V4+ Styles]\n")
         f.write(
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
@@ -53,7 +53,7 @@ def build_ass_styled(segments: list, output_path: str, alignment: int = 2,
         f.write(
             f"Style: Default,{font_name},{font_size},{primary_color},"
             f"&H000000FF,{outline_color},{back_color},"
-            f"0,0,0,0,100,100,0,0,1,{outline_w},2,{alignment},10,10,50,1\n\n"
+            f"0,0,0,0,100,100,0,0,1,{outline_w},2,{alignment},6,6,10,1\n\n"
         )
         f.write("[Events]\n")
         f.write(

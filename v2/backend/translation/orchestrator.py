@@ -110,11 +110,13 @@ def _run_speed_mode_batch(
     backends: list[TranslationBackend],
     context: str = "",
 ) -> tuple[list[str], TranslationBackend | None, dict | None]:
-    """Fire all backends in parallel. First valid result wins.
+    """Fire all backends in parallel. Best result wins (most valid entries).
+    First fully-valid result short-circuits remaining backends.
 
     Returns (translated_texts, winning_backend_or_None, tokens_used_or_None).
     """
-    result_container = [None]  # [(translated_list, backend, tokens_used)]
+    best_container = [None]  # (translated, backend, tokens, valid_count)
+    best_lock = threading.Lock()
     done_event = threading.Event()
 
     def _try(backend: TranslationBackend):
@@ -122,15 +124,16 @@ def _run_speed_mode_batch(
             return
         try:
             r = backend.translate_batch(batch, context=context)
-            if not done_event.is_set():
-                valid = all(
-                    x is not None and x != "" and x != "[翻译失败]"
-                    for x in r.translated
-                )
-                if len(r.translated) == len(batch):
-                    result_container[0] = (r.translated, backend, r.tokens_used)
-                    if valid:
-                        done_event.set()
+            if done_event.is_set() or len(r.translated) != len(batch):
+                return
+            valid_count = sum(
+                1 for x in r.translated if x not in (None, "", "[翻译失败]")
+            )
+            with best_lock:
+                if best_container[0] is None or valid_count > best_container[0][3]:
+                    best_container[0] = (r.translated, backend, r.tokens_used, valid_count)
+            if valid_count == len(batch):
+                done_event.set()
         except Exception:
             pass
 
@@ -151,8 +154,8 @@ def _run_speed_mode_batch(
         if done_event.is_set():
             break
 
-    if result_container[0] is not None:
-        translated, backend, tokens = result_container[0]
+    if best_container[0] is not None:
+        translated, backend, tokens, _ = best_container[0]
         while len(translated) < len(batch):
             translated.append("[翻译失败]")
         return translated[:len(batch)], backend, tokens
@@ -192,62 +195,96 @@ def _run_quality_mode_batch(
     return results, used_backend, list(failed_indices), batch_tokens
 
 
+_SUBTITLE_PROMPT = (
+    "你是专业视频字幕翻译。翻译规则：\n"
+    "- 保持口语自然，不书面化\n"
+    "- 每行对应一条字幕，独立翻译，不合并不拆分行\n"
+    "- 专有名词、人名保留原文或使用通用译法\n"
+    "- 只输出译文，不加任何解释或注释\n\n"
+)
+_CHUNK_SIZE = 1200   # segments per chunk；~1200 * 10 tokens ≈ 12000 < 16384 max
+_CONTEXT_CARRY = 5   # 上一块最后 N 条译文传入下一块，维持上下文衔接
+
+
 def _translate_whole_with_markers(
     texts: list[str],
     llm: TranslationBackend,
     progress_callback=None,
 ) -> tuple[list[str], dict | None]:
-    """Translate all texts in ONE LLM call. Time stamps stay in code.
-    LLM receives [N] markers, returns same markers. No JSON, no timestamps.
+    """Translate all texts with [N] markers. Adds subtitle system prompt.
+    Auto-chunks when segment count exceeds _CHUNK_SIZE; passes tail context
+    between chunks to maintain continuity.
     """
     if progress_callback:
         progress_callback(0, "LLM 整篇上下文翻译中…")
 
     translated = ["[翻译失败]"] * len(texts)
-    lines_to_send = []
-
-    # Bug 1 fix: empty lines handled locally, never sent to LLM
+    non_empty = []
     for i, t in enumerate(texts):
         if not t.strip():
             translated[i] = ""
         else:
-            lines_to_send.append(f"[{i}] {t.strip()}")
+            non_empty.append((i, t.strip()))
 
-    full_text = "\n".join(lines_to_send)
+    if not non_empty:
+        return translated, None
 
-    prompt = (
-        "Translate each line below to Chinese. Keep the [N] marker at the start "
-        "of each line exactly as-is. One translation per line, same order.\n\n"
-        f"{full_text}"
-    )
-
-    if hasattr(llm, "translate_raw"):
-        result = llm.translate_raw(prompt)
-    else:
-        result = llm.translate_batch([full_text], context="")
-
-    raw = result.translated[0] if result.translated else ""
-
-    # Issue 3 fix: re.search instead of re.match — tolerant of leading whitespace
+    chunks = [non_empty[s:s + _CHUNK_SIZE] for s in range(0, len(non_empty), _CHUNK_SIZE)]
+    total_chunks = len(chunks)
+    token_usage_total = None
+    prev_tail = ""  # last _CONTEXT_CARRY translated lines from previous chunk
     pattern = re.compile(r"\[(\d+)\]\s*(.+)")
-    for line in raw.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-        m = pattern.search(line)
-        if m:
-            idx = int(m.group(1))
-            zh = m.group(2).strip()
-            if 0 <= idx < len(texts) and zh:
-                translated[idx] = zh
+
+    for chunk_idx, chunk in enumerate(chunks):
+        context_section = (
+            f"【前文参考，勿翻译】\n{prev_tail}\n\n【待翻译字幕】\n"
+            if prev_tail else ""
+        )
+        lines = "\n".join(f"[{i}] {t}" for i, t in chunk)
+        prompt = _SUBTITLE_PROMPT + context_section + lines
+
+        try:
+            if hasattr(llm, "translate_raw"):
+                result = llm.translate_raw(prompt, max_tokens=16384)
+            else:
+                result = llm.translate_batch([lines], context="")
+            raw = result.translated[0] if result.translated else ""
+            token_usage_total = _merge_tokens(token_usage_total, result.tokens_used)
+        except Exception:
+            raw = ""
+
+        for line in raw.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            m = pattern.search(line)
+            if m:
+                idx = int(m.group(1))
+                zh = m.group(2).strip()
+                if 0 <= idx < len(texts) and zh:
+                    translated[idx] = zh
+
+        # Build context tail for next chunk
+        tail_lines = []
+        for orig_idx, _ in chunk[-_CONTEXT_CARRY:]:
+            zh = translated[orig_idx]
+            if zh and zh != "[翻译失败]":
+                tail_lines.append(f"[{orig_idx}] {zh}")
+        prev_tail = "\n".join(tail_lines)
+
+        if progress_callback:
+            pct = int((chunk_idx + 1) / total_chunks * 90)
+            label = (f"LLM 翻译第 {chunk_idx + 1}/{total_chunks} 段…"
+                     if total_chunks > 1 else "LLM 整篇翻译中…")
+            progress_callback(pct, label)
 
     ok_count = sum(1 for i, t in enumerate(translated) if t != "[翻译失败]" or not texts[i].strip())
     if ok_count == 0:
         raise RuntimeError("LLM 整篇翻译失败：完全无法解析返回格式")
 
     if progress_callback:
-        progress_callback(95, f"LLM 整篇翻译完成 ({ok_count}/{len(texts)} 条)")
-    return translated, result.tokens_used
+        progress_callback(95, f"LLM 翻译完成 ({ok_count}/{len(texts)} 条)")
+    return translated, token_usage_total
 
 
 def translate_with_orchestrator(
@@ -345,10 +382,8 @@ def translate_with_orchestrator(
 
         # ── Fallback: LLM failed, use free backends ──
         all_backends = ordered_backends
-        fallback_backends = []
     else:
         all_backends = ordered_backends + llm_backends
-        fallback_backends = []
 
     # ── 第 1 档：免费引擎批量翻译 ──
     batches = _split_into_batches(texts)

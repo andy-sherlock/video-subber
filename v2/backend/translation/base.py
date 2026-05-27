@@ -133,7 +133,8 @@ class LLMBackend(TranslationBackend):
         joined = SEP.join(t for _, t in non_empty)
         prompt = (
             f"{ctx_prefix}"
-            f"将以下文本翻译成{target_lang}。每个段落翻译结果用 '---' 分隔。只输出译文。\n\n"
+            f"你是专业视频字幕翻译。将以下字幕逐段翻译成{target_lang}，"
+            f"保持口语自然，每段译文用 '---' 分隔，只输出译文不加解释。\n\n"
             f"{joined}"
         )
 

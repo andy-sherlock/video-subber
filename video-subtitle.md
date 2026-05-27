@@ -27,7 +27,9 @@
 | **V2.06** | **代码审查修复 + LLMBackend 架构重构**。① 9 个 Bug 全歼（R01-R09）：路由装饰器修复、流式上传+5GB 限制、激活码吊销修复、死代码清理、GPU 加速、按钮文案统一、远程 URL 默认值、LLMBackend 基类架构、jobId 死变量清理 ② 前端 7 处同步：自定义平台下拉+端点/模型输入框+切换逻辑+字段收集+显示格式、上传区 5GB 提示+413 错误展示 ③ `LLMBackend` 基类驱动 7 个后端（6 原生 + `CustomOpenAIBackend`），每个 ~35 行，`translate_raw`/`translate_batch` 全平台零遗漏。详见 `code-review-report-2026-05-22.md` / `steve-jobs-solution-2026-05-22.md` / `problems.md` P086-P094。| ✅ 已保存至 `v2/v2.06/` |
 | **V2.07** | **遗留卫生债务清理 + 前后端一致性审查 + Windows 跨平台适配**。**Phase 1（三方审查）**：① P045 双 Worker 护卫 ② P051 STAGE_CACHE `dict[str,list[str]]` ③ syncUI 拆 3 函数+try/catch ④ P059 非 JSON→debug.log ⑤ P054 print→logging 8 处。**Phase 2（P096 · 16 项）**：前后端一致性 + UX 修复（详见 problems.md P096）。**Phase 3**：_real_stdout NameError + 开发者入口可见 + LLM 区域分层 + 弹窗 CSS 修复 + modelHint 隐藏。**Phase 4（P097 · 7 项 Windows 适配）**：W01 subprocess UTF-8 encoding + W02 Windows 字体 "Microsoft YaHei" + W03 ASS 路径反斜杠转义 + W04 Windows FFmpeg 路径检测 + W05 终端打印异常兜底 + W06 文件锁异常处理 + W07 模拟路径跨平台 | ✅ 已保存至 `v2/v2.07/` |
 | **V2.08** | **V1.3 模块迁移 + 完全自包含 + QA审查修复**。Phase 1：新建 `backend/core/`（extractor / subtitler / checkpoint / vad_filter），删除所有跨目录路径注入，`Segment` 移入 `transcriber_v2.py`。V2.08 起无需 v1/ 目录即可运行，具备 EXE 打包条件。`subtitler.py` 同步 W01-W04 跨平台修复。Phase 2（QA审查）：🔴本地路径不复制视频文件（只算hash引用原路径）、🔴Worker crash自动报错建议换模型、⚠️reconnectJobs处理error状态、⚠️多job恢复不互相覆盖设置、💡进度时间按模型动态估算。 | ✅ 已保存至 `v2/v2.08/` |
-| **V3** | **云端语料库 + RAG + 积分体系 + 配置感知去重**。用户账号登录。多语言视频支持。**以 V2.08 为框架。** | 2-4 周 |
+| **V2.09** | **配置感知去重 + 进度文字去专业化**。同视频不同设置=新任务，同视频同设置=复用结果。进度条全部换成用户能看懂的大白话。 | ✅ Git 提交 `97b39e2` |
+| **V2.10** | **说话人检测 V2 + 进程存活检测 + tier UI 修复 + 翻译兜底 + 前端体验统一**。6 个 bug 修复（P100-P105）：Google 翻译分隔符回归、配置哈希补全、说话人假阳性横杠、前端误报+漏报崩溃。前端 8 项体验优化：免费/付费 tier UI 修复、字幕样式确认按钮、设置变更统一刷新、表单控件高度统一、减少动画偏好、版本号。后端移除 RMS 物理特征检测模块（净减少 ~400 行代码）。 | ✅ 已保存至 `v2/v2.10/` |
+| **V3** | **云端语料库 + RAG + 积分体系 + 配置感知去重**。用户账号登录。多语言视频支持。**以 V2.10 为框架。** | 2-4 周 |
 | **V4** | 准确性评价系统 + 多语言自动检测。**以 V1.3 为框架。** | 2-3 周 |
 
 ### V3 预登记功能：配置感知哈希去重（方案 B）
@@ -236,13 +238,17 @@ class CustomOpenAIBackend(LLMBackend): ...     # 用户填 API URL + model
 > - 所有模型统一 nsp=0.6（P026 结论：per-model 校准在两个极端失效）
 > - 三个物理信号阈值待实测校准（P029 六段素材法），当前使用默认保守值
 
-### 说话人变化检测（v1.1 新增）
+### 说话人变化检测（v1.1 新增，V2.08 Guard C 重构）
 
 使用 `resemblyzer` 替代 `pyannote.audio`（后者 4.x API 不兼容 + 41 分钟超时崩溃）：
 - 对相邻字幕段提取声纹向量（VoiceEncoder）
-- 余弦相似度 < 0.75（可调）→ 标记 `speaker_change=True`
+- Otsu 自适应阈值切分相似度分数（每个视频独立计算）
 - 字幕渲染时 `speaker_change=True` 的段加 `- ` 前缀
-- 详情见 [P010](problems.md) / [P020](problems.md)
+- **Guard B**：段数 < 5 直接跳过（数据不足不做推断）
+- **Guard C（V2，借鉴 V1.3 动态阈值思路）**：两道独立检查，任一未通过即取消全部横杠：
+  - 间隙检测（相对）：排序分数后计算相邻间距，max_gap / median_gap < 3× → 无裂缝 → 单人
+  - 安全钳（绝对）：Otsu 切分后两组均值差距 < 0.15 → 距离太近 → 单人
+- 详情见 [P010](problems.md) / [P020](problems.md) / [P103](problems.md)
 
 ### 字幕特殊标记（全版本通用）
 
@@ -250,7 +256,7 @@ class CustomOpenAIBackend(LLMBackend): ...     # 用户填 API URL + model
 
 | 标记 | 含义 | 触发条件 |
 |------|------|----------|
-| `- ` 行首横杠 | 说话人切换 | resemblyzer 检测到声纹变化（余弦相似度 < 0.75） |
+| `- ` 行首横杠 | 说话人切换 | resemblyzer 声纹比较 + Otsu 自适应阈值 + Guard C 双重验证（间隙检测 + 安全钳） |
 | `[?]` 行尾问号 | 系统不确定是否真的有人在说话 | Whisper 和 RMS 两个法官意见冲突——一个说是人声，一个说不是。**宁可多给，不能少给：只要有一方认为是人声就保留，标记出来让用户自行判断** |
 
 > 用户看到 `[?]` 时：如果画面中确实有人在说话 → 字幕是对的，忽略问号。如果画面中没有人说话 → 这是误判，可以反馈给我们改善系统。

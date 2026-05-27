@@ -49,11 +49,15 @@ def _setup_file_log(job_id: str):
     log_dir = LOG_DIR / job_id
     log_dir.mkdir(parents=True, exist_ok=True)
 
+    class _ScrubFormatter(logging.Formatter):
+        def format(self, record):
+            return scrub_logs(super().format(record))
+
     # ────── 用户日志：只收 INFO+ ──────
     user_path = log_dir / "user.log"
     _file_handler_user = logging.FileHandler(str(user_path), encoding="utf-8")
     _file_handler_user.setLevel(logging.INFO)
-    _file_handler_user.setFormatter(logging.Formatter(
+    _file_handler_user.setFormatter(_ScrubFormatter(
         "%(asctime)s %(message)s", datefmt="%H:%M:%S"
     ))
 
@@ -66,7 +70,7 @@ def _setup_file_log(job_id: str):
         encoding="utf-8",
     )
     _file_handler_debug.setLevel(logging.DEBUG)
-    _file_handler_debug.setFormatter(logging.Formatter(
+    _file_handler_debug.setFormatter(_ScrubFormatter(
         "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     ))
@@ -98,16 +102,13 @@ from backend.core.extractor import extract_audio
 from backend.core.subtitler import build_srt, build_ass, burn_subtitles
 from backend.core.checkpoint import Checkpoint, find_versioned_cache, cleanup_old_versions
 from backend.transcriber_v2 import transcribe as transcribe_v2, Segment
+from backend.key_manager import scrub_logs
 
 
 def emit(event_type: str, **kwargs):
     msg = {"type": event_type, **kwargs}
     sys.stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
     sys.stdout.flush()
-
-
-def progress(stage: str, percent: int, message: str, detail: str = ""):
-    emit("progress", stage=stage, percent=percent, message=message, detail=detail)
 
 
 _ZH_SENT_RE = _re.compile(r'[。！？!?]+')
@@ -328,14 +329,14 @@ def main():
             stderr_progress("transcribe", 10, f"正在识别语音…（{model} 约需 {_time_est}）", f"模型: {model}")
             def _trans_progress(n):
                 if n == -1:
-                    stderr_progress("transcribe", 10, "正在加载语音识别模型…", f"模型: {model}")
+                    stderr_progress("transcribe", 10, "正在启动语音识别…", f"模型: {model}")
                     return
                 pct = min(34, 11 + n // 10)
                 stderr_progress("transcribe", pct, f"正在识别语音… 已识别 {n} 段", f"模型: {model}")
             segments = transcribe_v2(
                 audio_path, model_size=model, source_lang="auto",
-                skip_vad=True, vad_threshold=0.0, no_speech_threshold=0.6,
-                filter_keywords=True, speaker_detect=True, speaker_threshold=0.75,
+                skip_vad=True, vad_threshold=0.0,
+                filter_keywords=True, speaker_detect=True,
                 progress_callback=_trans_progress,
             )
             with open(transcript_path, "w", encoding="utf-8") as f:
@@ -400,6 +401,14 @@ def main():
 
         ok_count = sum(1 for s in segments if s.zh.strip() and s.zh != "[翻译失败]")
         stderr_progress("translate", 80, f"翻译完成: {ok_count}/{total} 句成功, {len(failed)} 句失败")
+
+        # Quality gate: if >50% failed, the cache is corrupt — delete it and abort
+        if total > 0 and ok_count / total < 0.5:
+            Path(translated_path).unlink(missing_ok=True)
+            raise RuntimeError(
+                f"翻译质量过低：仅 {ok_count}/{total} 条成功（{int(ok_count/total*100)}%）。"
+                "请检查翻译引擎配置后重试。"
+            )
 
         # ── Step 4: Subtitle (80-90%) ──
         for s in segments:

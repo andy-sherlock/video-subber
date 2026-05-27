@@ -2344,3 +2344,97 @@ _REMOTE_BASE = _os.environ.get(
 
 **涉及文件**：`worker.py`、`index.html`
 **已修** ✅（V2.08）
+
+---
+
+## P100 | 2026-05-26 | 🔴 google.py | Google 翻译 `|||` 分隔符空格被吃掉（P016 回归）
+
+**问题**：Google Translate API 翻译后将 ` ||| `（两侧有空格）改为 ` |||`（右侧无空格）。`split(" ||| ")` 匹配失败，返回 1 段结果而非 N 段。代码判定 "split count doesn't match" 直接返回全部 `[翻译失败]`。
+
+**根因**：P016（V1.1）已记录 `|||` 分隔符在翻译引擎中不可靠，但 P069（V2.05）实现 Google 批量时仍使用 `|||`，且 split 用精确匹配而非 regex 容错。**已知风险被遗忘导致回归。**
+
+**解决方案**：精确 split 失败时，用 `re.split(r'\s*\|\|\|\s*', text)` 重试。
+```python
+parts = [p.strip() for p in translated_full.split(SEPARATOR)]
+if len(parts) != len(non_empty):
+    parts = [p.strip() for p in re.split(r'\s*\|\|\|\s*', translated_full)]
+```
+
+**涉及文件**：`v2/backend/translation/google.py`
+**已修** ✅
+
+---
+
+## P101 | 2026-05-26 | 🔴 main.py | `_config_hash()` 缺 style 和 savePath（R03 后端遗漏）
+
+**问题**：审查报告 R03 指出 `_settingsMatchDone()` 缺少 style/savePath 比较，前端已修复。但后端 `_config_hash()` 同样遗漏这两个字段，导致同视频不同样式被去重为同一任务，用户改样式后重跑返回旧结果。
+
+**根因**：R03 修复只改了前端，没有同步修后端的 `_config_hash()`。前后端对"相同配置"的定义不一致。
+
+**解决方案**：`_config_hash()` 的 `relevant` 字典加入 `style` 和 `savePath`。
+
+**涉及文件**：`v2/backend/main.py:39-49`
+**已修** ✅
+
+---
+
+## P102 | 2026-05-26 | 🟡 百度翻译 | 敏感词过滤 error_code 20003
+
+**问题**：百度翻译 API 对包含政治敏感内容的文本（如 "President Xi" + "China"）返回 `error_code: 20003, error_msg: Hit sensitive word`，拒绝翻译。
+
+**根因**：百度 API 内容审核策略，非代码 bug。
+
+**影响**：当 Google 同时因分隔符问题失败时，两个免费后端同时失败 → 0% 翻译成功 → 触发质量门控 → 任务报错。P100 修复 Google 后，Google 可兜底百度的敏感词失败。
+
+**解决方案**：无需修代码。P100 修复后 Google 已能正确兜底。可考虑在日志中提示用户"百度因内容审核拒绝翻译"而非通用的"翻译失败"。
+
+**已知** ✅（无需代码修复）
+
+---
+
+## P103 | 2026-05-27 | 🔴 说话人检测 | 假阳性横杠（同一人语气变化被误判为换人）
+
+**问题**：resemblyzer 声纹比较在同一说话人语气变化（平静→激动、停顿后继续）时产生假阳性，在字幕前错误添加 `- ` 横杠前缀。短视频尤其明显（样本太少，Otsu 阈值不可靠）。
+
+**根因**：自适应阈值算法在数据不足时不稳定；未设置对不合理结果的安全检查。
+
+**解决方案**：B+C 组合方案：
+1. Guard B：段数 < 5 时直接跳过说话人检测（数据不足不做推断）
+2. Guard C（V2，替换旧版固定0.10门槛）：两道独立检查，任一未通过即取消全部横杠：
+   - **间隙检测（相对检查）**：将所有相似度分数排序后计算相邻间距，最大间距 / 中间间距 < 3倍 → 无裂缝 → 判定单人语气波动
+   - **安全钳（绝对检查）**：Otsu 切分后两组平均分差距 < 0.15 → 两组距离太近 → 判定单人语气波动
+   - 设计理由：间隙检测用相对倍数（不随视频分数范围变化），安全钳用绝对距离兜底（防止间距比例大但实际距离小的假阳性）。两道检查从不同角度验证，互不重复
+
+**涉及文件**：`v2/backend/transcriber_v2.py:_detect_speaker_changes()`
+**已修** ✅
+
+---
+
+## P104 | 2026-05-27 | 🔴 前端 | "任务可能已中断"误报（false positive stall warning）
+
+**问题**：前端每 2 秒轮询后端 `GET /api/jobs/{id}`，如果 `last_progress` 时间戳超过 60 秒未更新，就显示黄色警告"⚠️ 任务可能已中断，建议取消后重试"。但 Whisper large-v3 模型处理长视频时，进度回调每 10 段才触发一次，间隔可达 7 分钟。结果后台正常工作时前端反复误报，用户被吓到后取消任务，白白浪费已完成的进度。
+
+**根因**：前端用"距离上次进度消息的时间"来猜测进程状态，而不是直接查询进程是否存活。60 秒的超时阈值对 large-v3 + 长视频场景远远不够。
+
+**解决方案**：
+1. `worker_manager.py` 新增 `is_alive(job_id)` 方法，通过 `subprocess.Popen.poll()` 直接向操作系统查询进程是否存活
+2. `main.py` 的 `GET /api/jobs/{id}` 接口返回新字段 `process_alive: bool`（内存路径和磁盘 fallback 路径均已覆盖）
+3. `index.html` 前端轮询逻辑：用 `j.process_alive === false` 替换 `(Date.now()/1000 - j.last_progress) > 60` 的猜测逻辑
+
+**涉及文件**：`v2/backend/worker_manager.py`、`v2/backend/main.py:get_job()`、`v2/frontend/index.html:connectCard()`
+**已修** ✅
+
+---
+
+## P105 | 2026-05-27 | 🔴 前端 | 进程崩溃时前端无确定性提醒（missing crash notification）
+
+**问题**：当 worker 进程被系统杀死（OOM kill、segfault）时，不会发出任何 JSON 消息。旧逻辑中前端仅在 60 秒超时后显示"可能已中断"——措辞含糊且不可靠。用户无法区分"正在慢速处理"和"确实已崩溃"。
+
+**根因**：前端没有查询进程实际存活状态的能力。后端 `worker_manager._read_stdout()` 虽然能在进程退出后检测 `proc.returncode != 0` 并广播 error 事件，但前端的 60 秒猜测逻辑在此之前就已开火，产生误导。
+
+**解决方案**：与 P104 同一组修复。前端现在基于 `process_alive` 字段判断：
+- `process_alive === true` → 不管等多久都显示"处理中…"（消灭误报）
+- `process_alive === false` 且 status 仍为 running → 红色提示"处理异常中断，请取消后重试"（确定性崩溃通知）
+
+**涉及文件**：同 P104
+**已修** ✅

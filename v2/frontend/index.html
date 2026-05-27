@@ -69,7 +69,8 @@ body{
 .toggle button:last-child{border-radius:0 6px 6px 0}
 .toggle button.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 
-select,input[type=text],input[type=password]{padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--card);color:var(--text);transition:border-color .15s}
+select,input[type=text],input[type=password]{min-height:36px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--card);color:var(--text);transition:border-color .15s}
+.toggle button{min-height:36px;padding:8px 14px}
 select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,.12)}
 .burn-warn{font-size:11px;color:var(--red);margin-top:6px;padding:6px 10px;background:rgba(255,59,48,.06);border-radius:6px}
 
@@ -125,7 +126,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 /* ── Style Preview ── */
 .style-preview-box{background:#1a1a1a;color:#fff;padding:16px 20px;border-radius:8px;text-align:center;line-height:1.8;margin-top:10px;font-size:18px}
 .style-actions{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
-.style-confirm-btn{padding:7px 18px;border:1px solid var(--blue);border-radius:6px;background:var(--card);color:var(--blue);font-size:12px;cursor:pointer;transition:all .15s}
+.style-confirm-btn{min-height:36px;padding:8px 18px;border:1px solid var(--blue);border-radius:6px;background:var(--card);color:var(--blue);font-size:12px;cursor:pointer;transition:all .15s}
 .style-confirm-btn:hover{background:var(--blue);color:#fff}
 .style-confirmed-indicator{font-size:11px;color:var(--green);text-align:center;margin-top:4px;display:none}
 
@@ -194,6 +195,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 /* ── Dev Gear ── */
 .dev-gear{position:fixed;bottom:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:99;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .dev-gear:hover{color:var(--text);border-color:var(--text);box-shadow:0 2px 16px rgba(0,0,0,.12);transform:rotate(30deg)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
 </style>
 </head>
 <body>
@@ -202,7 +204,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 <!-- ═══════════════ Header ═══════════════ -->
 <header class="app-header">
   <h1>Video Subber</h1>
-  <p>拖进去，等一会，就能看懂</p>
+  <p>拖进去，等一会，就能看懂 <span style="font-size:10px;color:var(--sub);opacity:.5">v2.10</span></p>
 </header>
 
 <!-- Dev toolbar -->
@@ -283,7 +285,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="style-actions">
     <button class="style-confirm-btn" id="styleConfirmBtn">确认样式</button>
   </div>
-  <div class="style-confirmed-indicator" id="styleConfirmed" style="display:none">✓ 样式已保存，将在生成字幕时应用</div>
+  <div class="style-confirmed-indicator" id="styleConfirmed" style="display:none">✓ 样式已确认</div>
 </div>
 
 <!-- ═══════════════ Region 3: Model Selection ═══════════════ -->
@@ -331,7 +333,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 </div>
 
 <!-- ═══════════════ Region 6: Advanced Settings ═══════════════ -->
-<div class="card">
+<div class="card" id="advCard">
   <button class="collapse-toggle" id="advToggle"><span class="chevron">▶</span> 高级设置</button>
   <div class="collapse-body" id="advBody">
     <div class="row">
@@ -390,13 +392,13 @@ const $=id=>document.getElementById(id);
 const State={
   videoFile:null,
   localPath:null,
+  doneJobConfig:null,
   availableBackends:{free:[],llm:[],tiers:{}},
   settings:{
     subtitles:"no",burn:true,model:"medium",
     translationMode:"speed",translationPriority:["google","baidu"],
     tier:"free",contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
-    style:{font:"PingFang SC",size:20,color:"white",outlineColor:"black",bgColor:"transparent"},
-    styleConfirmed:false
+    style:{font:"PingFang SC",size:20,color:"white",outlineColor:"black",bgColor:"transparent"}
   }
 };
 const MODELS=["tiny","base","small","medium","large-v3"];
@@ -496,15 +498,17 @@ function updateBackendLists(data){
   // ── Production / Dev tier UI ──
   if(isDev && State.settings.tier==='paid_3'){
     $('apiTip').innerHTML='✅ <b>LLM 智能翻译已启用</b>（平台提供 API，无需配置）';
-    $('apiRow').style.display='none';$('modeRow').style.display='none';
-    $('transModeTitle').textContent='LLM 智能翻译';
+    $('apiRow').style.display='none';$('modeRow').style.display='flex';
+    $('modelHint').style.display='none';
+    $('transModeTitle').textContent='翻译模式';
   }else if(isDev && State.settings.tier==='paid_1'){
     $('apiTip').textContent=`可用 LLM 平台: ${data.llm.map(b=>b.name).join(' / ')}。添加 API Key 即可启用。`;
-    $('apiRow').style.display='flex';$('modeRow').style.display='none';
-    $('transModeTitle').textContent='LLM 智能翻译';
+    $('apiRow').style.display='flex';$('modeRow').style.display='flex';
+    $('transModeTitle').textContent='翻译模式';
   }else if(!isDev){
     $('apiTip').textContent=`LLM 智能翻译为付费功能，即将在后续版本上线`;
     $('apiRow').style.display='none';$('modeRow').style.display='flex';
+	    $('modelHint').style.display='none';$('advCard').style.display='none';
     $('transModeTitle').textContent='翻译模式';
     // Fix #16: disable contextAware when no LLM keys available
     const ctxBtns=document.querySelectorAll('#ctxToggle button');
@@ -519,7 +523,7 @@ function updateBackendLists(data){
 
 // ============ Upload ============
 const dz=$('dz'),fi=$('fileInput'),df=$('dzFile'),sbtn=$('startBtn'),lpi=$('localPathInput');
-dz.addEventListener('click',()=>fi.click());
+dz.addEventListener('click',()=>{fi.value='';fi.click()});
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('active')});
 dz.addEventListener('dragleave',()=>dz.classList.remove('active'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('active');const f=e.dataTransfer.files[0];if(f)selectFile(f)});
@@ -533,8 +537,26 @@ function selectFile(f){
   State.videoFile=f;State.localPath=null;lpi.value='';State.forceRerun=false;
   df.style.display='block';df.textContent=f.name+' ('+(f.size/1024/1024).toFixed(0)+'MB)';refreshStartBtn()
 }
+function _settingsMatchDone(){
+  const c=State.doneJobConfig;if(!c)return false;const s=State.settings;
+  if(String(s.subtitles)!==String(c.subtitles??'no'))return false;
+  if(String(s.burn)!==String(c.burn??false))return false;
+  if(String(s.model)!==String(c.model??'medium'))return false;
+  if(String(s.translationMode)!==String(c.translationMode??'speed'))return false;
+  if(String(s.contextAware)!==String(c.contextAware??false))return false;
+  if(JSON.stringify(s.apiKeys||[])!==JSON.stringify(c.apiKeys||[]))return false;
+  if(JSON.stringify(s.translationPriority||[])!==JSON.stringify(c.translationPriority||[]))return false;
+  if(JSON.stringify(s.style||{})!==JSON.stringify(c.style||{}))return false;
+  if(String(s.savePath||'')!==String(c.savePath||''))return false;
+  return true;
+}
 function refreshStartBtn(){
   if(!State.videoFile&&!State.localPath){sbtn.disabled=true;sbtn.textContent='选择视频文件开始';return}
+  if(State.doneJobConfig){
+    if(_settingsMatchDone()){sbtn.disabled=true;sbtn.textContent='已完成（修改设置后可重跑）'}
+    else{sbtn.disabled=false;sbtn.textContent='用新设置重跑';State.forceRerun=true}
+    return;
+  }
   sbtn.disabled=false;sbtn.textContent=State.settings.burn?'开始翻译并烧录':'开始生成字幕'
 }
 
@@ -552,7 +574,7 @@ $('savePathBtn').addEventListener('click',()=>{
 function updateSavePathDisplay(){$('savePathDisplay').textContent=State.settings.savePath||'~/Downloads/Video-Subber'}
 
 // ============ Subtitle ============
-$('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.subtitles=e.target.dataset.v});
+$('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.subtitles=e.target.dataset.v;refreshStartBtn()});
 $('burnSelect').addEventListener('change',()=>{State.settings.burn=$('burnSelect').value==='true';$('burnWarn').style.display=State.settings.burn?'block':'none';$('styleSubSection').style.display=State.settings.burn?'block':'none';refreshStartBtn()});
 
 // ============ Model Slider ============
@@ -562,14 +584,14 @@ function buildModelSlider(){
     const active=m===State.settings.model;
     const wrap=document.createElement('div');wrap.className='model-dot-wrap'+(active?' active':'');
     wrap.innerHTML=`<div class="model-dot-circle${active?' active':''}"></div><span class="model-dot-label">${m}</span>`;
-    wrap.addEventListener('click',()=>{State.settings.model=m;buildModelSlider()});
+    wrap.addEventListener('click',()=>{State.settings.model=m;buildModelSlider();refreshStartBtn()});
     dots.appendChild(wrap);
   });
   $('modelCurrent').textContent=`当前：${MODEL_INFO[State.settings.model]}`;
 }
 
 // ============ Translation Mode ============
-$('modeToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.translationMode=e.target.dataset.v;$('priorityList').classList.toggle('show',State.settings.translationMode==='quality');saveConfig()});
+$('modeToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.translationMode=e.target.dataset.v;$('priorityList').classList.toggle('show',State.settings.translationMode==='quality');saveConfig();refreshStartBtn()});
 function buildPriorityList(){
   const list=$('priorityList');
   const labels={...DEFAULT_LABELS};
@@ -582,14 +604,14 @@ function buildPriorityList(){
     item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',bid);item.style.opacity='.5'});
     item.addEventListener('dragend',()=>{item.style.opacity='1'});
     item.addEventListener('dragover',e=>{e.preventDefault()});
-    item.addEventListener('drop',e=>{e.preventDefault();const src=e.dataTransfer.getData('text/plain');const srcIdx=State.settings.translationPriority.indexOf(src);if(srcIdx<0)return;const dstIdx=State.settings.translationPriority.indexOf(bid);const tmp=State.settings.translationPriority[srcIdx];State.settings.translationPriority.splice(srcIdx,1);State.settings.translationPriority.splice(dstIdx,0,tmp);buildPriorityList();saveConfig()});
+    item.addEventListener('drop',e=>{e.preventDefault();const src=e.dataTransfer.getData('text/plain');const srcIdx=State.settings.translationPriority.indexOf(src);if(srcIdx<0)return;const dstIdx=State.settings.translationPriority.indexOf(bid);const tmp=State.settings.translationPriority[srcIdx];State.settings.translationPriority.splice(srcIdx,1);State.settings.translationPriority.splice(dstIdx,0,tmp);buildPriorityList();saveConfig();refreshStartBtn()});
     list.appendChild(item);
   });
 }
 
 // ============ Advanced ============
 $('advToggle').addEventListener('click',()=>{$('advToggle').classList.toggle('open');$('advBody').classList.toggle('open')});
-$('ctxToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.contextAware=e.target.dataset.v==='true';saveConfig()});
+$('ctxToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.contextAware=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
 
 // ============ Platform / Model select ============
 // Model list removed — now sourced from backend via State._llmModels
@@ -663,7 +685,7 @@ $('apiAddBtn').addEventListener('click',()=>{
 
   State.settings.apiKeys.push(entry);
   $('apiKeyInput').value='';$('apiName').value='';
-  buildKeyList();saveConfig();
+  buildKeyList();saveConfig();refreshStartBtn();
 });
 function buildKeyList(){
   const labels={};State.availableBackends.llm.forEach(b=>{labels[b.id]=b.name});
@@ -672,36 +694,31 @@ function buildKeyList(){
     let modelLabel='';
     if(k.platform==='custom'){modelLabel=' · '+(k.model||'gpt-4o')}
     else if(k.model){modelLabel=' · '+k.model}
-    return `<li><span>${platformLabel}${modelLabel} · ${k.name} · ${maskKey(k.key)}</span><button class="api-key-del" onclick="State.settings.apiKeys.splice(${i},1);buildKeyList();saveConfig()">✕</button></li>`;
+    return `<li><span>${platformLabel}${modelLabel} · ${k.name} · ${maskKey(k.key)}</span><button class="api-key-del" onclick="State.settings.apiKeys.splice(${i},1);buildKeyList();saveConfig();refreshStartBtn()">✕</button></li>`;
   }).join('');
 }
 function maskKey(k){return k.length>8?'···'+k.slice(-4):'···'}
 
 // ============ Style Preview ============
-let previewStyle=null;
-let confirmedStyle=null;
+function _readStyleFromDOM(){
+  return {font:$('styleFont').value,size:parseInt($('styleSize').value),color:$('styleColor').value,outlineColor:$('styleOutline').value,outlineWidth:parseInt($('styleOutlineWidth').value)||2,bgColor:'transparent'};
+}
 function updatePreview(){
   const p=$('stylePreview');
-  const font=$('styleFont').value;
-  const size=$('styleSize').value;
-  const color=$('styleColor').value;
-  const outline=$('styleOutline').value;
-  p.style.fontFamily=font;p.style.fontSize=size+'px';
+  const s=_readStyleFromDOM();
+  p.style.fontFamily=s.font;p.style.fontSize=s.size+'px';
   const cmap={white:'#fff',yellow:'#ff0',green:'#0f0',cyan:'#0ff'};
-  p.style.color=cmap[color]||'#fff';
-  const olc=outline==='none'?'transparent':(outline==='white'?'#fff':'#000');
+  p.style.color=cmap[s.color]||'#fff';
+  const olc=s.outlineColor==='none'?'transparent':(s.outlineColor==='white'?'#fff':'#000');
   p.style.textShadow=olc==='transparent'?'none':`-1px -1px 0 ${olc},1px -1px 0 ${olc},-1px 1px 0 ${olc},1px 1px 0 ${olc}`;
-  const outlineWidth=parseInt($('styleOutlineWidth').value)||2;
-  previewStyle={font,size:parseInt(size),color,outlineColor:outline,outlineWidth,bgColor:'transparent'};
-  confirmedStyle={...previewStyle};
-  State.settings.style=confirmedStyle;
-  State.settings.styleConfirmed=true;
-  $('styleConfirmed').style.display='block';
+  $('styleConfirmed').style.display='none';
 }
 ['styleFont','styleSize','styleColor','styleOutline','styleOutlineWidth'].forEach(id=>$(id).addEventListener('change',updatePreview));
 $('styleConfirmBtn').addEventListener('click',()=>{
-  saveConfig();
-  showToast('样式已保存');
+  State.settings.style=_readStyleFromDOM();
+  $('styleConfirmed').style.display='block';
+  saveConfig();refreshStartBtn();
+  showToast('样式已确认');
 });
 
 // ============ Config Persistence ============
@@ -713,7 +730,7 @@ async function saveConfig(){
 }
 function loadConfig(){
   const raw=localStorage.getItem('video-subber-config');
-  if(raw){try{const c=JSON.parse(raw);Object.assign(State.settings,c);State.settings.styleConfirmed=false}catch(e){}}
+  if(raw){try{const c=JSON.parse(raw);Object.assign(State.settings,c)}catch(e){}}
   fetch('/api/config').then(r=>r.json()).then(c=>{
     if(c&&c.translationMode)Object.assign(State.settings,c);
     if(isDev && urlTier)State.settings.tier=urlTier;
@@ -752,7 +769,10 @@ function handleFoundJob(d,filename){
   if(d.status==='done'){
     if(!card){addJobCard(d.job_id,d.config?.video_filename||filename);renderCardDone(d.job_id,{result_video:!!(d.config&&d.config.burn)})}
     else{card.scrollIntoView({behavior:'smooth'});card.classList.add('flash-highlight');setTimeout(()=>card.classList.remove('flash-highlight'),1000)}
-    showToast('💡 该视频已完成，可修改设置后重新开始');unlockUI();settingsLocked=false;sbtn.disabled=false;sbtn.textContent='用新设置重跑';State.forceRerun=true;return
+    State.doneJobConfig={...d.config};unlockUI();settingsLocked=false;
+    const _same=_settingsMatchDone();
+    showToast(_same?'✅ 该视频已完成，修改设置后可重跑':'💡 检测到设置已变更，可直接重跑');
+    refreshStartBtn();return
   }
   if(!card){State.settings={...State.settings,...d.config};syncUI();addJobCard(d.job_id,d.config?.video_filename||filename);connectCard(d.job_id);showToast('✅ 已检测到后台任务，正在恢复…')}
   else{
@@ -760,11 +780,11 @@ function handleFoundJob(d,filename){
     const fill=$('fill-'+d.job_id);const step=$('step-'+d.job_id);
     if(step){step.textContent='正在恢复处理…';step.style.color=''}
     if(fill){fill.style.width='0%';fill.style.background=''}
-    if(!activeJobs[d.job_id]){activeJobs[d.job_id]={ws:null,pollTimer:null,filename:card.querySelector('.job-card-name').textContent};connectCard(d.job_id)}
+    if(!activeJobs[d.job_id]){activeJobs[d.job_id]={ws:null,pollTimer:null,filename:card.querySelector('.job-card-name').textContent,config:{...d.config}};connectCard(d.job_id)}
     card.scrollIntoView({behavior:'smooth'});
     showToast('✅ 已恢复任务，正在继续处理…')
   }
-  lockUI();settingsLocked=true;sbtn.disabled=true;sbtn.textContent='任务进行中';saveActiveJobs();State.videoFile=null;df.style.display='none'
+  State.doneJobConfig=null;lockUI();settingsLocked=true;sbtn.disabled=true;sbtn.textContent='任务进行中';saveActiveJobs();State.videoFile=null;df.style.display='none'
 }
 
 sbtn.addEventListener('click',async()=>{
@@ -781,7 +801,7 @@ sbtn.addEventListener('click',async()=>{
       if(!r.ok){const err=await r.json().catch(()=>({error:'读取失败'}));showToast(err.error||'读取失败');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}return}
       const d=await r.json();
       if(d.found){handleFoundJob(d,State.localPath.split('/').pop()||'本地视频')}
-      else{addJobCard(d.id,State.localPath.split('/').pop()||'本地视频');connectCard(d.id);saveActiveJobs();sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
+      else{State.doneJobConfig=null;addJobCard(d.id,State.localPath.split('/').pop()||'本地视频');connectCard(d.id);saveActiveJobs();sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
       State.localPath=null;lpi.value='';
     }catch(e){console.error('本地路径读取失败',e);showToast('读取本地文件失败，请检查路径是否正确');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}}
     return;
@@ -801,7 +821,7 @@ sbtn.addEventListener('click',async()=>{
       if(xhr.status>=400){const err=JSON.parse(xhr.responseText||'{}');showToast(err.error||'上传失败，请重试');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}return}
       const d=JSON.parse(xhr.responseText);
       if(d.found){handleFoundJob(d,file.name)}
-      else{addJobCard(d.id,file.name);connectCard(d.id);saveActiveJobs();State.videoFile=null;df.style.display='none';sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
+      else{State.doneJobConfig=null;addJobCard(d.id,file.name);connectCard(d.id);saveActiveJobs();State.videoFile=null;df.style.display='none';sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
     }catch(e){console.error('解析响应失败',e);showToast('上传失败，请重试');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}}
   });
   xhr.addEventListener('error',()=>{console.error('上传网络错误');showToast('上传失败，请重试');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}});
@@ -827,7 +847,7 @@ function renderSettingsToDOM(){
   document.querySelectorAll('#modeToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.translationMode)});
   const pl=document.getElementById('priorityList');pl.classList.toggle('show',State.settings.translationMode==='quality');
   document.querySelectorAll('#ctxToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.contextAware))});
-  State.settings.styleConfirmed=false;document.getElementById('styleConfirmed').style.display='none';
+  document.getElementById('styleConfirmed').style.display='none';
   if(State.settings.style){
     const s=State.settings.style;
     const sf=document.getElementById('styleFont');if(sf&&s.font)sf.value=s.font;
@@ -874,14 +894,20 @@ function addJobCard(jid,filename){
     `<div class="job-card-result" id="result-${jid}"><a href="#" id="dlV-${jid}" target="_blank">下载视频</a><a href="#" id="dlS-${jid}" target="_blank">下载 SRT</a></div>`+
     `<div class="job-card-error" id="err-${jid}"></div>`;
   $('jobCards').appendChild(card);
-  activeJobs[jid]={ws:null,pollTimer:null,filename:filename};
+  activeJobs[jid]={ws:null,pollTimer:null,filename:filename,config:{...State.settings}};
 }
 function connectCard(jid){
   const job=activeJobs[jid];if(!job)return;
   const proto=location.protocol==='https:'?'wss:':'ws:';
   try{job.ws=new WebSocket(`${proto}//${location.host}/ws/${jid}`);job.ws.onmessage=e=>{try{handleCardMsg(jid,JSON.parse(e.data))}catch(ex){}};job.ws.onclose=()=>{job.ws=null};job.ws.onerror=()=>{job.ws=null}}catch(e){}
   const poll=()=>{if(!activeJobs[jid])return;fetch('/api/jobs/'+jid).then(r=>r.json()).then(j=>{
-    if(j.status==='running'||j.status==='queued'){const fill=$('fill-'+jid);const step=$('step-'+jid);if(fill)fill.style.width=j.progress+'%';if(step)step.textContent=j.message||j.stage||'处理中…';if(j.stage==='transcribe'&&j.progress>=10&&j.progress<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}job.pollTimer=setTimeout(poll,2000)}
+    const fill=$('fill-'+jid);const step=$('step-'+jid);
+    const processDead=(j.status==='running'||j.status==='queued')&&j.process_alive===false;
+    if(processDead){
+      if(fill){fill.style.width='100%';fill.style.background='var(--red)';fill.classList.remove('working')}
+      if(step){step.textContent='处理异常中断，请取消后重试';step.style.color='var(--red)'}
+      job.pollTimer=setTimeout(poll,5000)}
+    else if(j.status==='running'||j.status==='queued'){if(fill){fill.style.width=j.progress+'%';fill.style.background='';fill.classList.add('working')}if(step){step.textContent=j.message||j.stage||'处理中…';step.style.color=''}if(j.stage==='transcribe'&&j.progress>=10&&j.progress<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}job.pollTimer=setTimeout(poll,2000)}
     else if(j.status==='done'){handleCardMsg(jid,{type:'done',result_video:j.result_video,result_srt:j.result_srt,failed_segments:j.failed_segments,segment_count:j.segment_count,success_count:j.success_count})}
     else if(j.status==='error'){handleCardMsg(jid,{type:'error',message:j.error})}
     else if(j.status==='cancelled'){removeCard(jid)}
@@ -891,9 +917,9 @@ function connectCard(jid){
 }
 function handleCardMsg(jid,msg){
   const card=$('card-'+jid);if(!card)return;const fill=$('fill-'+jid);const step=$('step-'+jid);
-  if(msg.type==='progress'){if(fill)fill.style.width=msg.percent+'%';if(step)step.textContent=msg.message+(msg.detail?' ('+msg.detail+')':'');if(msg.stage==='transcribe'&&msg.percent>=10&&msg.percent<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}}
-  else if(msg.type==='done'){renderCardDone(jid,msg);if(job.ws){try{job.ws.close()}catch(e){}}clearTimeout(job.pollTimer);removeActiveJobId(jid);checkAllDone()}
-  else if(msg.type==='error'){if(step)step.textContent='出错';const err=$('err-'+jid);if(err){err.textContent=msg.message;err.classList.add('show')}card.classList.add('job-card-done');if(job.ws){try{job.ws.close()}catch(e){}}clearTimeout(job.pollTimer);removeActiveJobId(jid);checkAllDone()}
+  if(msg.type==='progress'){if(fill){fill.style.width=msg.percent+'%';fill.style.background=''}if(step){step.textContent=msg.message+(msg.detail?' ('+msg.detail+')':'');step.style.color=''}if(msg.stage==='transcribe'&&msg.percent>=10&&msg.percent<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}}
+  else if(msg.type==='done'){renderCardDone(jid,msg);const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone();refreshStartBtn()}
+  else if(msg.type==='error'){if(step)step.textContent='出错';const err=$('err-'+jid);if(err){err.textContent=msg.message;err.classList.add('show')}card.classList.add('job-card-done');const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone()}
 }
 function renderCardDone(jid,msg){
   const fill=document.getElementById('fill-'+jid);const step=document.getElementById('step-'+jid);
@@ -923,8 +949,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
   try{const res=await fetch('/api/backends');if(res.ok){const data=await res.json();if(typeof updateBackendLists==='function')updateBackendLists(data)}}catch(err){console.error("加载后端平台列表失败:",err)}
   if(typeof buildModelSlider==='function'){try{buildModelSlider()}catch(e){console.warn("buildModelSlider 防御捕获:",e)}}
   updatePreview();
-  confirmedStyle={...previewStyle};
-  State.settings.style=confirmedStyle;
   const rawActive=localStorage.getItem('activeJobs');
   if(!rawActive||rawActive==='[]'){try{const res=await fetch('/api/active-jobs');if(res.ok){const data=await res.json();if(data.jobs&&data.jobs.length>0){const ids=data.jobs.map(j=>j.job_id);localStorage.setItem('activeJobs',JSON.stringify(ids))}}}catch(e){console.error("检查磁盘未完成任务失败:",e)}}
   if(typeof reconnectJobs==='function')reconnectJobs();
