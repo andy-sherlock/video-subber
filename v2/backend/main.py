@@ -31,8 +31,26 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 JOBS = {}
 
 # ── v2.04: Memory-resident hash index (built at startup, O(1) lookup forever) ──
-GLOBAL_HASH_INDEX = {}   # file_hash → {job_id, status, config}
-JOB_ID_TO_HASH = {}      # job_id → file_hash  (reverse lookup for O(1) status updates)
+# v2.09: key changed from file_hash → task_key (file_hash + config_hash)
+GLOBAL_HASH_INDEX = {}   # task_key → {job_id, status, config, file_hash}
+JOB_ID_TO_HASH = {}      # job_id → task_key  (reverse lookup for O(1) status updates)
+
+
+def _config_hash(cfg: dict) -> str:
+    relevant = {
+        "model": cfg.get("model", ""),
+        "translationMode": cfg.get("translationMode", ""),
+        "translationPriority": cfg.get("translationPriority", ""),
+        "contextAware": cfg.get("contextAware", False),
+        "subtitles": cfg.get("subtitles", ""),
+        "burn": cfg.get("burn", False),
+    }
+    raw = json.dumps(relevant, sort_keys=True)
+    return hashlib.sha256(raw.encode()).hexdigest()[:12]
+
+
+def _task_key(file_hash: str, cfg: dict) -> str:
+    return f"{file_hash}_{_config_hash(cfg)}"
 
 
 # === Tier definitions ===
@@ -308,11 +326,13 @@ async def startup():
                 elif (job_dir / "output.srt").exists() and status != "done":
                     status = "done"
 
-                GLOBAL_HASH_INDEX[fh] = {
+                cfg = meta.get("config", {})
+                tk = meta.get("task_key") or _task_key(fh, cfg)
+                GLOBAL_HASH_INDEX[tk] = {
                     "job_id": jid, "status": status,
-                    "config": meta.get("config", {}),
+                    "config": cfg, "file_hash": fh,
                 }
-                JOB_ID_TO_HASH[jid] = fh
+                JOB_ID_TO_HASH[jid] = tk
             except Exception:
                 pass
 
@@ -487,9 +507,9 @@ async def save_config(payload: dict):
 
 def _update_hash_index(job_id: str, status: str):
     """O(1) status sync to GLOBAL_HASH_INDEX via JOB_ID_TO_HASH reverse lookup."""
-    fh = JOB_ID_TO_HASH.get(job_id)
-    if fh and fh in GLOBAL_HASH_INDEX:
-        GLOBAL_HASH_INDEX[fh]["status"] = status
+    tk = JOB_ID_TO_HASH.get(job_id)
+    if tk and tk in GLOBAL_HASH_INDEX:
+        GLOBAL_HASH_INDEX[tk]["status"] = status
 
 
 def _persist_job_status(job_id: str, status: str):
@@ -507,9 +527,9 @@ def _persist_job_status(job_id: str, status: str):
 
 def _cleanup_hash_index(job_id: str):
     """Remove job from both memory indexes (called on cancel)."""
-    fh = JOB_ID_TO_HASH.pop(job_id, None)
-    if fh:
-        GLOBAL_HASH_INDEX.pop(fh, None)
+    tk = JOB_ID_TO_HASH.pop(job_id, None)
+    if tk:
+        GLOBAL_HASH_INDEX.pop(tk, None)
 
 
 # ── POST /api/jobs — the core: upload/path → hash → dedup → create or restore ──
@@ -589,8 +609,10 @@ async def create_job(request: Request):
             return JSONResponse({"error": "上传失败，请重试"}, status_code=500)
 
     # ── 以下为共享的去重 + 任务创建逻辑 ──
+    # v2.09: config-aware dedup — same video + same settings = reuse, different settings = new task
 
-    existing = GLOBAL_HASH_INDEX.get(file_hash)
+    tk = _task_key(file_hash, cfg)
+    existing = GLOBAL_HASH_INDEX.get(tk)
 
     if existing:
         old_jid = existing["job_id"]
@@ -628,12 +650,12 @@ async def create_job(request: Request):
 
         _cleanup_hash_index(old_jid)
 
-    meta = {"file_hash": file_hash, "config": cfg, "video_filename": cfg.get("video_filename", ""),
-            "status": "queued"}
+    meta = {"file_hash": file_hash, "task_key": tk, "config": cfg,
+            "video_filename": cfg.get("video_filename", ""), "status": "queued"}
     (job_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 
-    GLOBAL_HASH_INDEX[file_hash] = {"job_id": jid, "status": "queued", "config": cfg}
-    JOB_ID_TO_HASH[jid] = file_hash
+    GLOBAL_HASH_INDEX[tk] = {"job_id": jid, "status": "queued", "config": cfg, "file_hash": file_hash}
+    JOB_ID_TO_HASH[jid] = tk
 
     JOBS[jid] = {
         "id": jid, "status": "queued", "progress": 0,
@@ -702,8 +724,8 @@ def get_job(job_id: str):
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
                 # v2.05: priority to GLOBAL_HASH_INDEX (corrected at startup, e.g. "interrupted")
-                fh = JOB_ID_TO_HASH.get(job_id)
-                status = GLOBAL_HASH_INDEX[fh]["status"] if (fh and fh in GLOBAL_HASH_INDEX) else meta.get("status", "unknown")
+                tk = JOB_ID_TO_HASH.get(job_id)
+                status = GLOBAL_HASH_INDEX[tk]["status"] if (tk and tk in GLOBAL_HASH_INDEX) else meta.get("status", "unknown")
                 return {
                     "id": job_id, "status": status,
                     "progress": 0, "stage": "", "message": "",

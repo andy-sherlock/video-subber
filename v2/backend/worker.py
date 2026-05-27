@@ -315,10 +315,10 @@ def main():
 
         # ── Step 1: Extract Audio (0-5%) ──
         if stage in ("start", "extract_audio") and not Path(audio_path).exists():
-            stderr_progress("extract", 2, "正在提取音频…")
+            stderr_progress("extract", 2, "正在分析视频…")
             extract_audio(video_path, audio_path)
             ck.save("extract_audio", meta=config)
-        stderr_progress("extract", 5, "音频提取完成")
+        stderr_progress("extract", 5, "视频分析完成")
 
         # ── Step 2: Transcribe (5-35%) ──
         segments = None
@@ -347,7 +347,7 @@ def main():
                 } for s in segments], f, ensure_ascii=False, indent=2)
             ck.save("transcribe", meta=config)
         else:
-            stderr_progress("transcribe", 10, "转录已缓存，跳过")
+            stderr_progress("transcribe", 10, "已有识别记录，跳过")
             raw = json.loads(transcript_path.read_text(encoding="utf-8"))
             segments = [Segment(r["id"], r["start"], r["end"], r["text"]) for r in raw]
             for s, r in zip(segments, raw):
@@ -356,7 +356,7 @@ def main():
                 s.words = r.get("words", [])
 
         total = len(segments)
-        stderr_progress("transcribe", 35, f"转录完成: {total} 段")
+        stderr_progress("transcribe", 35, f"语音识别完成: 共 {total} 句")
 
         # ── Step 3: Translate (35-80%) ──
         failed = []
@@ -392,14 +392,14 @@ def main():
                 } for s in segments], f, ensure_ascii=False, indent=2)
             ck.save("translate", meta=config)
         else:
-            stderr_progress("translate", 40, "翻译已缓存，跳过")
+            stderr_progress("translate", 40, "已有翻译记录，跳过")
             raw = json.loads(translated_path.read_text(encoding="utf-8"))
             for s, r in zip(segments, raw):
                 s.zh = r.get("zh", "")
             failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
 
         ok_count = sum(1 for s in segments if s.zh.strip() and s.zh != "[翻译失败]")
-        stderr_progress("translate", 80, f"翻译: {ok_count}/{total} 成功, {len(failed)} 失败")
+        stderr_progress("translate", 80, f"翻译完成: {ok_count}/{total} 句成功, {len(failed)} 句失败")
 
         # ── Step 4: Subtitle (80-90%) ──
         for s in segments:
@@ -407,7 +407,7 @@ def main():
 
         subtitle_segments = _word_align_segments(segments)
 
-        stderr_progress("subtitle", 85, "正在生成 SRT 字幕…")
+        stderr_progress("subtitle", 85, "正在生成字幕文件…")
         build_srt(subtitle_segments, srt_path)
 
         if burn_flag:
@@ -416,18 +416,18 @@ def main():
             if style:
                 try:
                     from backend.subtitle_style import build_ass_styled
-                    stderr_progress("subtitle", 88, "正在生成 ASS 字幕…")
+                    stderr_progress("subtitle", 88, "正在排版字幕样式…")
                     build_ass_styled(subtitle_segments, ass_path, alignment=alignment, style=style)
                 except ImportError:
                     build_ass(subtitle_segments, ass_path, alignment=alignment)
             else:
-                stderr_progress("subtitle", 88, "正在生成 ASS 字幕…")
+                stderr_progress("subtitle", 88, "正在排版字幕样式…")
                 build_ass(subtitle_segments, ass_path, alignment=alignment)
 
             # ── Step 5: Burn (90-100%) ──
-            stderr_progress("burn", 92, "正在烧录字幕到视频…")
+            stderr_progress("burn", 92, "正在合成最终视频…")
             burn_subtitles(video_path, ass_path, video_out)
-            stderr_progress("burn", 98, "烧录完成")
+            stderr_progress("burn", 98, "合成完成")
 
         ck.save("done", meta=config)
 
