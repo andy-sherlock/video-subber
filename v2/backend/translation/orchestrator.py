@@ -1,5 +1,5 @@
 """Speed mode (parallel race) / Quality mode (serial fallback) orchestration."""
-import concurrent.futures, threading, time, re
+import threading, time, re
 import os as _os
 import json as _json
 from .base import TranslationBackend, TranslationResult
@@ -14,7 +14,7 @@ FREE_BACKENDS: dict[str, TranslationBackend] = {
     k: v for k, v in _ALL_FREE.items() if v.enabled
 }
 
-# ¥3 tier platform-provided LLM keys (injected automatically for paid_3 users).
+# SVIP tier platform-provided LLM keys (injected automatically for svip users).
 # Priority: VSUB_PLATFORM_KEYS env var (dev) → remote GitHub fetch (production).
 
 def _get_platform_keys() -> list[dict]:
@@ -304,7 +304,7 @@ def translate_with_orchestrator(
         priority: Ordered list of backend names (e.g. ["google","bing","baidu","youdao"]).
         api_keys: List of LLM key configs: [{"platform":"claude","name":"my key","key":"sk-..."}].
         context_aware: If True, LLM reads full context first (paid only).
-        tier: "free" / "paid_1" / "paid_3". paid_3 injects platform keys automatically.
+        tier: "free" / "vip" / "svip". svip injects platform keys automatically.
         progress_callback: fn(pct: int, message: str).
 
     Returns:
@@ -315,7 +315,7 @@ def translate_with_orchestrator(
 
     # Inject platform keys for ¥3 tier
     all_api_keys = list(api_keys or [])
-    if tier == "paid_3":
+    if tier == "svip":
         all_api_keys.extend(_get_platform_keys())
 
     # Build backend list in priority order
@@ -328,7 +328,7 @@ def translate_with_orchestrator(
     llm_backends = _build_llm_backends(all_api_keys)
 
     # ── Paid user: LLM-powered translation ──
-    if tier in ("paid_1", "paid_3") and llm_backends:
+    if tier in ("vip", "svip") and llm_backends:
         if context_aware:
             # ── 第 3 档：上下文感知（整篇翻译，一次 LLM 调用）──
             try:

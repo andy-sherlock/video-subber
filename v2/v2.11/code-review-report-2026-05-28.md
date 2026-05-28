@@ -1,156 +1,177 @@
-# Code Review Report — V2.10 上线前审查
+# Code Review Report -- Video Subber V2.11
 
-审查范围：`v2/v2.10/` 全部后端 + 前端 + desktop.py
-审查日期：2026-05-28
-
----
-
-## 🔴 Critical（必须在上线前修复）
-
-### C1. `os.getuid()` Windows 兼容性崩溃
-**文件:** [key_manager.py:24](backend/key_manager.py#L24)
-```python
-material = f"{platform.node()}-{os.getuid()}".encode()
-```
-`os.getuid()` 在 Windows 上不存在，打包 EXE 后 `import key_manager` 即崩溃，整个应用无法启动。
-**修复:** 改为跨平台方案：
-```python
-import getpass
-material = f"{platform.node()}-{getpass.getuser()}-{uuid.getnode()}".encode()
-```
-
-### C2. health 端点版本号过时
-**文件:** [main.py:469](backend/main.py#L469)
-```python
-return {"ok": True, "version": "2.08"}
-```
-前端 HTML 标题显示 `v2.10`，但后端 `/api/health` 返回 `2.08`。版本号不一致会给用户支持和 bug 报告带来混乱。
-**修复:** 改为 `"2.10"`。
-
-### C3. 启动时强制写入旧版本标记
-**文件:** [main.py:372-378](backend/main.py#L372-L378)
-```python
-if current.get("version") != "2.08":
-    version_data = {"version": "2.08", ...}
-```
-每次启动如果 `.version` 不是 `"2.08"` 就强制写回 `"2.08"`。这意味着 V2.10 的 `.version` 文件永远写着 `"2.08"`，V3 升级迁移逻辑无法正确判断来源版本。
-**修复:** 改为 `"2.10"`。
-
-### C4. orchestrator 中存在不可达死代码
-**文件:** [orchestrator.py:383-384](backend/translation/orchestrator.py#L383-L384)
-```python
-        # ── Fallback: LLM failed, use free backends ──
-        all_backends = ordered_backends
-    else:
-        all_backends = ordered_backends + llm_backends
-```
-`translate_with_orchestrator` 的 paid 分支（`context_aware` 和逐段翻译）都以 `return` 结束，383-384 行的 "Fallback" 逻辑永远不可达。注释声称"LLM 失败后用免费后端兜底"，但实际没有实现这个降级路径。
-**修复:** 如果需要兜底逻辑，应在 try/except 或失败检查后执行，而非放在 return 之后。如果不需要，删除不可达代码并更新注释。
+**审查日期**: 2026-05-28
+**审查范围**: `backend/main.py`, `backend/worker.py`, `backend/worker_manager.py`, `backend/ws_manager.py`, `backend/config_manager.py`, `backend/key_manager.py`, `backend/subtitle_style.py`, `backend/env_check.py`, `backend/core/checkpoint.py`, `backend/usage_reporter.py`, `backend/translation/orchestrator.py`, `desktop.py`, `frontend/index.html`
 
 ---
 
-## 🟡 Important（建议修复）
+## 🔴 Critical
 
-### M1. 硬编码的开发者激活码
-**文件:** [main.py:151](backend/main.py#L151)
-```python
-_BUILTIN_CODES: set[str] = {"ANDY", "MENG"}
-```
-"ANDY" 和 "MENG" 硬编码在源码中。发布到公网后，任何人反编译 EXE 都能看到这两个码。
-**修复:** 
-- 删除内置码，改用环境变量 `VSUB_DEV_CODES` + 远程 `activation_codes.json` 双重渠道
-- 或者保留少量内置码但通过环境变量注入（不写死）
+### C1: FROZEN 模式下所有进度更新丢失
 
-### M2. 机器指纹过于简单
-**文件:** [main.py:277-283](backend/main.py#L277-L283)
-```python
-parts = [str(_uuid.getnode()), _os.name]
-return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
-```
-只用 MAC 地址 + 操作系统名做指纹。Windows 上 MAC 地址可轻易修改，激活码绑定不够强。
-**修复:** 增加更多硬件因子：硬盘序列号、用户名、机器名、Windows Product ID 等，提高换机破解的门槛。
+- **文件**: `desktop.py` 行 81-90, `backend/worker.py` 行 538-545
+- **问题**: FROZEN/exe 模式下，`desktop.py` 替换了 `_worker.emit` 使其通过 `asyncio.run_coroutine_threadsafe` 直连 WebSocket。但 `worker.py` 中的 `stderr_progress()` 函数（行 538）**不调用 `emit()`**，而是直接写入模块级变量 `_real_stdout`。在 FROZEN 模式下没有父进程读取 stdout，因此所有中间进度消息（extract / transcribe / translate / subtitle / burn 的 percent 和 message）全部丢失，前端进度条始终停留在 0%。
 
-### M3. 上下文感知翻译缺少"先理解再翻译"的 Step 1
-**文件:** [orchestrator.py:331-337](backend/translation/orchestrator.py#L331-L337)
-`context_aware=True` 时直接调 `_translate_whole_with_markers()`，用 `[N]` 标记整篇翻译。但 V2 架构设计（video-subtitle.md 第 488-493 行）定义了两步流程：
-1. LLM 先读全文理解语境（理解主题/人物/术语，不需要翻译）
-2. 基于语境理解逐段翻译
+  ```python
+  # worker.py 行 538 -- 绕过 emit，直接写 stdout
+  def stderr_progress(stage, percent, message, detail=""):
+      _real_stdout.write(msg + "\n")  # <-- FROZEN 下无人读取
+  ```
 
-当前实现跳过了 Step 1，只是把所有 segment 拼在一起做一次 LLM 调用。虽然 `[N]` marker 方案有效，但缺少独立的"语境理解"步骤，与设计文档不符。
-**修复:** 要么在 `context_aware` 路径前加一步独立的语境理解调用，要么更新架构文档承认 marker 方案是最终实现。
+  `stderr_progress` 被调用了 17 次（行 315-477），每次都是 pipeline 的关键进度节点。
+- **建议**: 将 `stderr_progress` 也纳入 `_direct_emit` 的替换范围，或者在 `stderr_progress` 内部检测 FROZEN 模式并调用 `_direct_emit`。最干净的做法是在 `desktop.py` 中同样替换 `_worker.stderr_progress`（它也是模块级函数）。
 
-### M4. `_config_hash` 未包含 `apiKeys`
-**文件:** [main.py:39-51](backend/main.py#L39-L51)
-`_config_hash` 函数排除了 `apiKeys` 字段（因为 Key 是敏感数据不应进哈希）。但换 Key 后翻译结果可能完全不同（不同模型翻译质量不同），应该让换 Key 被视为"配置变更"。
-**修复:** 将 `apiKeys` 的脱敏版本（如 `{platform, model}` 不含 key 值）纳入哈希：
-```python
-"apiKeys": [{"platform": k.get("platform",""), "model": k.get("model","")} for k in cfg.get("apiKeys", [])]
-```
+### C2: 前端单任务 UI 残留 DOM 元素（5 个死元素）
 
-### M5. `reconnectJobs` 第一个恢复 job 的 config 覆盖用户当前设置
-**文件:** [index.html:751](frontend/index.html#L751)
-```javascript
-if(firstReconnect&&j.config){State.settings={...State.settings,...j.config};syncUI();firstReconnect=false}
-```
-页面加载时如果 localStorage 有未完成任务，第一个 job 的 config 直接覆盖 `State.settings`。如果用户当时正在调整设置（比如换了模型），这些未保存的修改会丢失。
-**修复:** 只恢复不覆盖当前设置，或者至少对比后提示用户。
+- **文件**: `frontend/index.html` 行 353-361
+- **问题**: `progressSection` (line 353), `progressFill` (line 354), `progressStep` (line 355), `resultSection` (line 357), `failedDetail` (line 361) -- 这 5 个 DOM 元素是旧版单任务 UI 的进度/结果展示区域。V2.11 已全面迁移到多任务卡片 UI（`job-card` 组件），这些元素在全部 JS 代码中**从未被设置 `active` 类名**，始终处于 `display:none` 状态，不会被用户看到。
+- **建议**: 删除这些死 DOM 元素及相关 CSS 规则（行 139-157），减小 HTML 体积。
 
-### M6. `apiKeys` 中的 key 值通过 localStorage 明文持久化
-**文件:** [index.html:726](frontend/index.html#L726)
-```javascript
-const cfg={..., apiKeys:State.settings.apiKeys, ...};
-localStorage.setItem('video-subber-config',JSON.stringify(cfg));
-```
-用户的 API Key 明文写入浏览器 localStorage。虽然这是本地应用且后端用 Fernet 加密存储到 `config.json`，但 `localStorage` 中的副本是明文的。任何能访问该浏览器的用户/扩展都能读取。
-**修复:** 前端 localStorage 不保存 key 本身，只保存 `{platform, name, model}` 元数据。key 值仅在添加时 POST 到后端加密存储，页面加载时从后端拉回脱敏后的列表。
+### C3: `showError()` 函数从未调用
+
+- **文件**: `frontend/index.html` 行 973
+- **问题**: `showError(msg)` 函数定义存在但全代码库中没有任何调用点。错误展示现在通过 job-card 内嵌的 `err-{jid}` 元素处理，不再使用全局 error overlay。`errorOverlay` 本身仅由 `closeError()` 关闭（行 974）。
+- **建议**: 删除 `showError()` 函数；若确认 `errorOverlay` 也不再需要，一并删除。
 
 ---
 
-## 🟢 Low（可延后）
+## 🟡 Warning
 
-### L1. `_machine_fingerprint` 在 `load_activation` 检查前未初始化
-**文件:** [main.py:286-302](backend/main.py#L286-L302)
-`_load_activation()` 调用 `_machine_fingerprint()` 没有问题（函数定义在前面），但如果未来的重构移动了函数顺序，可能引发 NameError。当前代码安全。
+### W1: Tier 判断未使用后端返回值
 
-### L2. 导入别名不一致
-**文件:** [main.py:118](backend/main.py#L118) vs [main.py:560](backend/main.py#L560)
-`import os as _os` 和 `import os as _os_module` 两个别名指向同一个模块。不影响功能，但降低可读性。
+- **文件**: `frontend/index.html` 行 510-531, `backend/main.py` 行 451-464
+- **问题**: `updateBackendLists(data)` 中判断 tier 使用的是 `State.settings.tier`（前端本地状态），而**不使用 `data.current_tier`**（后端 `_effective_tier()` 解析后的权威值）。在正常操作中两者一致，但若 URL 传入无效 tier（如 `?tier=gold`），后端会降级返回 `"free"`，前端 UI 却可能显示付费功能。当前因为 `isDev` 门禁和 TIER_FEATURES 白名单，未造成实际 bug，但属于 fragile code。
 
-### L3. `_read_stdout` reader 线程未处理 proc.stdout 为 None
-**文件:** [worker_manager.py:78](backend/worker_manager.py#L78)
-```python
-for line in proc.stdout:
-```
-如果子进程启动后立即崩溃，stdout pipe 可能为 None，导致 `TypeError`。极低概率，但可加防御。
+  ```js
+  // 行 510 -- 应该用 data.current_tier 而非 State.settings.tier
+  if(isDev && State.settings.tier==='paid_3'){
+  ```
+- **建议**: 将三处 tier 判断替换为 `data.current_tier`，确保前端展示与后端实际生效的 tier 一致。
 
-### L4. 前端 `saveConfig` 只重试 2 次
-**文件:** [index.html:728](frontend/index.html#L728)
-保存配置到后端失败后只重试 1 次（总共 2 次尝试）。如果后端恰好重启中，这可能不够。建议增加到 3 次 + 指数退避。
+### W2: 字幕字体列表仅含 macOS 字体
 
-### L5. `desktop.py` webview 窗口缺少 Windows 图标设置
-**文件:** [desktop.py:156-163](desktop.py#L156-L163)
-`webview.create_window()` 没有设置窗口图标。打包成 EXE 后任务栏会显示默认 Python 图标。
-**修复:** 添加图标文件并在打包配置中指定。
+- **文件**: `frontend/index.html` 行 278
+- **问题**: 样式字体 `<select>` 硬编码了 5 个 macOS 字体（PingFang SC, Noto Sans CJK SC, Heiti SC, Songti SC, Kaiti SC），Windows 用户无法选择 Microsoft YaHei、SimHei 等平台原生字体。后端 `config_manager.py` 行 12 有平台判断逻辑但仅在 DEFAULT_CONFIG 中生效，前端下拉列表不受其影响。
+- **建议**: 前端根据 `navigator.platform` 动态构建字体列表，或至少添加 `"Microsoft YaHei"` 和 `"SimHei"`。
+
+### W3: `onModelChange()` 在 `custom` 平台切换后错误显示自定义模型输入框
+
+- **文件**: `frontend/index.html` 行 664-669, 672
+- **问题**: 当用户在上一个 LLM 平台选择了"其他模型..."（`__custom__`），然后切换到 `custom` 平台时：
+  1. `onPlatformChange()` 隐藏 `apiModel` 并 remove `customModel` 的 visible 类（正确）
+  2. `onModelChange()` 随后执行，检测到 `apiModel.value === '__custom__'`（残留值），重新将 visible 加回 `customModel`（错误）
+
+  结果：`#apiCustomModel` 输入框在不该出现时闪现。用户在 `custom` 平台下既看到 `apiModelName`（正确）又看到 `apiCustomModel`（错误）。
+
+  ```js
+  // 行 672 -- onModelChange 无条件跟在 onPlatformChange 后面
+  $('apiPlatform').addEventListener('change',()=>{onPlatformChange();onModelChange()});
+  ```
+- **建议**: 在 `onPlatformChange()` 返回前重置 `apiModel.value = ''`，或在 `onModelChange()` 中加 `if (getComputedStyle(modelSel).display === 'none') return;` 防护。
+
+### W4: `usage_reporter.replay_fallback()` 从未调用
+
+- **文件**: `backend/usage_reporter.py` 行 77-90
+- **问题**: `replay_fallback()` 用于启动时重放上次失败的用量上报记录。函数定义存在但 **没有被任何代码调用**（`main.py` 的 `startup()` 中没有调用它）。失败的用量记录会永久保存在 `pending_usage.json` 中而不被重试。
+- **建议**: 在 `startup()` 中添加 `threading.Thread(target=replay_fallback, daemon=True).start()`，或在确认 V3 之前不需要此功能时添加 TODO 注释并标记为 dead code。
+
+### W5: 后端 `DEFAULT_CONFIG` 缺少多个前端使用的字段
+
+- **文件**: `backend/config_manager.py` 行 7-22
+- **问题**: `DEFAULT_CONFIG` 缺少 `burn`, `subtitles`, `contextAware` 字段。这些字段由前端 `saveConfig()` 写入并在后续加载时可用，但首次启动（用户从未保存过配置时）`load_config()` 返回的对象不包含它们。当前因为 `loadConfig()` 的条件 `c.translationMode` 为真时才合并，且前端 `State.settings` 有自身默认值，未造成实际故障，但字段集的不一致增加了维护风险。
+- **建议**: 在 `DEFAULT_CONFIG` 中补充 `"burn": True, "subtitles": "no", "contextAware": False`，与前端初始值对齐。
+
+### W6: `_llmFallbackPending` 声明但未使用
+
+- **文件**: `frontend/index.html` 行 950
+- **问题**: `let _llmFallbackPending=null;` 定义后从未被引用。实际的 LLM fallback 逻辑使用 `window._pendingFallbackJob`（行 946, 953, 957）。
+- **建议**: 删除 `_llmFallbackPending` 变量声明。
+
+### W7: `handleCardMsg` 未处理 `token_usage` 类型消息
+
+- **文件**: `frontend/index.html` 行 938-948
+- **问题**: Worker 会发出 `{"type": "token_usage", "usage": {...}}` 消息，后端 `_tracking_send` 将其存入 JOBS dict（`main.py` 行 872-873），但前端 `handleCardMsg` 没有对应的 case 分支。消息被静默忽略。当前这被视为"by design"（token 用量不向用户展示），但 `j["token_usage"]` 也因此从未被任何 REST API 返回。
+- **建议**: 明确设计意图 -- 如果 token_usage 完全不需要实时展示，考虑移除 WebSocket 推送直接写入磁盘日志；如果未来需要前端展示，添加对应的 case 分支。
+
+### W8: `GET /api/jobs/{job_id}` fallback 路径返回字段不完整
+
+- **文件**: `backend/main.py` 行 750-774
+- **问题**: 当 JOBS dict 未命中、从磁盘 meta.json fallback 时（服务重启后），返回的 JSON 不包含 `token_usage` 和 `failed_segments` 字段。虽然主路径（JOBS dict 命中时）同样不返回这些字段（仅在 done 消息中通过 WebSocket 推送），但 fallback 分支与主分支返回结构不完全一致。
+- **建议**: 若有前端需要 consume 这些字段，在 fallback 分支中补充；否则确认当前设计无影响后关闭。
 
 ---
 
-## 总结
+## 🟢 Info / OK
 
-| 类别 | 数量 | 必须修 |
-|------|------|--------|
-| 🔴 Critical | 4 | C1, C2, C3, C4 |
-| 🟡 Important | 6 | M1（安全）, M6（安全） |
-| 🟢 Low | 5 | 无 |
+### I1: 前后端 API 字段一致性 -- 全部匹配
 
-### 上线判断
+- `POST /api/dev/activate` 的 `{code}` 与后端 `payload.get("code")` ✅
+- `POST /api/jobs/{job_id}/llm-fallback` 的 `{decision}` 与后端 `payload.get("decision")` ✅
+- `GET /api/jobs/{job_id}` 返回的 `process_alive` 字段前端正确使用（行 925） ✅
+- `GET /api/active-jobs` 返回的 `data.jobs[].job_id` 前端正确消费（行 988） ✅
+- WebSocket 消息 type 枚举（`progress`, `done`, `error`, `llm_failed`, `token_usage`）前后端完全一致 ✅
+- Worker `emit()` 和 `stderr_progress()` 发出的 JSON 结构与 `_tracking_send` 消费的字段完全对齐 ✅
+- `POST /api/jobs` 返回的 `{found, job_id, status, config}` 前端 `handleFoundJob` 和 `handleCardMsg` 正确消费 ✅
 
-C1（Windows 崩溃）是 blocker——EXE 打包后直接无法启动。修复 C1-C4 后代码质量达到上线标准。M1（激活码泄露）和 M6（localStorage 明文）属于安全债务，如果首批用户是受控内测则可不修，公网发布则必须修。
+### I2: pywebview 线程安全 -- 正确
 
-### 做得好的地方
+- uvicorn 服务器运行在 daemon 线程，`webview.create_window()` 和 `webview.start()` 在主线程调用，符合 pywebview 要求 ✅
+- `asyncio.run_coroutine_threadsafe` 用法正确，loop 引用在 startup 时存储 ✅
+- FROZEN 模式下 Worker 线程为 daemon=True，主进程退出时自动清理 ✅
 
-- 前后端字段名基本一致（`burn`, `subtitles`, `model`, `translationMode` 等），参数传递链完整
-- worker_manager 的双重护卫（`_kill_if_alive` + heartbeat 超时检测）设计可靠
-- 配置感知去重（`task_key` = file_hash + config_hash）逻辑正确
-- 错误翻译（`_friendly_error`）覆盖了内存不足、超时、限流、认证失败等主要场景
-- `_word_align_segments` 利用 English word timestamps 做准确的中文时间对齐，设计精巧
-- 双日志系统（user.log + debug.log + RotatingFileHandler）成熟
+### I3: 后端所有路由已挂载 -- 16 个端点全部激活
+
+- 3 个 GET（health, env, backends, config, active-jobs, jobs/{id}, download/video, download/srt）
+- 2 个 POST（jobs, reset, dev/activate, llm-fallback）
+- 1 个 PUT（config）
+- 1 个 DELETE（jobs/{id}）
+- 1 个 WebSocket（/ws/{job_id}）
+
+全部检查通过，无未挂载路由 ✅
+
+### I4: 前端 DOM ID 引用检查 -- 核心 ID 全部存在
+
+以下 38 个前端 ID 全部存在对应 DOM 元素：`dz`, `fileInput`, `dzFile`, `localPathInput`, `localPathGuide`, `startBtn`, `subToggle`, `burnSelect`, `burnWarn`, `styleSubSection`, `styleFont`, `styleSize`, `styleColor`, `styleOutline`, `styleOutlineWidth`, `stylePreview`, `styleConfirmBtn`, `styleConfirmed`, `modelSection`, `modelDots`, `modelCurrent`, `transSection`, `transModeTitle`, `modeRow`, `modeToggle`, `priorityList`, `apiTip`, `apiRow`, `apiPlatform`, `apiModel`, `apiCustomModel`, `apiModelName`, `apiName`, `apiKeyInput`, `apiEndpoint`, `apiAddBtn`, `apiKeyList`, `modelHint`, `advCard`, `advToggle`, `advBody`, `ctxToggle`, `jobCards`, `devToolbar`, `devTierBadge`, `devLoginOverlay`, `devLoginTrigger`, `devCodeInput`, `devLoginError`, `llmFallbackOverlay`, `llmFallbackMsg`, `savePathDisplay`, `savePathBtn`, `envBar`, `errorOverlay`, `errorText`, `devNoFfmpeg`, `devNoLibass`, `devNoWhisper` ✅
+
+### I5: FROZEN 模式 V1.3 路径修正 -- 正确
+
+- `desktop.py` 行 34-39: 将 `BUNDLE_DIR / "v1.3"` 注入 sys.path ✅
+- `backend/main.py` 中的 FRONTEND 路径 (`Path(__file__).parent.parent / "frontend"`) 在打包后自然正确 ✅
+
+### I6: `_tracking_send` 猴子补丁 -- 安全
+
+- `ws_manager.send` 在 `main.py` 行 890 被替换为 `_tracking_send`，后者内部调用 `_original_send` ✅
+- `worker_manager._forward` 在每次调用时重新 `from .ws_manager import ws_manager`，通过实例属性查找获取当前绑定的方法（动态分发），正确调用 `_tracking_send` ✅
+- 不存在递归调用风险 ✅
+
+### I7: `cancel_job` 的 `time.sleep(0.1)` -- 可接受
+
+- `main.py` 行 811: 在 `worker_manager.cancel()` 后等待 0.1s，目的是给 OS 一点时间完成进程清理后再删除日志目录。非关键路径，可接受 ✅
+
+### I8: `done_job_config` 去重逻辑 -- 完整覆盖三种状态
+
+- 已完成 (done): 复用结果，提示"修改设置后可重跑" ✅
+- 运行中 (running/queued): 复用卡片，连接 WebSocket 恢复进度 ✅
+- 中断 (interrupted/error): 恢复任务，重新启动 worker ✅
+
+### I9: `saveConfig` localStorage 安全脱敏 -- 正确
+
+- `frontend/index.html` 行 739: 写入 localStorage 的配置显式剔除了 `apiKeys[].key` 字段，仅保留元数据 ✅
+- 服务端 `config_manager.py` 使用 Fernet 加密存储完整 API Key ✅
+
+### I10: 配置变更增量缓存失效 -- 逻辑正确
+
+- `backend/worker.py` 行 290-313: `SETTING_STAGE` 映射了每个设置影响的 pipeline 阶段，配置变更时从受影响阶段起删除所有后续缓存 ✅
+- 字幕阶段特殊处理（行 271-276）: 同时清除 `.srt` 和 `.ass`，避免旧 ASS 被复用 ✅
+
+---
+
+## 统计
+
+| 级别 | 数量 | 说明 |
+|------|------|------|
+| 🔴 Critical | 3 | C1(FROZEN进度丢失), C2(5个死DOM元素), C3(showError从未调用) |
+| 🟡 Warning | 8 | W1-W8 |
+| 🟢 Info | 10 | 确认无误的项目 |
+
+**建议优先修复**: C1 (FROZEN 模式进度丢失) -- 这会导致打包后的 exe 版本在用户等待期间完全没有任何进度反馈，体验极差且可能被误认为卡死。

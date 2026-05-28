@@ -18,7 +18,7 @@ class GeminiBackend(LLMBackend):
         return ""
 
     def _build_headers(self) -> dict:
-        return {"Content-Type": "application/json"}
+        return {"Content-Type": "application/json", "x-goog-api-key": self._key}
 
     def _build_body(self, prompt: str, max_tokens: int) -> bytes:
         return json.dumps({
@@ -29,7 +29,7 @@ class GeminiBackend(LLMBackend):
     def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
-            f"models/{self._model}:generateContent?key={self._key}"
+            f"models/{self._model}:generateContent"
         )
         body = self._build_body(prompt, max_tokens)
         req = urllib.request.Request(url, data=body, headers=self._build_headers())

@@ -81,8 +81,24 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .model-dot-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;z-index:1;cursor:pointer}
 .model-dot-circle{width:20px;height:20px;border-radius:50%;background:var(--card);border:2px solid var(--border);transition:all .2s}
 .model-dot-circle.active{background:var(--blue);border-color:var(--blue);box-shadow:0 2px 12px rgba(0,113,227,.35);transform:scale(1.15)}
+.model-dot-circle.missing{border-color:#ff453a;background:transparent}
+.model-dot-circle.downloading{border-color:var(--blue);animation:dotPulse .8s ease-in-out infinite}
+.model-dot-circle.downloaded{background:#30d158;border-color:#30d158}
+@keyframes dotPulse{0%,100%{opacity:1}50%{opacity:.4}}
 .model-dot-label{font-size:11px;color:var(--sub);text-align:center;white-space:nowrap}
 .model-dot-wrap.active .model-dot-label{color:var(--text);font-weight:600}
+.model-dot-wrap.missing .model-dot-label{color:#ff453a}
+.model-dot-hint{font-size:11px;color:var(--sub);margin-bottom:10px;display:none}
+.model-dot-hint.visible{display:block}
+.model-progress-area{margin-top:12px}
+.model-progress-row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;animation:slideDown .2s ease-out}
+.model-progress-name{min-width:50px;color:var(--sub)}
+.model-progress-bar-wrap{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.model-progress-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .3s}
+.model-progress-pct{min-width:34px;text-align:right;color:var(--sub)}
+.model-progress-cancel{width:16px;height:16px;border:none;background:none;color:var(--sub);font-size:12px;cursor:pointer;padding:0;line-height:1;border-radius:50%}
+.model-progress-cancel:hover{color:#ff453a}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .model-arrow-bar{display:flex;align-items:center;margin:0 6px}
 .model-arrow-line{flex:1;height:2px;background:var(--border)}
 .model-arrow-left,.model-arrow-right{width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent}
@@ -204,7 +220,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 <!-- ═══════════════ Header ═══════════════ -->
 <header class="app-header">
   <h1>Video Subber</h1>
-  <p>拖进去，等一会，就能看懂 <span style="font-size:10px;color:var(--sub);opacity:.5">v2.11</span></p>
+  <p>拖进去，等一会，就能看懂 <span style="font-size:10px;color:var(--sub);opacity:.5" id="versionTag"></span></p>
 </header>
 
 <!-- Dev toolbar -->
@@ -216,6 +232,11 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <label style="margin:0 6px"><input type="checkbox" id="devNoWhisper" onchange="reloadEnv()"> 无语音识别</label>
   &nbsp;|&nbsp;
   <span id="devTierBadge" style="color:var(--blue)"></span>
+  <select id="devTierSwitch" onchange="onDevTierChange(this.value)" style="display:none;font-size:11px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px;margin-left:4px;cursor:pointer">
+    <option value="free">免费用户</option>
+    <option value="vip">VIP</option>
+    <option value="svip">SVIP</option>
+  </select>
   <button onclick="devLogout()" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--sub);cursor:pointer;padding:2px 8px;border-radius:4px;margin-left:6px">退出开发者</button>
 </div>
 
@@ -292,7 +313,9 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 <div class="card">
   <div class="card-label">Whisper 模型</div>
   <div class="model-section" id="modelSection">
+    <div class="model-dot-hint" id="modelHintText">点击圆点即可下载对应模型。medium 约 1.5GB，推荐大多数人使用。</div>
     <div class="model-dots" id="modelDots"></div>
+    <div class="model-progress-area" id="modelProgressArea"></div>
     <div class="model-arrow-labels"><span>快 · 低准确度</span><span>慢 · 高准确度</span></div>
     <div class="model-arrow-bar">
       <div class="model-arrow-left"></div><div class="model-arrow-line"></div><div class="model-arrow-right"></div>
@@ -311,7 +334,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
     </div>
   </div>
   <div class="priority-list" id="priorityList"></div>
-  <div class="info-note">ℹ 字幕句尾出现 [?] 标记，表示系统对该段翻译准确性存疑。画面中确实有人说话 → 字幕大概率正确；若无人说话 → 可能误判。</div>
+  <div class="info-note">ℹ 字幕中 <b>- </b> 前缀表示系统检测到说话人切换。句尾 <b>[?]</b> 标记表示翻译准确性存疑：画面中确实有人说话 → 字幕大概率正确；若无人说话 → 可能误判。</div>
 </div>
 
 <!-- ═══════════════ Region 5: API Key Management ═══════════════ -->
@@ -427,7 +450,9 @@ async function checkDevStatus(){
     $('devLoginTrigger').style.display='flex';
     if(isDev){
       $('devToolbar').style.display='block';
-      $('devTierBadge').textContent='全 tier 解锁'+(d.has_platform_keys?' (含平台Key)':'');
+      $('devTierBadge').textContent='开发者模式'+(d.has_platform_keys?' (含平台Key)':'');
+      $('devTierSwitch').style.display='inline-flex';
+      syncDevTierSwitch();
     }
     return d;
   }catch(e){return {dev_mode:false};}
@@ -444,6 +469,17 @@ async function devActivate(){
   }catch(e){$('devLoginError').textContent='网络错误，请重试';$('devLoginError').style.display='block'}
 }
 async function devLogout(){await fetch('/api/dev/deactivate',{method:'POST'});location.reload()}
+function onDevTierChange(tier){
+  State.settings.tier=tier;
+  $('devTierSwitch').value=tier;
+  const url=new URL(location);url.searchParams.set('tier',tier);history.replaceState(null,'',url);
+  syncUI();
+}
+function syncDevTierSwitch(){
+  const current=State.settings.tier||'free';
+  const sel=$('devTierSwitch');
+  if(sel)sel.value=current;
+}
 
 const urlParams=new URLSearchParams(location.search);
 const urlTier=urlParams.get('tier');
@@ -507,12 +543,12 @@ function updateBackendLists(data){
   });
   onPlatformChange();
   // ── Production / Dev tier UI ──
-  if(isDev && State.settings.tier==='paid_3'){
+  if(isDev && State.settings.tier==='svip'){
     $('apiTip').innerHTML='✅ <b>LLM 智能翻译已启用</b>（平台提供 API，无需配置）';
     $('apiRow').style.display='none';$('modeRow').style.display='flex';
     $('modelHint').style.display='none';
     $('transModeTitle').textContent='翻译模式';
-  }else if(isDev && State.settings.tier==='paid_1'){
+  }else if(isDev && State.settings.tier==='vip'){
     $('apiTip').textContent=`可用 LLM 平台: ${data.llm.map(b=>b.name).join(' / ')}。添加 API Key 即可启用。`;
     $('apiRow').style.display='flex';$('modeRow').style.display='flex';
     $('transModeTitle').textContent='翻译模式';
@@ -589,16 +625,93 @@ $('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')retur
 $('burnSelect').addEventListener('change',()=>{State.settings.burn=$('burnSelect').value==='true';$('burnWarn').style.display=State.settings.burn?'block':'none';$('styleSubSection').style.display=State.settings.burn?'block':'none';refreshStartBtn()});
 
 // ============ Model Slider ============
+let modelDownloads={}; // model_id → {downloading, progress}
+
+async function fetchModelStatus(){
+  try{
+    const r=await fetch('/api/models/status',{cache:'no-store'});
+    if(!r.ok)return;
+    const data=await r.json();
+    modelDownloads=data;
+    buildModelSlider();
+    renderModelProgress();
+  }catch(e){}
+}
 function buildModelSlider(){
   const dots=$('modelDots');dots.innerHTML='';
+  const hint=$('modelHintText');
+  const hasMissing=MODELS.some(m=>!modelDownloads[m]||(!modelDownloads[m].downloaded&&!modelDownloads[m].downloading));
+  hint.classList.toggle('visible',hasMissing);
+
   MODELS.forEach(m=>{
+    const md=modelDownloads[m]||{downloaded:false,downloading:false,progress:0};
     const active=m===State.settings.model;
-    const wrap=document.createElement('div');wrap.className='model-dot-wrap'+(active?' active':'');
-    wrap.innerHTML=`<div class="model-dot-circle${active?' active':''}"></div><span class="model-dot-label">${m}</span>`;
-    wrap.addEventListener('click',()=>{State.settings.model=m;buildModelSlider();refreshStartBtn()});
+    const wrap=document.createElement('div');
+    let cls='model-dot-wrap';
+    if(active)cls+=' active';
+    if(!md.downloaded&&!md.downloading)cls+=' missing';
+
+    let circleCls='model-dot-circle';
+    if(active&&md.downloaded)circleCls+=' active downloaded';
+    else if(active&&!md.downloaded)circleCls+=' active missing';
+    else if(md.downloaded)circleCls+=' downloaded';
+    else if(md.downloading)circleCls+=' downloading';
+    else circleCls+=' missing';
+
+    wrap.className=cls;
+    wrap.innerHTML=`<div class="${circleCls}"></div><span class="model-dot-label">${m}</span>`;
+    wrap.addEventListener('click',()=>onModelDotClick(m));
     dots.appendChild(wrap);
   });
   $('modelCurrent').textContent=`当前：${MODEL_INFO[State.settings.model]}`;
+}
+function renderModelProgress(){
+  const area=$('modelProgressArea');
+  const downloading=MODELS.filter(m=>modelDownloads[m]&&modelDownloads[m].downloading);
+  area.innerHTML=downloading.map(m=>{
+    const p=modelDownloads[m].progress||0;
+    return `<div class="model-progress-row" id="mp-${m}">
+      <span class="model-progress-name">${m}</span>
+      <div class="model-progress-bar-wrap"><div class="model-progress-fill" style="width:${p}%"></div></div>
+      <span class="model-progress-pct">${p}%</span>
+      <button class="model-progress-cancel" onclick="cancelModelDownload('${m}')" title="取消下载">✕</button>
+    </div>`;
+  }).join('');
+}
+async function onModelDotClick(modelId){
+  const md=modelDownloads[modelId]||{downloaded:false,downloading:false};
+  if(md.downloaded){State.settings.model=modelId;buildModelSlider();refreshStartBtn();return}
+  if(md.downloading)return;
+  // Start download
+  try{
+    const r=await fetch('/api/models/download/'+modelId,{method:'POST'});
+    if(!r.ok)return;
+    modelDownloads[modelId]={downloading:true,progress:0};
+    buildModelSlider();renderModelProgress();
+    pollModelProgress(modelId);
+  }catch(e){}
+}
+async function cancelModelDownload(modelId){
+  try{
+    await fetch('/api/models/download/'+modelId,{method:'DELETE'});
+  }catch(e){}
+  modelDownloads[modelId]={downloading:false,progress:modelDownloads[modelId]?modelDownloads[modelId].progress:0,downloaded:false};
+  buildModelSlider();renderModelProgress();
+}
+function pollModelProgress(modelId){
+  const check=async()=>{
+    try{
+      const r=await fetch('/api/models/status',{cache:'no-store'});
+      if(!r.ok)return;
+      const data=await r.json();
+      modelDownloads=data;
+      buildModelSlider();renderModelProgress();
+      const md=data[modelId];
+      if(md&&md.downloading)setTimeout(check,500);
+      else if(md&&md.downloaded){State.settings.model=modelId;buildModelSlider();refreshStartBtn()}
+    }catch(e){setTimeout(check,1000)}
+  };
+  setTimeout(check,300);
 }
 
 // ============ Translation Mode ============
@@ -745,9 +858,9 @@ function loadConfig(){
   fetch('/api/config').then(r=>r.json()).then(c=>{
     if(c&&c.translationMode)Object.assign(State.settings,c);
     if(isDev && urlTier)State.settings.tier=urlTier;
-    syncUI();updateSavePathDisplay();
+    syncUI();updateSavePathDisplay();syncDevTierSwitch();
   }).catch(()=>{});
-  if(isDev && urlTier)State.settings.tier=urlTier;
+  if(isDev && urlTier)State.settings.tier=urlTier;syncDevTierSwitch();
 }
 
 // ============ Job ============
@@ -883,6 +996,7 @@ function rebuildDynamicWidgets(){
   buildModelSlider();
   buildKeyList();
   buildPriorityList();
+  fetchModelStatus();
 }
 
 function syncUrlAndTier(){
@@ -978,6 +1092,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const urlParams=new URLSearchParams(location.search);
   const isFresh=urlParams.has('fresh');
   await checkDevStatus();
+  fetch('/api/health').then(r=>r.json()).then(d=>{const v=$('versionTag');if(v)v.textContent='v'+d.version}).catch(()=>{});
   if(isFresh){localStorage.clear();try{await fetch('/api/reset',{method:'POST'})}catch(e){}urlParams.delete('fresh');const qs=urlParams.toString();location.replace(location.pathname+(qs?'?'+qs:''));return}
   const burnSelect=document.getElementById('burnSelect');if(burnSelect)burnSelect.dispatchEvent(new Event('change'));
   if(typeof loadConfig==='function')loadConfig();

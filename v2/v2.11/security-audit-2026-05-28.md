@@ -1,157 +1,534 @@
-# Security Audit Report — V2.10 上线前审查
+# Security Audit Report — Video Subber V2.11
 
-审查日期：2026-05-28
-审查范围：API Key 加密、日志脱敏、依赖供应链、输入验证、本地服务器安全、激活码机制、子进程安全
+**Date**: 2026-05-28
+**Auditor**: Chief Security Officer (automated)
+**Scope**: All backend Python files + `frontend/index.html` + `desktop.py`
+**Methodology**: Static code analysis. No dynamic testing (penetration test) was performed.
 
 ---
 
-## 🔴 Critical
+## Risk Classification
 
-### S1. `os.getuid()` 在 Windows 不可用 → 应用崩溃
-**文件:** [key_manager.py:24](backend/key_manager.py#L24)
+| Level | Meaning |
+|-------|---------|
+| 🔴 Critical | Exploitable, causes data leak, financial loss, or system compromise. Must fix before release. |
+| 🟡 Medium | Defense-in-depth gap, configuration weakness, or best-practice violation. Fix in next iteration. |
+| 🟢 Low / Informational | Acceptable for a local desktop app. Documented for awareness. |
+
+---
+
+## V2.10 Audit Follow-up
+
+The V2.10 audit identified two critical and five important findings. Status of remediation in V2.11:
+
+| V2.10 ID | Description | Status in V2.11 |
+|----------|------------|-----------------|
+| S1 | `os.getuid()` crashes on Windows | ✅ Fixed — now uses `getpass.getuser() + uuid.getnode()` |
+| S2 | Hardcoded activation codes | ❌ **Not fixed** — `ANDY`/`MENG` still in source |
+| S3 | localStorage plaintext API keys | ✅ Fixed — frontend `saveConfig()` now strips keys from localStorage |
+| S4 | Weak machine fingerprint | ❌ Not fixed — still only MAC + `os.name` |
+| S5 | No certificate pinning for remote config | 🟡 Accepted risk — `urlopen` verifies TLS by default |
+| S6 | Worker input validation | 🟡 Accepted risk — list-form args, low threat |
+| S7 | No integrity check on activation.json | 🟡 Accepted risk — low ROI for local app |
+
+---
+
+## Findings Summary (New in V2.11)
+
+| # | Severity | Area | Title |
+|---|----------|------|-------|
+| F1 | 🔴 | API Key Storage | Plaintext key write: `PUT /api/config` bypasses Fernet encryption entirely |
+| F2 | 🔴 | API Key Storage | Hardcoded Baidu Translate credentials in source code |
+| F3 | 🔴 | API Key Storage | Gemini API key in URL query string |
+| F4 | 🟡 | API Key Storage | Fixed PBKDF2 salt reduces encryption strength |
+| F5 | 🟡 | API Key Storage | `encrypt_api_key` fallback to plaintext when `cryptography` unavailable |
+| F6 | 🟡 | Activation | Hardcoded developer codes in source + no brute-force protection |
+| F7 | 🟡 | Activation | `_effective_tier()` in dev mode trusts client-supplied tier without server-side verification |
+| F8 | 🟡 | Activation | Machine fingerprint uses only two easily-spoofed values |
+| F9 | 🟡 | Log Sanitization | Baidu backend logs exception messages that may expose API parameters |
+| F10 | 🟡 | Log Sanitization | `worker_manager` reads stderr from worker without log scrubbing |
+| F11 | 🟡 | Path Traversal | `local_path` mode reads arbitrary filesystem paths supplied by client |
+| F12 | 🟢 | Desktop App | pywebview developer tools potentially accessible |
+| F13 | 🟢 | Web General | WebSocket no authentication |
+| F14 | 🟢 | Web General | Job ID entropy (40 bits) is borderline for multi-tenant, acceptable for local |
+| F15 | 🟢 | Frontend | `innerHTML` used with user-supplied filenames (local-only mitigates) |
+| F16 | 🟢 | Dependency | `pyproject.toml` uses `>=` version pins without hash verification |
+| F17 | 🟢 | API Design | `GET /api/config` decrypts then masks; broken when keys stored plaintext |
+
+---
+
+## Detailed Findings
+
+---
+
+### 🔴 F1 — Plaintext API key write: `PUT /api/config` bypasses Fernet encryption entirely
+
+**Files**: `backend/main.py:526-531`, `backend/config_manager.py:35-38`, `frontend/index.html:736-741`
+
+**Description**: The encryption infrastructure in `key_manager.py` (`encrypt_api_key`, `decrypt_api_key`, Fernet with PBKDF2) exists and is correctly implemented, but it is **never wired into the save path**.
+
+The flow is:
+1. User types an API key in the frontend (`frontend/index.html:676-700`). The plaintext key is stored in `State.settings.apiKeys`.
+2. `saveConfig()` (`frontend/index.html:736-741`) sends the **plaintext key** to `PUT /api/config`:
+   ```javascript
+   const cfg = { ..., apiKeys: State.settings.apiKeys, ... };
+   fetch('/api/config', {method:'PUT', body: JSON.stringify(cfg)});
+   ```
+3. The backend endpoint (`main.py:526-531`) writes the payload **directly** to disk without encrypting keys:
+   ```python
+   @app.put("/api/config")
+   async def save_config(payload: dict):
+       from .config_manager import save_config
+       save_config(payload)  # ← no encryption step
+   ```
+4. `config_manager.save_config()` (`config_manager.py:35-38`) performs a raw `json.dump()`.
+
+**Impact**: All user-provided API keys (Claude, GPT, Gemini, DeepSeek, Doubao, GLM, Custom) are stored in **plaintext** at `~/.video-subber/config.json`. Anyone with filesystem access to the user's home directory can read them.
+
+**Root Cause**: The encryption layer was designed (`key_manager.py`) but the integration step into the save path was never implemented. The `encrypt_api_key()` function has zero callers in the production code path. Conversely, `worker.py` reads `config.get("apiKeys", [])` directly without calling `decrypt_api_key()` — so even if keys were encrypted at rest, the worker would pass ciphertext to the LLM APIs.
+
+**Recommendation**: In `main.py` `save_config()`, iterate over `payload.get("apiKeys", [])` and call `encrypt_api_key()` on each key value before calling `config_manager.save_config()`. Distinguish between already-encrypted values (Fernet tokens start with `gAAAAA`) and new plaintext values to avoid double-encryption. In `worker.py:main()`, call `decrypt_api_key()` on each key when loading the config for translation.
+
+---
+
+### 🔴 F2 — Hardcoded Baidu Translate credentials in source code
+
+**File**: `backend/translation/baidu.py:5-6`
+
 ```python
-material = f"{platform.node()}-{os.getuid()}".encode()
-```
-`os.getuid()` 是 Unix-only API。Windows 上 `import key_manager` 直接抛出 `AttributeError`，导致整个应用无法启动。
-**修复:** 改用跨平台方案：
-```python
-import getpass, uuid
-material = f"{platform.node()}-{getpass.getuser()}-{str(uuid.getnode())}".encode()
+BAIDU_APP_ID = os.environ.get("BAIDU_APP_ID", "20260520002616499")
+BAIDU_SECRET = os.environ.get("BAIDU_SECRET", "NGw5pcrCkfDqe6gpygvT")
 ```
 
-### S2. 硬编码激活码可被反编译提取
-**文件:** [main.py:151](backend/main.py#L151)
+**Description**: Baidu Translate API credentials (`APP_ID` and `SECRET`) are hardcoded as Python default values. These are live production credentials for the Baidu Translate API (a paid service with quota limits). Anyone who can read the source code (open-source repo, decompiled EXE, or even a `strings` command on the .pyc) can extract these credentials and use them to make API calls on the developer's Baidu account.
+
+**Impact**:
+- Financial: attacker can exhaust the developer's Baidu Translate quota, incurring charges
+- Denial of Service: quota exhaustion breaks Baidu translation for all legitimate users
+- The `SECRET` value is a credential that should never appear in source code
+
+**Recommendation**:
+1. **Immediately**: Rotate the Baidu credentials on the Baidu console (this report will be stored on disk; treat the current `APP_ID`/`SECRET` as compromised).
+2. Remove the hardcoded default values. Change to:
+   ```python
+   BAIDU_APP_ID = os.environ.get("BAIDU_APP_ID", "")
+   BAIDU_SECRET = os.environ.get("BAIDU_SECRET", "")
+   ```
+3. If these are meant to be "platform-provided" free credentials for the `free` tier, serve them through the same remote config mechanism as `platform_keys.json` rather than baking them into source.
+
+---
+
+### 🔴 F3 — Gemini API key passed in URL query string
+
+**File**: `backend/translation/gemini.py:29-36`
+
+```python
+def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/"
+        f"models/{self._model}:generateContent?key={self._key}"
+    )
+```
+
+**Description**: The Gemini backend passes the API key as a URL query parameter (`?key=...`). This is a well-known anti-pattern because:
+1. URLs appear in server logs, proxy logs, and error messages
+2. If any exception occurs during the request, the full URL (including the key) may end up in a Python traceback that gets logged to `debug.log`
+3. The `_call_api` method in `base.py` uses `urllib.request.urlopen()`, and if an `HTTPError` is raised, its string representation includes the full URL
+4. Even though there's no proxy between the app and Google's API, the key in the URL means it's transmitted in the HTTP request line (not just headers), making it visible in any intermediate network logging
+
+**Impact**: API key leakage through log files (`~/.video-subber/logs/<job_id>/debug.log`) if an `HTTPError` traceback is logged.
+
+**Recommendation**: Use the HTTP header method instead. Google's Gemini API supports `x-goog-api-key` header. Override `_build_headers()` and `_call_api()` to pass the key via header:
+```python
+def _build_headers(self) -> dict:
+    return {
+        "Content-Type": "application/json",
+        "x-goog-api-key": self._key,
+    }
+
+def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/"
+        f"models/{self._model}:generateContent"
+    )
+    body = self._build_body(prompt, max_tokens)
+    req = urllib.request.Request(url, data=body, headers=self._build_headers())
+    ...
+```
+
+---
+
+### 🟡 F4 — Fixed PBKDF2 salt reduces encryption strength
+
+**File**: `backend/key_manager.py:20`
+
+```python
+_SALT = b'video-subber-v2-fixed-salt-2026'
+```
+
+**Description**: The PBKDF2 salt is hardcoded in source code. A salt should be random and unique per installation to prevent pre-computation attacks (rainbow tables). With a fixed salt, an attacker who knows the salt (anyone with access to source code) can pre-compute key derivation tables targeting this specific application. The encryption key derivation becomes dependent solely on the machine identity material, which has limited entropy (hostname + username + MAC).
+
+**Impact**: Reduced entropy of the derived encryption key. Since the source is open/decompilable, the salt is effectively public. An attacker targeting multiple installations could pre-compute one rainbow table for all users.
+
+**Recommendation**: Generate a random salt on first run and store it in `~/.video-subber/.salt`. If the salt file doesn't exist, generate one with `os.urandom(16)` and persist it. This ensures each installation has a unique encryption key derivation even if machine identity components are similar across installations.
+
+---
+
+### 🟡 F5 — `encrypt_api_key` silently falls back to plaintext
+
+**File**: `backend/key_manager.py:39-42`
+
+```python
+def encrypt_api_key(plaintext: str) -> str:
+    f = _get_fernet()
+    if f is None:
+        return plaintext  # No cryptography available — store as-is (dev mode)
+```
+
+**Description**: If the `cryptography` package fails to import (e.g., missing dependency, broken virtual environment), `encrypt_api_key()` returns the plaintext key unchanged. The caller receives no indication that encryption was skipped. There is no WARNING log message, no exception, and no return value that distinguishes "encrypted" from "plaintext (failed)."
+
+**Impact**: Keys stored in plaintext without the developer or user being aware. While `cryptography` is listed in `pyproject.toml` dependencies, installation failures or environment issues could silently degrade security.
+
+**Recommendation**: Either (a) raise a `RuntimeError` if encryption is unavailable at startup, refusing to run without it, or (b) at minimum, log a prominent warning at WARNING level so the user/developer is aware that encryption is degraded.
+
+---
+
+### 🟡 F6 — Hardcoded developer codes + no brute-force protection
+
+**File**: `backend/main.py:151`
+
 ```python
 _BUILTIN_CODES: set[str] = {"ANDY", "MENG"}
 ```
-PyInstaller 打包的 EXE 可通过 `pyinstxtractor` + `uncompyle6` 反编译提取字符串。任何人拿到 EXE 都能看到这两个激活码。
-**修复:** 删除硬编码码，改用全环境变量 + 远程拉取：
+
+**Description**: Developer activation codes are hardcoded as short, predictable strings in source code. Anyone who reads the source can activate developer mode. Additionally, the `/api/dev/activate` endpoint has no rate limiting or brute-force protection — an attacker can attempt unlimited activation codes without delay.
+
+**Impact**: Developer mode unlocks all tiers including `paid_3` (platform-provided API keys). An attacker with source code access can activate dev mode and use platform-provided LLM keys. While the app is local-only, if the remote config system is enabled and platform keys are configured, this could lead to unauthorized consumption of paid LLM quotas.
+
+**Recommendation**:
+1. Remove hardcoded codes from source; use environment variable only (`VSUB_DEV_CODES`).
+2. Add rate limiting to `/api/dev/activate` (e.g., 5 attempts per minute per source).
+3. Consider using longer, randomly-generated activation codes (e.g., `python -c "import secrets; print(secrets.token_urlsafe(16))"`).
+
+---
+
+### 🟡 F7 — `_effective_tier()` in dev mode trusts client-supplied tier without verification
+
+**File**: `backend/main.py:451-464`
+
 ```python
-_BUILTIN_CODES: set[str] = set()
+def _effective_tier(requested: str) -> str:
+    if _dev_mode_active:
+        tier = requested if requested in TIER_FEATURES else "free"
+        return tier  # ← trusts client directly, no audit log
+    return "free"
+```
+
+**Description**: When dev mode is active, the client-supplied `tier` parameter is accepted without any server-side verification against the activation code's allowed tier. The activation mechanism grants access to dev mode, but dev mode grants access to ALL tiers unconditionally. There is no audit trail or logging when `paid_3` tier (platform keys) is used.
+
+**Impact**: Any activated developer can use `paid_3` tier (platform-provided LLM keys). While this is partially by design (devs need to test all tiers), there is no audit trail, tier differentiation between activation codes, or usage tracking.
+
+**Recommendation**: If tier differentiation is desired, extend the activation code system to include tier metadata. For example, store `{"code": "ANDY", "tier": "paid_3", "fingerprint": "..."}` in `activation.json` and gate `_effective_tier()` based on the stored tier. At minimum, add an audit log entry when dev mode is used with `paid_3` tier to track platform key consumption.
+
+---
+
+### 🟡 F8 — Machine fingerprint uses only two easily-spoofed values
+
+**File**: `backend/main.py:277-283`
+
+```python
+def _machine_fingerprint() -> str:
+    parts = [str(_uuid.getnode()), _os.name]
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+```
+
+**Description**: The activation binding fingerprint consists of only two components: MAC address (`uuid.getnode()`) and OS name (`os.name`). On some systems, `uuid.getnode()` returns a fallback random value rather than a real MAC. The fingerprint hash is truncated to 16 hex characters (64 bits), which discards entropy from the SHA256 output.
+
+**Impact**: An attacker who knows the target's MAC address and OS could forge the activation file on another machine. The MAC address is visible on local networks (ARP tables). On virtual machines and containers, MAC addresses are often predictable.
+
+**Recommendation**: Add more entropy sources: `platform.node()` (hostname), `getpass.getuser()` (username), `platform.platform()` (OS details). Use the full SHA256 hash (64 characters) instead of truncating to 16 — the storage cost is negligible.
+
+---
+
+### 🟡 F9 — Baidu backend log messages may expose API parameters
+
+**File**: `backend/translation/baidu.py:63-64`
+
+```python
+except Exception as e:
+    _log.warning("百度翻译失败: %s", e)
+```
+
+**Description**: If the Baidu API request raises an exception (e.g., `HTTPError`), the exception object is logged. `HTTPError` objects include the full URL in their string representation. While the Baidu API uses MD5 signing (not a direct key in the URL), the `appid`, `salt`, and query text are present. More broadly, the log scrubbing layer in `key_manager.py` (`scrub_logs`) uses regex patterns for common key formats (`sk-...`, `AIza...`), but would not catch a Baidu secret if it appeared in a log message.
+
+**Impact**: Low, but the log scrubbing layer has demonstrated gaps. If a translation backend ever logs the raw API key in an error message, the scrub patterns may not catch it (e.g., Doubao or GLM keys don't have a recognizable prefix like `sk-`).
+
+**Recommendation**: Expand `KEY_PATTERNS` in `key_manager.py` to include a generic "Bearer token in log" pattern. Additionally, override exception handling in each translation backend to sanitize the error message before logging — strip query parameters from URLs, and never include the raw API response body in log messages at INFO level or above.
+
+---
+
+### 🟡 F10 — `worker_manager` reads stderr from worker without log scrubbing
+
+**File**: `backend/worker_manager.py:122-129`
+
+```python
+def _read_stderr(self, job_id: str, proc: subprocess.Popen):
+    for line in proc.stderr:
+        line_str = line.rstrip()
+        _log.debug("[worker:%s stderr] %s", job_id, line_str)
+```
+
+**Description**: The worker subprocess's stderr output is logged at DEBUG level without passing through `scrub_logs()`. While the worker process uses `_ScrubFormatter` for its own logging (user.log and debug.log), third-party libraries (faster-whisper, ctranslate2, librosa, torch) writing directly to stderr/stderr would bypass the worker's formatter. If a library's error or warning message happened to include sensitive data, it would appear in the main server's log unsanitized.
+
+**Impact**: Low probability but a defense-in-depth gap. The worker's stderr is mostly C++ library output (faster-whisper progress, ffmpeg warnings) that is unlikely to contain API keys. However, if a future translation backend outputs debug info to stderr, there is no safety net.
+
+**Recommendation**: Import `scrub_logs` and apply it to the stderr line before logging:
+```python
+from .key_manager import scrub_logs
+# ...
+_log.debug("[worker:%s stderr] %s", job_id, scrub_logs(line_str))
 ```
 
 ---
 
-## 🟡 Important
+### 🟡 F11 — `local_path` mode enables arbitrary filesystem reads
 
-### S3. 前端 localStorage 明文存储 API Key
-**文件:** [index.html:726-727](frontend/index.html#L726-L727)
+**File**: `backend/main.py:574-608`
+
+```python
+local_path = cfg.pop("local_path", "")
+if not local_path or not _os_module.path.isfile(local_path):
+    return JSONResponse({"error": f"找不到文件：{local_path or '(空路径)'}"}, status_code=400)
+# ...
+with open(local_path, "rb") as src:
+```
+
+**Description**: The `/api/jobs` endpoint accepts a `local_path` parameter and reads any file the backend process has access to. There is no restriction to video file extensions, no validation that the path is within an expected directory, and no guard against reading system files. The file content is not returned to the client (only hashed), but the error message confirms or denies file existence (information disclosure).
+
+**Impact**: An attacker with the ability to make HTTP requests to `localhost:8766` could read any file the user can access. While the app is local-only, a malicious website on the same machine could exploit DNS rebinding or simply make fetch requests to localhost. The file content isn't returned, but existence is confirmed, and the file is read into process memory.
+
+**Recommendation**: Restrict `local_path` to only video file extensions (`.mp4`, `.ts`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.flv`, `.webm`). Additionally, validate that the resolved absolute path is within the user's home directory or a whitelist of directories.
+
+---
+
+### 🟢 F12 — pywebview developer tools potentially accessible
+
+**File**: `desktop.py:156-163`
+
+```python
+webview.create_window(
+    "Video Subber — 视频字幕生成",
+    URL,
+    width=1100, height=750,
+    resizable=True,
+    min_size=(800, 500),
+)
+```
+
+**Description**: pywebview's `create_window()` does not have an explicit parameter to disable developer tools or right-click context menus. Depending on the platform and pywebview version, right-clicking may open a context menu with "Inspect Element" or similar. On some backends, keyboard shortcuts (F12, Ctrl+Shift+I) may open developer tools.
+
+**Impact**: A user with physical access could open dev tools and inspect JavaScript state, potentially viewing API keys from `State.settings.apiKeys` in memory (keys remain in JS memory after being sent to the backend). For a local desktop app, physical access typically implies trust, so this is low risk.
+
+**Recommendation**: If supported by the pywebview version, add `text_select=False` or explicitly disable the context menu. Alternatively, clear `State.settings.apiKeys` key values from JavaScript memory after the key is successfully sent to the backend.
+
+---
+
+### 🟢 F13 — WebSocket has no authentication
+
+**File**: `backend/main.py:844-853`, `backend/ws_manager.py`
+
+```python
+@app.websocket("/ws/{job_id}")
+async def websocket_progress(websocket: WebSocket, job_id: str):
+    await ws_manager.register(job_id, websocket)
+```
+
+**Description**: The WebSocket endpoint accepts connections without any authentication. Anyone who knows a job ID (or guesses one) can connect and receive real-time progress updates, including segment counts, current stage, progress percentage, and final success/failure counts.
+
+**Impact**: An attacker on the same machine could monitor video processing jobs. No sensitive data (API keys, video content, translation text) is transmitted over WebSocket — only progress metadata, segment counts, and final status. Acceptable risk for a local desktop app.
+
+**Recommendation**: Consider adding a simple session token (random value generated at server start, embedded in the frontend HTML) if multi-user support or network-accessible deployment is planned.
+
+---
+
+### 🟢 F14 — Job ID entropy: 40 bits
+
+**File**: `backend/main.py:589,619`
+
+```python
+jid = uuid.uuid4().hex[:10]
+```
+
+**Description**: Job IDs are generated from UUID4 truncated to 10 hex characters = 40 bits of entropy (approximately 1.1 trillion possibilities). Collision probability with single-digit active jobs is negligible (birthday paradox not relevant at these scales). However, guessability at 40 bits means an attacker making 1000 HTTP requests/second would need approximately 34 years to enumerate the full space.
+
+**Impact**: Minimal. An attacker on the same machine could try to guess job IDs to access WebSocket streams or download results, but the search space is too large for practical brute-force attacks over HTTP. For context, the V2.10 audit's S5 noted that this was "borderline" — the practical risk has not changed.
+
+**Recommendation**: Use full UUID4 hex (32 characters, 122 bits) for future-proofing. The extra bytes in filenames, URLs, and JSON responses are negligible.
+
+---
+
+### 🟢 F15 — `innerHTML` with user-supplied filenames in frontend
+
+**File**: `frontend/index.html:907-918` (`addJobCard`), `envBar.innerHTML` assignments
+
 ```javascript
-const cfg={..., apiKeys:State.settings.apiKeys, ...};
-localStorage.setItem('video-subber-config',JSON.stringify(cfg));
+card.innerHTML =
+    `<div class="job-card-header"><span class="job-card-name">${filename}</span>...`;
 ```
-用户的 LLM API Key 以明文存入浏览器 localStorage。虽然这是本地应用，但：
-- 浏览器扩展可以读取 localStorage
-- 如果用户共用电脑，他人打开同一浏览器即可看到 Key
-- 后端 `key_manager.py` 做了 Fernet 加密，但前端的 localStorage 副本绕过了这个保护
-**修复:** 前端 localStorage 仅存 `{platform, name, model}` 元数据，key 值只通过 POST `/api/config` 加密存储到后端 `config.json`。页面加载时从后端拉回脱敏列表。
 
-### S4. 机器指纹仅用 MAC + OS 名，换机破解门槛低
-**文件:** [main.py:277-283](backend/main.py#L277-L283)
-```python
-parts = [str(_uuid.getnode()), _os.name]
+**Description**: The frontend uses `innerHTML` extensively with dynamic values including `filename` (from user's video file or `local_path` input) and `jid` (server-generated). A maliciously crafted filename (e.g., `<img src=x onerror=alert(1)>.mp4`) could execute JavaScript when inserted via `innerHTML`. The `local_path` value is typed by the user and inserted into the DOM directly.
+
+**Impact**: Since the app is local-only (127.0.0.1), the attacker would need to trick the user into selecting a file with a malicious name, or typing an XSS payload into the local path input. This is a self-XSS scenario with minimal practical risk.
+
+**Recommendation**: Use `textContent` for text values. When HTML structure is needed, HTML-encode the variable parts:
+```javascript
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 ```
-Windows 上修改 MAC 地址只需几秒（设备管理器 → 网络适配器 → 高级 → Network Address）。一旦复制激活文件 + 修改 MAC，即可在另一台机器上激活。
-**修复:** 增加硬件绑定因子：
+
+---
+
+### 🟢 F16 — `pyproject.toml` uses `>=` version pins without hash verification
+
+**File**: `pyproject.toml:11-20`
+
 ```python
-import platform, getpass
-parts = [
-    str(uuid.getnode()),           # MAC
-    platform.node(),               # 机器名
-    getpass.getuser(),             # 用户名
-    platform.platform(),           # OS 详情
+dependencies = [
+    "cryptography>=44.0",
+    "faster-whisper>=1.0",
+    ...
 ]
 ```
 
-### S5. `_fetch_remote_json` 无证书验证
-**文件:** [main.py:135-145](backend/main.py#L135-L145)
-```python
-req = _urllib.Request(url, headers={"User-Agent": "VideoSubber"})
-resp = _urllib.urlopen(req, timeout=5)
-```
-`urllib.request.urlopen` 默认验证 HTTPS 证书，这是正确的。但没有设置更严格的超时和重试策略。如果攻击者控制了 DNS/网络（同一 WiFi），可中间人攻击注入伪造的激活码列表。
-**修复:** 添加 SSL 证书固定（certificate pinning）或在请求中添加 `context` 参数。
+**Description**: All dependencies use minimum version constraints (`>=`) without upper bounds or hash verification. A compromised upstream package could publish a malicious update that gets installed on the next `pip install` or `uv sync`.
 
-### S6. Worker 子进程无输入验证防护
-**文件:** [worker.py:199-216](backend/worker.py#L199-L216)
-Worker 从 `config.json` 读取所有参数并直接使用。`video_path` 传给了 ffmpeg 和 Whisper。如果恶意构造的 config.json 包含 `"video_path": "/etc/passwd"` 或 `"; rm -rf /"`，理论上有风险。
-**实际风险评估:** 
-- ffmpeg 子进程使用 list-form args（`["ffmpeg", "-i", video_path, ...]`）→ **安全**，不会命令注入
-- config.json 由主进程（main.py）写入，非用户直接控制 → **低风险**
-- 路径遍历：`video_path` 可指向任意文件，但 ffmpeg 只读不写 → **低风险**
-**建议:** 在 worker 启动时验证 `video_path` 是合法的视频文件扩展名。
+**Impact**: Supply-chain attack vector. An attacker compromising the `deep-translator` PyPI package could publish a malicious version that exfiltrates API keys. The existing `uv.lock` file provides reproducible builds but does not verify package signatures or authenticity.
 
-### S7. activation.json 无完整性校验
-**文件:** [main.py:286-302](backend/main.py#L286-L302)
-`_load_activation()` 仅检查 `activation.json` 存在且指纹匹配。如果用户手动编辑 JSON 修改指纹字段，激活码验证会失败（因为指纹对不上），这是安全的。但没有文件篡改检测（HMAC/签名），高级用户可能绕过。
-**实际风险:** 本地应用 + 低单价（¥1-3），攻击 ROI 很低。**可延后。**
+**Recommendation**: For production builds (PyInstaller EXE), use `pip install --require-hashes` with a fully-pinned `requirements.txt` that includes SHA256 hashes. Commit `uv.lock` to version control and verify it hasn't been tampered with in CI.
 
 ---
 
-## 🟢 Low / Info
+### 🟢 F17 — `GET /api/config` decryption path conflicts with plaintext storage
 
-### S8. 子进程安全：无 `shell=True`
-对所有 subprocess 调用做了代码审计：
-- [extractor.py:16](backend/core/extractor.py#L16): `subprocess.run([...], capture_output=True)` — list form, safe
-- [subtitler.py:173](backend/core/subtitler.py#L173): `subprocess.run([...], capture_output=True)` — list form, safe
-- [worker_manager.py:45-53](backend/worker_manager.py#L45-L53): `subprocess.Popen([...])` — list form, safe
+**File**: `backend/main.py:511-523`
 
-**全部安全，无命令注入风险。**
-
-### S9. 日志脱敏覆盖范围
-- Worker 子进程：`_ScrubFormatter` 包装了 `scrub_logs()` → user.log 和 debug.log 均脱敏 ✅
-- Worker stdout JSON IPC：通过 `emit()` 发送，包含 `message` 字段。`_friendly_error()` 已将技术错误转为用户友好消息 → API Key 不应出现在 JSON 消息中 ✅
-- 主进程 stderr (worker_manager): `_log.debug("[worker:%s stderr] %s", ...)` — 如果 worker 子进程的 stderr 包含 Key（如 C++ 库的调试输出），可能泄露到 uvicorn 控制台。但 Whisper/faster-whisper/ffmpeg 的 stderr 不会包含 API Key → 低风险 🟡
-
-### S10. CORS 配置
 ```python
-allow_origins=["http://127.0.0.1:8766", "http://localhost:8766"]
+@app.get("/api/config")
+def get_config():
+    cfg = load_config()
+    for k in cfg.get("apiKeys", []):
+        if "key" in k:
+            try:
+                k["key"] = mask_key(decrypt_api_key(k["key"]))
+            except Exception:
+                k["key"] = "···（解密失败）"
+    return cfg
 ```
-仅允许本地访问。其他本机应用（如恶意网页 running on localhost:3000）无法跨域调用 API。✅ 安全。
 
-### S11. 依赖供应链
-pyproject.toml 声明的依赖：
-| 包 | 版本 | 风险 |
-|---|---|---|
-| fastapi | >=0.115 | 活跃维护，低风险 |
-| uvicorn | >=0.34 | 活跃维护，低风险 |
-| faster-whisper | >=1.0 | 活跃维护，低风险 |
-| cryptography | >=44.0 | 官方库，低风险 |
-| librosa | >=0.10 | 音频处理，低风险 |
-| resemblyzer | >=0.1 | 小众但稳定，低风险 |
+**Description**: The `GET /api/config` endpoint attempts to `decrypt_api_key()` on stored keys. Since keys are currently stored in plaintext (see F1), the Fernet `decrypt()` call raises an exception (Fernet tokens have a specific format that plaintext doesn't match), and the exception handler sets the key to "decryption failed" in Chinese. This means the frontend receives corrupted key masks.
 
-无已知严重漏洞的依赖。建议在发布前运行一次 `pip-audit` 或 `uv lock --check` 做最终确认。
+The frontend then merges this corrupted value into `State.settings.apiKeys`, and on the next `saveConfig()`, the corrupted mask string is written back to disk, permanently destroying the actual key value.
 
-### S12. 本地文件路径注入
-应用支持粘贴本地路径（`local_path`）。后端用 `os.path.isfile()` 验证路径存在。如果用户输入 `../../../etc/passwd`，`os.path.isfile()` 会正确解析并拒绝（如果文件不存在或不合法）。但 `os.path.isfile()` 接受任意可读文件——用户可以传入非视频文件（如系统 DLL），导致 ffmpeg 报错。**不会造成损害，但错误信息不够友好。** 🟢
+**Impact**: This is a data-loss bug triggered by F1. Any existing plaintext keys in `config.json` will be corrupted on the first `GET /api/config` call after server restart. If F1 is fixed and keys are encrypted before saving, this endpoint works correctly.
 
-### S13. 密码输入框
-**文件:** [index.html:327](frontend/index.html#L327)
-```html
-<input type="password" id="apiKeyInput" placeholder="粘贴 API Key">
-```
-API Key 输入使用 `type="password"` + `autocomplete="off"` → 浏览器不会保存。✅
+**Recommendation**: Fix F1 first (encrypt keys on save, decrypt on load). This endpoint will then work as designed. For robustness, add a guard: if the stored value doesn't look like a Fernet token (doesn't start with `gAAAAA`), treat it as legacy plaintext and either encrypt-on-read or mask it directly without attempting decryption.
 
 ---
 
-## 总结
+## Architecture Positives
 
-| 类别 | 数量 | 上线前必须修 |
-|------|------|-------------|
-| 🔴 Critical | 2 | S1, S2 |
-| 🟡 Important | 5 | S3（localStorage 明文） |
-| 🟢 Low | 6 | 无 |
+These security design choices are well-implemented and worth noting:
 
-### 安全就绪度评分: **6.5/10**
+1. **Binding to 127.0.0.1 only** (`main.py:902`, `desktop.py:132`): The server correctly binds to localhost only, preventing remote network access.
 
-扣分项：
-- S1（Windows 崩溃）: -2.0
-- S2（激活码泄露）: -0.5
-- S3（localStorage 明文 Key）: -0.5
-- S4（弱指纹）: -0.5
+2. **CORS restricted to localhost** (`main.py:18-21`): CORS allows only `http://127.0.0.1:8766` and `http://localhost:8766`, blocking cross-origin requests from other domains.
 
-### 上线建议
+3. **Log scrubbing infrastructure** (`key_manager.py:63-67`, `worker.py:52-54`): The `_ScrubFormatter` wrapping all log handlers is a proactive defense against accidental key leakage in logs. Both `user.log` and `debug.log` pass through `scrub_logs()` before being written to disk.
 
-S1 必须修复（否则 EXE 无法启动）。S2 和 S3 如果首批用户是受控内测（信任用户），可暂缓；公网发布则必须修。S4-S7 对 ¥1-3 价位的本地工具而言，攻击 ROI 太低，不是实际威胁。
+4. **Fernet encryption via PBKDF2** (`key_manager.py`): The encryption algorithm choice (Fernet with 100,000 PBKDF2 iterations) is sound. The main issue is integration, not algorithm selection — the lock is good, it just isn't being used.
 
-_子进程参数使用 list form（无 shell injection）、Fernet 加密 Key、CORS 仅 localhost、日志脱敏——安全基础架构是好的。_
+5. **Machine-bound activation** (`main.py:286-302`): Activation files include a machine fingerprint, preventing simple file copying to other machines. The mechanism is not bulletproof but raises the bar above trivial bypass.
+
+6. **No API keys on WebSocket**: WebSocket messages carry only progress metadata (stage, percent, message). API keys travel only over REST endpoints and are never broadcast to WebSocket listeners.
+
+7. **Frontend strips keys from localStorage** (`frontend/index.html:739`): The `saveConfig()` function correctly strips key values before writing to `localStorage`, keeping plaintext keys only in JavaScript memory.
+
+8. **All subprocess calls use list-form args** (`subprocess.Popen([...])`, `subprocess.run([...])`): No `shell=True` anywhere in the codebase. Zero command injection risk in subprocess calls.
+
+9. **`type="password"` on API key input** (`frontend/index.html:327`): Browser will not autocomplete or save the key value.
+
+10. **Deduplication does not leak data**: The hash index system (`GLOBAL_HASH_INDEX`) uses SHA256 hashes of file content + config, never storing or comparing plaintext API keys.
+
+---
+
+## Threat Model
+
+Video Subber V2.11 is a **single-user local desktop application**. The primary threats are:
+
+| Threat Actor | Capability | Mitigation Status |
+|-------------|------------|-------------------|
+| Malicious website (DNS rebinding to localhost) | Make HTTP requests to `127.0.0.1:8766` | CORS restricts to localhost origin ✅ |
+| Local malware / another user on same machine | Read `~/.video-subber/config.json` | Plaintext key storage means no protection 🔴 F1 |
+| Source code reader (open source, decompiled EXE) | Extract hardcoded credentials | Baidu keys exposed 🔴 F2; dev codes exposed 🟡 F6 |
+| Network eavesdropper (same LAN) | Capture HTTP traffic to external APIs | TLS on all external API calls ✅; Gemini key in URL weakens this 🟡 F3 |
+| Physical access to unlocked machine | Open pywebview dev tools, read files | Plaintext keys + dev tools = full exposure 🟢 F12 |
+| Compromised PyPI package | Publish malicious update | `>=` pins without hashes 🟢 F16 |
+
+---
+
+## Prioritized Remediation Plan
+
+### Before Release (Must Fix)
+
+| Priority | Finding | Effort | Description |
+|----------|---------|--------|-------------|
+| P0 | F1 | Medium | Wire `encrypt_api_key` into `PUT /api/config` save path; wire `decrypt_api_key` into worker config load |
+| P0 | F2 | Trivial | Remove hardcoded Baidu credentials; use env var only; rotate compromised keys immediately |
+| P1 | F3 | Small | Move Gemini API key from URL query string to `x-goog-api-key` request header |
+
+### Next Iteration (Should Fix)
+
+| Priority | Finding | Effort | Description |
+|----------|---------|--------|-------------|
+| P2 | F4 | Small | Generate random salt on first run, store in `~/.video-subber/.salt` |
+| P2 | F5 | Trivial | Raise error or log prominent warning if `cryptography` unavailable |
+| P2 | F6 | Small | Remove hardcoded dev codes; add rate limiting to activate endpoint |
+| P2 | F7 | Small | Add tier metadata to activation records; audit log for `paid_3` usage |
+| P2 | F8 | Small | Add more entropy sources to machine fingerprint |
+| P3 | F9 | Small | Sanitize exception messages in all translation backends |
+| P3 | F10 | Trivial | Apply `scrub_logs()` in `_read_stderr` |
+| P3 | F11 | Small | Restrict `local_path` to video extensions and/or home directory |
+
+### Future (Nice to Have)
+
+| Priority | Finding | Effort | Description |
+|----------|---------|--------|-------------|
+| P4 | F12 | Small | Disable context menu / dev tools in pywebview if possible |
+| P4 | F15 | Small | Replace `innerHTML` with safe DOM construction or HTML-encoding |
+| P4 | F16 | Medium | Add `--require-hashes` to build process |
+| P4 | F17 | Trivial | Add plaintext-vs-encrypted guard in `get_config()` |
+| P4 | F14 | Trivial | Use full UUID4 hex for job IDs |
+
+---
+
+## Conclusion
+
+V2.11 has a solid security architecture for a local desktop application, with deliberate choices around localhost binding, CORS restriction, log scrubbing, and machine-bound activation. The three critical findings (F1, F2, F3) are all integration gaps rather than design flaws:
+
+- **F1**: The encryption layer exists but is not connected to the save/load path (the lock is installed but the door isn't closed).
+- **F2**: Production credentials in source code (a common but severe oversight — also flagged in V2.10 audit as S2, not yet fixed).
+- **F3**: API key in URL (a well-known anti-pattern with a straightforward fix).
+
+All three are fixable with targeted, low-risk changes. Once addressed, the application's security posture would be appropriate for a local desktop tool handling third-party API credentials.
+
+**Security Readiness Score: 6.0/10** (downgraded from V2.10's 6.5 due to newly discovered F1, F2, F3)
+
+Scoring breakdown:
+- F1 (plaintext keys): -1.5
+- F2 (hardcoded Baidu creds): -1.0
+- F3 (Gemini key in URL): -0.5
+- F4-F5 (encryption hardening): -0.5
+- F6-F11 (defense-in-depth): -0.5
+
+---
+
+*Report generated by automated security audit. No dynamic testing was performed. Findings based on static code analysis of all backend Python files, frontend HTML/JS, and desktop launcher.*

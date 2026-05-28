@@ -1,123 +1,294 @@
-# Steve Jobs 最终审查 — V2.10 上线就绪度
+# Steve Jobs Final Review -- Video Subber V2.11
 
-审查日期：2026-05-28
-已阅读：Code Review / Security Audit / Design Review / Health / QA / Engineering Review（6 份）
-
----
-
-## 一句话判断
-
-**This product has a soul. But it's not ready to ship. Three things stand between you and launch. Fix them, then get it in front of real users.**
+**Date**: 2026-05-28
+**Reviewer**: Steve Jobs perspective
+**Sources**: Code Review, Security Audit, Design Review, Health Report, Desktop Port Design, QA Report (6 reports)
+**Question**: Is V2.11 ready to ship as a Windows EXE?
 
 ---
 
-## 我喜欢的地方
+## Verdict: No-Go
 
-"拖进去，等一会，就能看懂。"
+This is not ready to ship. There are six problems that a real user would hit in their first five minutes with the EXE. Three of them are deal-breakers on their own. Fix these six, and we have something worth putting in front of beta testers. Ship without fixing them, and we have an EXE where the progress bar never moves, API keys sit in plaintext on disk, and anyone who runs `strings` on the binary can steal paid API credentials.
 
-这句话不是 marketing copy。这是产品的整个定义。iPod 是 "1,000 songs in your pocket"——不是"5GB 容量的便携式 MP3 播放器"。你的产品也是一样——"Drag it in, wait, and you understand"——不是"基于 Whisper 模型的视频字幕自动生成工具"。如果你不能用一句话定义一个产品，这个产品就有问题。你做到了。
-
-**设计有意图。** Design Score B+, AI Slop 评分 A-。你知道这两者的区别吗？大多数开发者的界面看起来像是 AI 吐出来的——紫色渐变、三个特性卡片、圆形图标。你的界面看起来像是一个人坐在那里想过的。Apple 的配色系统（`#f5f5f7`, `#0071e3`）、有层次的圆角（6px → 10px → 12px → 16px → 20px）、暗色模式下的表面层级——这些不是偶然的。这是有意为之。
-
-**架构干净。** 7 个 LLM 后端，每个 ~35 行，共享一个基类。加一个新平台只需 ~25 行代码。这不是巧合——这是好的设计。`LLMBackend` 基类、子类只重写三个方法、`translate_raw` 和 `translate_batch` 由基类统一提供——这才是我说的"模块化"。不是把代码拆成 50 个文件就叫模块化。真正的模块化是：每个模块只做一件事，可以独立替换。
-
-**前后端一致性做对了。** 14 个 API 端点全部通过，字段名一致，错误消息中文化。你知道有多少产品在上线前一天才发现前端发 `burn` 后端读 `burn_subtitles` 吗？很多。你提前检查了。
+Let me be precise.
 
 ---
 
-## 挡在发布面前的东西
+## The Six Things That Must Be Fixed Before Anyone Touches This EXE
 
-### 🔴 必须修（2 小时）
+These are not debatable. They are not "nice to have." They are things a user will encounter, will be confused or angry about, and will tell their friends not to use this software.
 
-**1. `os.getuid()` — 这是砖墙，不是 bug。**
+### 1. FROZEN Mode Progress Is Completely Broken (C1 from Code Review)
 
-`key_manager.py:24`。一行代码。Windows 上 `import key_manager` 直接崩溃。不是某个功能坏了——是整个应用不存在。用户双击 EXE，什么都不会发生。打包一个在目标平台上无法启动的 EXE，这是不可接受的。
+**Files**: `desktop.py:81-90`, `backend/worker.py:538-545`
 
-修它。`os.getuid()` → `getpass.getuser()`。10 分钟。
+This is the most embarrassing one. The entire point of V2.11 is to package as a Windows EXE. In that EXE, the progress bar stays at 0%. The whole time. From start to finish. The user sits there staring at a dead screen while the app does real work underneath.
 
-**2. 版本号 "2.08" 到处都是。**
+The root cause: `stderr_progress()` in `worker.py` writes progress to stdout -- but in FROZEN/exe mode, there is no parent process reading stdout. The 17 progress calls that drive the pipeline UI (extract, transcribe, translate, subtitle, burn) all vanish into a pipe nobody reads. Meanwhile, `desktop.py` correctly patches `_worker.emit` to route through WebSocket -- but `stderr_progress` bypasses `emit` entirely.
 
-`main.py:469` 返回 `"version": "2.08"`。前端标题写 `v2.10`。`.version` 文件强制写回 `"2.08"` 每次启动。
+The fix is straightforward: either replace `stderr_progress` in the same way `desktop.py` already replaces `emit`, or make `stderr_progress` internally detect FROZEN mode and call the emit path. One file, one concept, about 20 lines of code.
 
-如果你连版本号都搞不清楚，用户怎么报告 bug？"我在 2.08 上遇到问题"——但根本没有 2.08 这个公开发布版本。这是注意力的细节。而细节就是一切。
+**If we ship with this, the EXE is broken. There is no point in packaging.**
 
-**3. 死代码。**
+### 2. User API Keys Are Stored in Plaintext on Disk (F1 from Security + D2 from Health)
 
-orchestrator.py 383-384 行有两行永远不可达的代码——`return` 在上面已经把函数结束了。main.py 有 `UploadFile, File, Form` 三个死导入。concurrent.futures 导入了但从未使用。
+**Found independently by two different reviewers using two different methods. This is the strongest signal in all six reports.**
 
-死代码不是无害的。它让阅读代码的人停下来思考"这段逻辑是做什么的？"——然后发现什么都不做。每一次停顿都是对信任的消耗。删掉它们。
+**Files**: `backend/main.py:526-531`, `backend/config_manager.py:35-38`, `backend/key_manager.py:39-42`
+
+The encryption infrastructure exists. Fernet with 100,000 PBKDF2 iterations. The lock is manufactured and bolted to the door. But nobody ever connected the lock to the door frame.
+
+The save path (`PUT /api/config` -> `config_manager.save_config()`) does a raw `json.dump()`. The load path (`worker.py` reading config) reads plaintext directly. `encrypt_api_key()` and `decrypt_api_key()` exist, are correctly implemented, and have zero callers in the production code path. The health report flagged `encrypt_api_key()` as dead code. The security audit traced the entire save flow end-to-end and confirmed the gap.
+
+Two changes needed:
+- In `main.py` `save_config()`: iterate `apiKeys`, call `encrypt_api_key()` on each plaintext key before writing
+- In `worker.py`: call `decrypt_api_key()` on each key when loading config for translation
+- In `main.py` `get_config()`: add a guard for legacy plaintext values (they won't look like Fernet tokens starting with `gAAAAA`) so existing keys aren't corrupted
+
+The encryption code is already written. It needs to be called.
+
+**Users trust us with their API keys. Plaintext storage is a betrayal of that trust.**
+
+### 3. Hardcoded Baidu Production Credentials in Source Code (F2 from Security)
+
+**File**: `backend/translation/baidu.py:5-6`
+
+```python
+BAIDU_APP_ID = os.environ.get("BAIDU_APP_ID", "20260520002616499")
+BAIDU_SECRET = os.environ.get("BAIDU_SECRET", "NGw5pcrCkfDqe6gpygvT")
+```
+
+These are live, paid Baidu Translate API credentials. They ship in the source. Anyone who runs `strings` on the EXE can extract them. Anyone who reads the open-source repo can use them. This was flagged in the V2.10 security audit (S2) and was not fixed. It is now flagged again in V2.11.
+
+The fix is trivial: remove the hardcoded defaults, use environment variables only with empty-string fallbacks. Then rotate the compromised credentials on Baidu's console immediately (this report will exist on disk; treat the current credentials as burned).
+
+**Two audits, same finding, still not fixed. This is not a technical problem. It is a discipline problem.**
+
+### 4. Gemini API Key Leaked Through URL Query String (F3 from Security)
+
+**File**: `backend/translation/gemini.py:29-36`
+
+The Gemini backend puts the API key in the URL as a query parameter:
+```python
+url = f"...?key={self._key}"
+```
+
+When the HTTP request fails -- and HTTP requests do fail -- the `HTTPError` exception includes the full URL in its string representation. That traceback goes into `debug.log`. Now the user's Gemini API key is sitting in a plaintext log file on disk.
+
+Google's Gemini API supports the `x-goog-api-key` HTTP header. The key belongs in a header, not in a URL. This is a one-line change to the request construction plus adding the header to `_build_headers()`.
+
+**Keys in URLs is a well-known anti-pattern. The fix is documented in the security audit report. Do it.**
+
+### 5. Double-Clicking the EXE Opens Two Broken Windows (A4 from Desktop Port Design)
+
+**File**: `desktop.py` (no single-instance lock exists)
+
+Current behavior when the user double-clicks the EXE twice:
+1. Instance 1 starts, uvicorn binds port 8766, works fine
+2. Instance 2 starts, uvicorn fails to bind port 8766 (address in use)
+3. Instance 2's health poll loop times out silently (see item 6 below)
+4. Instance 2 opens a webview window anyway, pointed at a server that isn't running
+5. User sees two windows -- one working, one showing a connection error
+
+The fix: before opening any window, try to bind port 8766. If it's taken, another instance is already running. Bring the first instance's window to front (or just exit cleanly). About 30 lines of Python in `desktop.py`.
+
+**First-run experience matters. Two windows, one broken, is a terrible first impression.**
+
+### 6. Health Poll Timeout Opens a Blank Error Window (A1-1 from Desktop Port Design)
+
+**File**: `desktop.py:143-151`
+
+When the backend server fails to start within 5 seconds (slow machine, cold start, model scanning), the health poll loop exits silently. No error check. No "did it actually connect?" The code proceeds to `webview.create_window()` pointing at a server that isn't running. The user sees a blank white page with a connection error. No explanation. No retry. No "something went wrong" dialog.
+
+Fix: after the 50-iteration poll loop, check whether the health check actually succeeded. If not, show a clear error message (at minimum `print()` and `sys.exit(1)`, ideally a native error dialog). Do not open a window pointed at nothing.
+
+**Silent failure is the worst kind of failure. The user should never see a blank white page.**
 
 ---
 
-### 🟡 上线前至少要开始做
+## What Should Be Fixed Before Giving This to Beta Testers
 
-**4. 零测试。不是开玩笑。**
+These are not release blockers. An internal tester can work around them. But they cause friction, and friction in beta means bad feedback and wasted time.
 
-Health 报告给 5.5/10，其中 20% 权重的"测试覆盖"得了 0 分。
+### 7. Window Close Kills Workers Without Cleanup (A1-2 from Desktop Port Design)
 
-我知道你会说什么——"这是 v1.0，我们手动测试过了，流水线跑通了。"当我做初代 Mac 的时候，我们也没有自动化测试。我们用人肉测试。但当时我们有 100 个 A player，而且软件只有几百 K。
+Closing the window kills uvicorn's daemon thread. Worker subprocesses become orphans, keep consuming CPU/GPU. Cache files being written at close time may be corrupted. No "a job is running, are you sure?" confirmation.
 
-你现在有 4,681 行代码。你的加密模块（`key_manager.encrypt/decrypt`）如果坏了——用户的 API Key 全部丢失。你的配置哈希函数（`_config_hash`）如果坏了——所有缓存去重逻辑崩溃。你的字幕断句函数（`_split_zh_into_sentences`）如果坏了——用户看到的字幕是一团乱麻。
+Fix: register a close handler via pywebview's `window.events.closing` that cancels all running jobs, waits briefly, then shuts down cleanly.
 
-你不需要 100% 覆盖率。你需要覆盖 4 个函数：加密、去重、断句、错误翻译。写 4 个单元测试。总共 50 行代码。这就够了——对你现在的规模来说。
+### 8. Download Links Don't Work in pywebview (A6-1 from Desktop Port Design)
 
-**5. 激活码 "ANDY" 和 "MENG" 硬编码在源码里。**
+In a browser, `<a href="/api/jobs/x/download/srt">` triggers the browser's download manager. In pywebview, the file either opens in the system browser or gets rendered inline. The user clicks "Download SRT" and nothing visible happens.
 
-任何人反编译你的 EXE（PyInstaller 打包的 EXE 用 `pyinstxtractor` 解包只需要 30 秒）就能看到这两个码。
+Fix: expose a native save-file dialog through pywebview's JS bridge (`window.pywebview.api`). Download button calls the bridge, Python shows a "Save As" dialog via `tkinter.filedialog` or `win32com`, then downloads to the chosen path.
 
-这是安全问题吗？不完全是——你的产品卖 ¥1-3，没人会费劲破解。但这是品味问题。把开发者名字写死在产品代码里，这是业余行为。改成环境变量注入。
+### 9. Activation Code System Has No Tier Differentiation (B2 from Desktop Port Design)
 
----
+All activation codes grant full `paid_3` access. There is no way to give a beta tester `paid_1` (bring your own keys) without also giving them platform-provided LLM keys. Every activation code is a master key.
 
-### 🟢 可以等（公网发布前）
+Fix: add tier metadata to activation codes (`{"code": "...", "tier": "paid_1", "fingerprint": "..."}`), then cap `_effective_tier()` based on the activation code's granted tier. The 7 specific changes are documented in the Desktop Port Design report, Section B2.
 
-**6. Windows 适配测试。**
+### 10. Frontend Tier Display Uses Wrong Data Source (W1 from Code Review)
 
-QA 报告的最大盲区：一切测试都在 macOS 上完成。字体回退（PingFang SC → Microsoft YaHei → Segoe UI）、路径分隔符（`\` vs `/`）、ffmpeg 位置检测——这些逻辑已经写了，但从未在 Windows 上跑过。
+**File**: `frontend/index.html:510-531`
 
-你需要一台 Windows VM。或者找一个有 Windows 笔记本的朋友。花一个下午。跑一遍完整流水线。你会发现问题——一定会有。但这些问题不一定阻塞内测。
+The frontend decides what tier UI to show based on `State.settings.tier` (local JS state) instead of `data.current_tier` (the backend's authoritative tier resolution). In normal operation they match. But when the backend downgrades a request, the frontend shows features the user can't actually use.
 
-**7. EV Code Signing 证书。**
+Fix: switch three tier checks from `State.settings.tier` to `data.current_tier`.
 
-没有签名的 EXE 在 Windows 上会被 SmartScreen 拦截。用户双击后会看到蓝色的"Windows 已保护你的电脑"警告，然后需要点"更多信息"→"仍要运行"。70% 的用户在这一步放弃。签名证书 ~$300-500/年。对于公开上线来说这是必须的。对于内测——告诉用户忽略警告就行了。
+### 11. Minimum Window Height Is Too Small (D1 from Design Review)
 
-**8. 前端 13 处 console.log。**
+The minimum window is 800x500. Actual content needs ~1182px vertically. On first open, even with everything collapsed, the user sees only the upload area and maybe one setting. Everything below requires scrolling.
 
-不是安全问题。不是功能问题。是 polish 问题。一个产品如果 console 里全是 debug 日志，就感觉像半成品。删掉它们——或者在 build step 里剥离。
+Fix: raise `min_size` from `(800, 500)` to `(800, 650)` in `desktop.py:162`. One line.
 
----
+### 12. Progress Bar Pulse Animation Only During Transcription (D16 from Design Review)
 
-## 我的最终判断
+The progress bar's `working` pulse animation only activates during the transcribe stage (10-35%). Translation can consume 45% of total pipeline time with a completely static progress bar. The user thinks the app froze.
 
-**现在可以内测。不能公网发布。**
-
-修完 C1（`os.getuid()`）、C2/C3（版本号）、C4（死代码），然后在 10 个受信用户中做内测。不要等所有东西都完美了再发布——完美是迭代出来的，不是设计出来的。
-
-让真实用户告诉你什么最重要。他们会发现我没发现的问题、你的代码审查没发现的问题、QA 测试没发现的问题。六份审查报告加起来不如 10 个真实用户用一周。
-
-**Minimum viable launch checklist:**
-
-| # | 任务 | 时间 | 阻塞 |
-|---|------|------|------|
-| 1 | 修 `os.getuid()` → `getpass.getuser()` | 10 min | 内测 |
-| 2 | 版本号 "2.08" → "2.10" 全部替换 | 10 min | 内测 |
-| 3 | 删 orchestrator 不可达代码 + main.py 死导入 | 10 min | 内测 |
-| 4 | `key_manager` + `_config_hash` + `_friendly_error` 单测 | 1 h | 公网 |
-| 5 | Windows VM 上跑一遍完整流水线 | 2 h | 公网 |
-| 6 | 激活码改为全环境变量，删除硬编码 | 30 min | 公网 |
-| 7 | PyInstaller .spec + Windows 打包 | 1 h | 公网 |
-| 8 | EV Code Signing | 1-3 天 | 公网 |
+Fix: extend the pulse animation to all `running`/`queued` states. About 5 lines in `handleCardMsg()`.
 
 ---
 
-## One more thing...
+## What Can Wait (Public Release / V2.12)
 
-你知道吗——这个产品的 27 项功能清单，从 V2.01 到 V2.10 迭代了 10 个版本。每次只做一件事，做好，锁定，再进入下一个。这是对的。
+These are real issues. They should be fixed eventually. They do not block beta.
 
-但 10 个版本之后，你的版本号还写着 "2.08"。你的 health endpoint 还在说 2.08。你的 `.version` 文件还在强制写 2.08。你写的每一行代码都经过仔细思考，但你忘了更新三个字符串。
+### From Design Review -- 8 Quick Wins (~20 minutes total)
 
-这就是为什么细节重要。不是因为这些字符串本身重要——是因为如果你忘了更新版本号，你还会忘了什么？
+| ID | Issue | Fix |
+|----|-------|-----|
+| D3 | Dark mode dashed border barely visible | Change `--border` dark value to `#8e8e93` |
+| D6 | Subtitle preview box invisible in dark mode | Add `border:1px solid #555` in dark mode |
+| D17 | Two overlay backgrounds have different opacity (0.4 vs 0.5) | Unify to 0.5 |
+| D18 | Five buttons use inline styles instead of CSS classes | Extract button classes |
+| D19 | Input padding inconsistent (6px vs 8px) | Unify to 8px 12px |
+| D2 | Toast: no exit animation, no stacking, no close button, no type differentiation | Rewrite with CSS transitions |
+| D8 | Model dots have no hover state | Add `:hover { border-color: var(--blue) }` |
+| D20 | Native `confirm()` dialog breaks visual consistency | Replace with custom modal |
 
-修掉它。然后把这个产品交到用户手里。用户不需要完美的产品——用户需要一个有用的产品。你这个产品有用。
+### From Health Report -- Dead Code Cleanup (~15 minutes)
 
-**Verdict: APPROVED for private beta. Fix the 3 blockers, ship to 10 users, iterate.**
+- Remove 4 unused imports: `key_manager.py:os`, `gemini.py:time`, `gemini.py:TranslationResult`, `base.py:field`
+- Delete `get_video_duration()` in `extractor.py` (V1.3 legacy, zero callers)
+- Mark 7 `understand_context()` methods as `# TODO(V3)` or move to base class
+- Mark `usage_reporter.py` as V3 placeholder (90 lines, all no-op until `SERVER_URL` is set)
+
+### From Security Audit -- Defense-in-Depth
+
+| ID | Issue |
+|----|-------|
+| F4 | PBKDF2 salt is hardcoded -- generate random salt per installation |
+| F5 | `encrypt_api_key()` silently returns plaintext if `cryptography` unavailable |
+| F6 | Hardcoded dev codes "ANDY"/"MENG" in source |
+| F8 | Machine fingerprint uses only MAC + OS name -- add more entropy |
+| F9-F11 | Log sanitization gaps in Baidu backend and worker stderr reader |
+
+### From Code Review -- Minor
+
+| ID | Issue |
+|----|-------|
+| C2 | Five dead DOM elements from old single-task UI (never visible to user) |
+| C3 | `showError()` function never called (dead code) |
+| W2 | Font list hardcoded to macOS fonts only |
+| W3 | `onModelChange()` flash when switching to custom platform |
+| W4 | `usage_reporter.replay_fallback()` never called |
+| W5 | `DEFAULT_CONFIG` missing `burn`, `subtitles`, `contextAware` fields |
+| W6 | `_llmFallbackPending` declared but never used |
+| W7 | `handleCardMsg` ignores `token_usage` messages |
+| W8 | `GET /api/jobs/{id}` fallback path returns incomplete fields |
+
+### From QA
+
+| ID | Issue |
+|----|-------|
+| Q4 | Download endpoint 404 error is in English ("not found") while job query endpoint is Chinese ("未找到该任务") |
+
+---
+
+## What Is Actually Good
+
+I want to be clear: a lot of this product is right.
+
+**The pipeline works.** QA tested a 718MB real video end-to-end. Transcription, hallucination filtering, language detection, translation, checkpoint caching -- all correct. The worker correctly identified and discarded a music hallucination segment ("ТРЕВОЖНАЯ МУЗЫКА"). That is non-trivial engineering that took multiple versions to get right.
+
+**The security architecture is well-designed.** Localhost binding only. CORS restricted to 127.0.0.1. Log scrubbing infrastructure in place. Fernet encryption with 100,000 PBKDF2 iterations. All subprocess calls use list-form args. Zero `shell=True`. The architecture has taste. The failures are integration failures (the encryption exists but isn't connected), not design failures.
+
+**The UI has soul.** The design review gave an A- on the AI Slop Score. No purple gradients. No floating blobs. No three-column emoji cards. Apple HIG influence throughout. 12 CSS custom properties with proper light/dark theming. A clear, restrained design language. The hero copy is human: "拖进去，等一会，就能看懂" -- that is a product definition, not marketing copy.
+
+**The API error messages are in Chinese.** QA verified 6 of 8 error paths return Chinese messages. The 404 that was English in V2.10 (Q1) is now Chinese in V2.11. This attention to detail matters for the target audience.
+
+**V2.10 bugs were actually fixed.** Health report confirmed all three V2.10 critical issues resolved (dead imports removed, unreachable code eliminated, 13 console.log statements cleaned). QA confirmed the 404 localization and version number fixes. Follow-through is real.
+
+**Frontend key hygiene is thoughtful.** `saveConfig()` explicitly strips API key values from localStorage before writing. Only metadata is persisted client-side. The encryption key manager exists and is correctly implemented. The architecture anticipates the threat model.
+
+---
+
+## Cross-Report Validation
+
+One of the most useful signals in a multi-review process is when different reviewers, looking at different things, independently find the same problem. Here are the cross-validated findings:
+
+| Problem | Found By | Signal Strength |
+|---------|----------|----------------|
+| API keys stored in plaintext | Security (F1) + Health (D2) | **Strongest** -- security traced the save path forward, health found the dead encrypt function backward |
+| Hardcoded Baidu credentials | Security V2.10 (S2) + Security V2.11 (F2) | **Strong** -- same finding across two audit cycles, still not fixed |
+| FROZEN progress loss | Code Review (C1) + QA (FROZEN mode untested) | **Strong** -- critical path broken for the exact use case V2.11 is built for |
+| No graceful shutdown | Desktop Design (A1-2) | **Standalone but well-analyzed** |
+| No single-instance lock | Desktop Design (A4) | **Standalone but high user impact** |
+| Activation tier system missing | Desktop Design (B2) + Security (F7) | **Moderate** -- both note lack of tier gating |
+
+The strongest signal is the API key encryption gap. The security audit found it by tracing the save path end-to-end. The health report found it by scanning for dead functions. Two completely different methodologies converged on the same conclusion. This is not a false positive.
+
+---
+
+## The Scorecard
+
+| Dimension | Score | What It Means |
+|-----------|-------|---------------|
+| Core pipeline | 9/10 | Works. Tested with real video. No crashes. Hallucination filter active and correct. |
+| Security architecture | 7/10 | Well designed. Three integration gaps. |
+| Security implementation | 4/10 | Plaintext keys + hardcoded creds + key in URL. |
+| UI design quality | 8/10 | Tasteful. Apple-influenced. Not AI slop. |
+| UI polish | 6/10 | 17 spacing values, 11 font sizes across 995 lines. |
+| Desktop readiness | 3/10 | No progress in EXE. No single-instance lock. No graceful shutdown. Downloads broken in webview. |
+| Code quality | 5.5/10 | Zero tests. Dead code. But clean syntax, good types, solid architecture. |
+| QA coverage | 7/10 | Core flows tested. Windows, WebSocket, 7 LLM backends untested. |
+| **Overall** | **5.5/10** | **Not ready. Clear path to ready.** |
+
+---
+
+## Path to Go
+
+Fix these six items, in this order:
+
+| # | Item | Time | Source |
+|---|------|------|--------|
+| 1 | FROZEN progress loss -- route `stderr_progress` through emit in FROZEN mode | 30 min | Code Review C1 |
+| 2 | Plaintext API key storage -- wire encrypt/decrypt into save/load paths | 1 hour | Security F1 + Health D2 |
+| 3 | Hardcoded Baidu credentials -- remove defaults, rotate keys on Baidu console | 15 min | Security F2 |
+| 4 | Gemini key in URL -- move to `x-goog-api-key` header | 20 min | Security F3 |
+| 5 | Single-instance lock -- port-binding check before window open | 45 min | Desktop A4 |
+| 6 | Health poll timeout -- error check after poll loop, don't open blank window | 15 min | Desktop A1-1 |
+
+**Total: about 3 hours of focused work.**
+
+After these six are fixed, the EXE will function correctly for a user. Then fix the six Should-Fix items (7-12 above, about 4 more hours) before giving it to beta testers.
+
+After beta feedback, tackle the Nice-to-Have items before public release.
+
+---
+
+## Final Word
+
+This product has a soul. The pipeline is real engineering -- hallucination filtering, checkpoint caching, multi-backend translation with priority fallback. The design has taste -- someone sat down and thought about it. The error messages are in Chinese because someone cared enough to translate them. These are not small things.
+
+But shipping an EXE where the progress bar never moves is like shipping an iPod where the screen stays black while music plays. It does not matter how good the rest is. The thing the user sees is broken.
+
+Fix the six. Then ship the beta. Then make it great.
+
+**No-Go. Fix the six blocking items. Come back.**
+
+---
+
+*"Details matter. It's worth waiting to get it right."*

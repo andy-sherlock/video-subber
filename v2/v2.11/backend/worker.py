@@ -225,7 +225,7 @@ def main():
             raise ValueError(f"config.translationMode 无效: {cfg['translationMode']}")
         if "subtitles" in cfg and cfg["subtitles"] not in ("yes", "no", None):
             raise ValueError(f"config.subtitles 无效: {cfg['subtitles']}")
-        if "tier" in cfg and cfg["tier"] not in ("free", "paid_1", "paid_3", None):
+        if "tier" in cfg and cfg["tier"] not in ("free", "vip", "svip", None):
             raise ValueError(f"config.tier 无效: {cfg['tier']}")
 
     _validate_config(config)
@@ -387,7 +387,7 @@ def main():
             failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
 
             # ── LLM 失败降级弹窗 ──
-            _is_paid = tier in ("paid_1", "paid_3")
+            _is_paid = tier in ("vip", "svip")
             _all_failed = len(failed) == total and total > 0
             if _is_paid and _all_failed:
                 stderr_progress("translate", 40, "LLM 翻译全部失败，等待用户选择…")

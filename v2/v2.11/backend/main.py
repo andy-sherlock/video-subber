@@ -57,12 +57,12 @@ def _task_key(file_hash: str, cfg: dict) -> str:
 
 # === Tier definitions ===
 # "free": Google + Baidu only. No LLM. Speed/Quality modes both work.
-# "paid_1": user provides own LLM API keys. Context-aware translation unlocks.
-# "paid_3": platform provides LLM keys. Full features.
+# "vip": user provides own LLM API keys. Context-aware translation unlocks.
+# "svip": platform provides LLM keys. Full features.
 TIER_FEATURES = {
-    "free":    {"llm": False, "context_aware": False, "max_llm_keys": 0},
-    "paid_1":  {"llm": True,  "context_aware": True,  "max_llm_keys": 10},
-    "paid_3":  {"llm": True,  "context_aware": True,  "max_llm_keys": 0, "platform_keys": True},
+    "free":  {"llm": False, "context_aware": False, "max_llm_keys": 0},
+    "vip":   {"llm": True,  "context_aware": True,  "max_llm_keys": 10},
+    "svip":  {"llm": True,  "context_aware": True,  "max_llm_keys": 0, "platform_keys": True},
 }
 
 # Available LLM backends — add new ones here and they appear in the UI automatically.
@@ -226,7 +226,7 @@ def _fetch_remote_models():
         )
 
 
-# ── Platform keys (paid_3 tier) ────────────────────────────
+# ── Platform keys (SVIP tier) ──────────────────────────────
 
 _PLATFORM_KEYS_CACHE: list[dict] = []
 
@@ -456,7 +456,7 @@ def _effective_tier(requested: str) -> str:
     """
     if _dev_mode_active:
         tier = requested if requested in TIER_FEATURES else "free"
-        # In dev mode with platform keys set, allow paid_3
+        # In dev mode with platform keys set, allow svip
         return tier
 
     # Production: everyone is free. LLM access is gated by whether the
@@ -484,11 +484,34 @@ def get_env(simulate: str = ""):
     return data
 
 
+# ── Model download ──
+
+@app.get("/api/models/status")
+def model_status():
+    """Return download status for all 5 models."""
+    from .model_manager import get_model_status
+    return get_model_status()
+
+
+@app.post("/api/models/download/{model_id}")
+def model_download(model_id: str):
+    """Start downloading a model."""
+    from .model_manager import start_download
+    return start_download(model_id)
+
+
+@app.delete("/api/models/download/{model_id}")
+def model_cancel(model_id: str):
+    """Cancel an in-progress model download."""
+    from .model_manager import cancel_download
+    return cancel_download(model_id)
+
+
 @app.get("/api/backends")
 def get_backends(tier: str = "free"):
     """Return ENABLED backends + current tier info.
 
-    Dev mode: ?tier=paid_3 works (for testing).
+    Dev mode: ?tier=svip works (for testing).
     Production: tier is always 'free'. LLM access is gated by user's own API keys.
     """
     from .translation.google import GoogleBackend
@@ -512,14 +535,11 @@ def get_backends(tier: str = "free"):
 def get_config():
     """Return user config from ~/.video-subber/config.json. API keys are masked."""
     from .config_manager import load_config
-    from .key_manager import decrypt_api_key, mask_key
+    from .key_manager import mask_key
     cfg = load_config()
     for k in cfg.get("apiKeys", []):
         if "key" in k:
-            try:
-                k["key"] = mask_key(decrypt_api_key(k["key"]))
-            except Exception:
-                k["key"] = "···（解密失败）"
+            k["key"] = mask_key(k["key"])
     return cfg
 
 

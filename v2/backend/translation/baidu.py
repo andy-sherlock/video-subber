@@ -2,8 +2,8 @@
 import os, json, time, hashlib, random, logging, urllib.request, urllib.parse
 from .base import TranslationBackend, TranslationResult
 
-BAIDU_APP_ID = os.environ.get("BAIDU_APP_ID", "20260520002616499")
-BAIDU_SECRET = os.environ.get("BAIDU_SECRET", "NGw5pcrCkfDqe6gpygvT")
+BAIDU_APP_ID = os.environ.get("BAIDU_APP_ID", "")
+BAIDU_SECRET = os.environ.get("BAIDU_SECRET", "")
 
 _log = logging.getLogger("baidu")
 

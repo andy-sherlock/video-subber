@@ -1,257 +1,510 @@
-# Design Review — V2.10 上线前审查
+# Design Review — V2.11 上线前审查
 
 审查日期：2026-05-28
-页面类型：APP UI（单页工具应用）
-审查方式：CSS/HTML 静态分析 + 浏览器实际渲染
+审查范围：`frontend/index.html`（995 行，内联 CSS + HTML + JS）
+桌面窗口：`desktop.py` 配置 1100x750（最小 800x500）
 
 ---
 
-## 设计评分
+## Design Score: B
 
-| 指标 | 评分 | 说明 |
+| 维度 | 评分 | 说明 |
 |------|------|------|
-| **Design Score** | **B+** | 整体干净专业，有明确的设计语言，少数细节可打磨 |
-| **AI Slop Score** | **A-** | 几乎无 AI 生成痕迹，设计有明确意图 |
+| 整体印象 | B+ | 干净、克制、设计语言明确 |
+| 7 区域布局 | B | 单列 680px 合理，小窗口下拥挤 |
+| 视觉一致性 | B | CSS 变量体系好，但行内样式泛滥 |
+| 交互逻辑 | B- | 状态覆盖全面，但细节毛刺多 |
+| 窗口适配 | B- | 800x500 最小窗口太紧，modal 和 toast 不受窗口尺寸影响 |
+| **综合** | **B** | 可用但有 19 个值得修的设计问题 |
 
 ---
 
-## Phase 1: First Impression
+## AI Slop Score: A-
 
-在浏览器中打开 http://127.0.0.1:8766 的第一感受：
+| 检测项 | 结果 |
+|--------|------|
+| 紫色/蓝色渐变背景 | 未检出 |
+| 3 列 feature 卡片 + emoji 图标 | 未检出 |
+| 均匀圆角（AI 模板特征） | 未检出 -- 6/10/12/16/20px 有层次 |
+| 装饰性 blob / 浮动形状 | 未检出 |
+| 通用 hero 文案 | 未检出 -- "拖进去，等一会，就能看懂" 独特 |
+| `system-ui` / `Inter` 字体 | 检出 `-apple-system` -- 桌面工具场景合理 |
+| 大量功能型 emoji | 检出 5 处（💡⚠ℹ🔧✓）-- 阈值内，非装饰滥用 |
+| 模板化区域节奏 | 未检出 -- 单页工具应用，布局有意图 |
 
-- **这个页面传达的是：** 一个严肃的工具。「拖进去，等一会，就能看懂」——一句话定义了产品。界面朴素、干净、没有装饰。
-- **我注意到：** 顶部四个环境状态圆点在正中央排成一行——这很好，用户一眼知道系统是否就绪。上传区（虚线框）是最大的视觉元素，入口清晰。
-- **视线前三落点：** ① 标题 "Video Subber" ② 大虚线框上传区 ③ 亮蓝色「选择视频文件开始」按钮。这三个落点完全正确——品牌 → 行动入口 → 行动按钮。
-- **如果要一个词形容：** 克制。
-
-**截断测试（Trunk Test）：**
-1. 这是什么网站？— Video Subber（标题清晰）PASS
-2. 我在哪个页面？— 单页应用，所有功能在眼前 PASS
-3. 主要分区？— 上传区 / 设置 / 按钮，区域分明 PASS
-4. 当前层级有什么选项？— 模型、翻译模式、字幕样式，清晰 PASS
-5. 我在哪里？— 单页，不适用 N/A
-6. 如何搜索？— 不需要搜索 PASS
-
-**Trunk Test: PASS**
+唯一的 AI Slop 减分项是 5 处 emoji 略多，以及 `-apple-system` 字体在 Windows 上回退到 Segoe UI 体验不统一。
 
 ---
 
-## Phase 2: 推断设计系统
+## 1. 桌面窗口适配
 
-### 颜色系统
+### 1.1 宽度适配
 
-从 CSS 变量提取：
-
-| Token | 日间 | 夜间 | 用途 |
-|-------|------|------|------|
-| `--bg` | `#f5f5f7` | `#1c1c1e` | 页面背景 |
-| `--card` | `#fff` | `#2c2c2e` | 卡片背景 |
-| `--text` | `#1d1d1f` | `#f5f5f7` | 正文 |
-| `--sub` | `#86868b` | `#98989d` | 次要文字 |
-| `--blue` | `#0071e3` | 同 | 主色调 |
-| `--red` | `#ff3b30` | 同 | 危险/错误 |
-| `--green` | `#34c759` | 同 | 成功 |
-| `--yellow` | `#ff9500` | 同 | 警告 |
-| `--border` | `#c7c7cc` | `#48484a` | 边框 |
-| `--surface` | `#f0f0f0` | `#3a3a3c` | 次级表面 |
-
-**评价：** 这套颜色是 Apple Human Interface Guidelines 的直接映射（`f5f5f7` = iOS 系统背景，`#0071e3` = Apple Blue，`#34c759` = Apple Green）。非 AI 生成——这是刻意模仿 macOS/iOS 原生应用视觉。对 Windows EXE 来说，这套颜色在 Windows 上会显得"外来"——Windows 用户习惯的是 Fluent Design（更灰、更平的色调）。
-
-### 字体
-
-```css
-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+```
+desktop.py: 1100x750 / min 800x500
+CSS:        .app { max-width:680px; padding:32px 20px 60px }
 ```
 
-- 首选 Apple 系统字体 + 苹方中文
-- Windows 上没有 SF Pro Text，会回退到 BlinkMacSystemFont（Windows 上渲染为 Segoe UI）
-- `-apple-system` 作为正文字体是「AI Slop 黑名单」第 11 条
-- **但这里例外：** 这是一个桌面工具，目标是看起来像原生应用。使用系统字体是正确的选择。
+| 窗口宽度 | 内容区 | 侧边留白 | 判定 |
+|----------|--------|----------|------|
+| 1100px | 680px | 210px/侧 | 宽裕，呼吸感好 |
+| 800px (min) | 680px | 60px/侧 | 偏紧但可行 |
 
-**建议：** 为 Windows 平台添加 `"Segoe UI"` 到字体栈前端。
+**结论：宽度在 800-1100px 范围内无溢出风险。** `max-width:680px` + `padding:20px*2` = 720px < 800px 最小窗口宽度。
 
-### 圆角系统
+### 1.2 高度适配 -- 主要问题
 
-| 元素 | 圆角 |
-|------|------|
-| 环境状态标签 | 20px（药丸形） |
-| 上传区 | 16px |
-| 卡片 | 12px |
-| 按钮 | 10px |
-| 选择框/输入框 | 6px |
-| Toast | 5px |
+**D1 -- 500px 最小高度严重不足 (line 28, line 158)**
 
-**评价：** 不一致的圆角通常是随意的。但这里是有意为之——大圆角用于 pill/container 元素，小圆角用于交互控件。有一个层次感。不是 AI 均匀圆角。
+实际内容估算（全部区域折叠后展开）：
+- Header: ~72px (title + subtitle)
+- Env bar: ~38px (4 个药丸标签)
+- Region 1 上传区: ~160px (dropzone 44px padding * 2 + 路径行 + 指引)
+- Region 2a 字幕设置: ~120px
+- Region 2b 字幕样式: ~200px (5 selects + preview + confirm)
+- Region 3 模型滑块: ~130px
+- Region 4 翻译模式: ~80px (toggle + info)
+- Region 5 API Key: ~120px (collapsed)
+- Region 6 高级设置: ~40px (collapsed)
+- Start 按钮: ~60px
+- Job cards: dynamic
+- 容器 padding: 32px top + 60px bottom = 92px
+- Cards margin: 7 * 10px = 70px
 
-### 间距
+**总计：~1182px** 内容在一个 500px 高的窗口中。用户首次打开时，即使所有可折叠区域都收起，能看到的也只有上传区和 1-2 个设置卡片。**必须滚动**。
 
-`max-width: 680px` + `padding: 32px 20px 60px`
+**建议：** `min_size` 从 `(800, 500)` 提高到 `(800, 650)`，或将区域 2b/5/6 默认折叠。
 
-680px 对于视频字幕工具来说偏窄。在 1100px 的桌面窗口中，两侧各有 210px 空白。虽然这创造了干净的阅读线，但也浪费了空间——模型滑块、优先级列表、API Key 列表可以受益于更宽的布局。
+### 1.3 Modal / Overlay 适配
 
----
+| Overlay | 行号 | 宽度 | 窗口适配 |
+|---------|------|------|----------|
+| `.error-overlay` | 159-163 | `max-width:400px` | 在 800px 窗口中居中，OK |
+| `.dev-login-overlay` | 165-169 | `max-width:360px;width:90%` | 响应式宽度，OK |
+| `#llmFallbackOverlay` | 382-391 | `max-width:360px;width:90%` | 复用 dev-login 样式，OK |
 
-## Phase 3: 逐元素审查
+Modal 全部使用 `position:fixed;inset:0` 覆盖整个 webview viewport，不受内容区 `max-width:680px` 限制。在 800x500 最小窗口中仍然可以完整显示（error box ~150px 高 + dev login box ~280px 高，都 < 500px）。
 
-### 区域 1：上传区
-**Strengths:**
-- 虚线边框 + 大点击区域——上传入口清晰
-- 拖拽和点击双支持
-- 文件选中后显示文件名 + 大小
-- 本地路径输入有跨平台指引（Mac Cmd+Opt+C / Windows Shift+右键）
+**结论：Modal 无窗口适配问题。**
 
-**Issues:**
-- 🟡 **D1**: 上传区虚线边框在暗色模式下对比度低。`#c7c7cc` 在白色背景上清晰，但暗色模式下的 `#48484a` 与 `#2c2c2e` 卡片背景区分度不足。暗色模式下虚线几乎看不见。
+### 1.4 Toast 适配
 
-### 区域 2：环境栏
-**Strengths:**
-- 四个状态圆点并排，一目了然
-- 安装指引悬浮展开，不打扰
+**D2 -- Toast 硬编码 fixed 定位，无窗口边界安全区 (line 772-776)**
 
-**Issues:**
-- 🟢 **D2**: 环境栏的 `justify-content: center` 在小屏幕上导致换行时左边参差不齐。建议改为 `flex-start`。
+```javascript
+// line 774
+t.style.cssText='position:fixed;bottom:20px;right:20px;...'
+```
 
-### 区域 3：Whisper 模型滑块
-**Strengths:**
-- 5 点 + 双向箭头——把技术参数（模型大小）转化为直觉操作（快/准）
-- 用户不需要知道 "large-v3" 是什么——只需要知道更右 = 更准但更慢
-- 下方显示"当前：medium（推荐，~1.5GB）"——信息充分
-
-**Issues:**
-- 🟡 **D3**: 圆点间距均匀，但 tiny→base→small→medium→large-v3 之间的实际性能差距不是线性的。tiny→base 可能只差 50MB，但 medium→large-v3 差了 1.5GB。视觉上的"等距"可能误导。不过这属于产品设计选择，不是视觉问题。
-
-### 区域 4：翻译模式
-**Strengths:**
-- 极速/质量优先——两个按钮切换，清楚
-- 质量模式下优先级列表可拖拽排序
-- `[?]` 标记说明（ℹ）+ 灰色小字，不打断视觉流
-
-**Issues:**
-- 🟡 **D4**: 优先级拖拽排序的视觉反馈不够。`dragstart` 时设置 `opacity: 0.5`，但被拖拽的元素没有"抬起"效果（无阴影，无缩放）。用户可能在拖拽时不确定是否在拖。
-
-### 区域 5：LLM/API Key 管理
-**Strengths:**
-- 付费功能灰色可见但不可操作——FOMO 驱动升级
-- 平台下拉 + 模型选择 + 命名 + Key 输入 + 添加——流程线性
-- Key 后四位打码显示
-
-**Issues:**
-- 🟡 **D5**: 免费用户看到的"LLM 智能翻译为付费功能，即将在后续版本上线"——"后续版本"是模糊承诺。建议改为具体描述或直接说"升级后可用"。
-- 🟢 **D6**: API Key 输入框 placeholder "粘贴 API Key" 在输入后消失。使用 `type="password"` 是正确的，但没有"显示/隐藏"切换按钮——用户无法确认粘贴的内容是否正确。
-
-### 区域 6：字幕样式
-**Strengths:**
-- 5 个选择器（字体/字号/颜色/描边/宽度）+ 黑底实时预览
-- 预览文字"変身！必殺技全開！"包含中日混合——展示了实际字幕效果
-- 需要点击"确认样式"才生效——防止误操作
-
-**Issues:**
-- 🟢 **D7**: 预览框背景固定黑色——与暗色模式无关，是正确的（模拟视频画面）。但字号选择器用 px 值（16/20/24/28）对非设计师用户不够直观。建议加一个"预览字号"的描述。
-
-### 区域 7：整体布局 & 窗口适配
-**Strengths:**
-- 单列 680px 布局，在 1100px 窗口居中——干净
-- `@media(prefers-reduced-motion:reduce)` 已处理——无障碍意识
-
-**Issues:**
-- 🟡 **D8（重要）**: 在 800px 最小窗口宽度下（desktop.py 设置 `min_size=(800,500)`），680px 内容 + 40px padding = 720px < 800px。OK 能放下。但 500px 高度非常紧张——7 个区域 + header + job cards + 按钮，需要滚动。在首次打开时，上传区（大虚线框 44px padding × 2 = 88px）、环境栏、多个卡片区域，500px 高度下用户看到的内容非常有限。
-- 🟢 **D9**: `transition` 在 `*` 通配符上——`*,*::before,*::after{transition:background-color .3s,border-color .3s}`。这在页面加载时会对所有元素触发过渡动画，造成初始加载时的"闪烁"。建议只对暗色模式切换需要的元素添加过渡。
+Toast 在 800px 窗口中有足够空间，但 `right:20px` 在 webview 环境中可能与窗口装饰（滚动条）重叠。无 `max-width` 限制，长消息会撑到窗口边缘。
 
 ---
 
-## Phase 4: 交互流审查
+## 2. 7 区域逐区审查
 
-### 流程：拖视频 → 设置 → 开始 → 等待 → 下载
+### Region 1: 上传区 (lines 226-246)
 
-1. **打开页面：** 环境栏检测、模型滑块、翻译模式——全部就绪。上传区居中醒目。按钮灰色"选择视频文件开始"——明确告知第一步。
-2. **拖入视频：** 上传区 hover 变蓝，拖放后显示文件名和大小，按钮变蓝"开始生成字幕"——反馈及时。
-3. **点击开始：** 设置锁定（灰色不可操作），进度条出现，轮询 WebSocket 更新时间——loading 状态完整。
-4. **处理中：** 百分比 + 阶段文字。按钮保持灰色不可操作。卡片实时更新。
-5. **完成：** 下载链接出现。设置解锁。按钮文案变为"已完成（修改设置后可重跑）"。
-
-**评价：** 交互流覆盖了 loading、empty、error、success 四个状态。按钮文案随状态变化（6 种不同文案），进度分阶段展示。
-
-**Issues:**
-- 🟡 **D10**: 上传文件模式（FormData + XMLHttpRequest）的进度百分比只在按钮上显示（"上传中… 45%"）。但没有进度条——用户不知道上传还要多久。大文件（5GB）上传可能需要几分钟，只有文字百分比不够直观。
-- 🟡 **D11**: 设置锁定的样式是 `opacity: 0.45`——视觉上变灰了，但这是全部控件统一的模糊，没有锁的图标或文字说明为什么不能操作。用户可能以为界面卡住了。
-- 🟢 **D12**: cancel 确认用原生 `confirm()` 弹窗——在 2026 年的桌面应用中使用浏览器原生弹窗，风格与应用不统一。但作为 MVP 可接受。
-
----
-
-## Phase 5: 暗色模式审查
+**D3 -- 暗色模式下虚线边框不可见 (line 51, line 18-22)**
 
 ```css
-@media(prefers-color-scheme:dark){
-  :root{
-    --bg:#1c1c1e;--card:#2c2c2e;--text:#f5f5f7;--sub:#98989d;
-    --border:#48484a;--surface:#3a3a3c;
-  }
+/* line 51 */
+.dropzone{border:2px dashed var(--border);...}
+```
+
+暗色模式下 `--border: #636366` vs `--card: #2c2c2e`，对比度仅约 2.1:1。虚线在暗色卡片上几乎看不到。日间模式 `--border: #c7c7cc` vs `--card: #fff` 对比度约 2.5:1 同样偏低 -- 但在日间模式下更明显因为绝对亮度更高。
+
+**建议：** 虚线边框单独设色，暗色模式下 `border-color: #636366`（当前值）应改为 `#8e8e93` 或更高。
+
+**D4 -- 展开指引无 max-height / overflow (line 60-62)**
+
+```css
+/* line 61 */
+.local-path-guide .expand{display:none;margin-top:4px;line-height:1.8;padding:8px 12px;...}
+```
+
+点击展开时内容追加到文档流中，无 `max-height` 过渡也无 `overflow-y:auto`。当前内容很短（约 4 行），不构成实际问题。但如果未来内容增长，这是隐患。
+
+### Region 2a: 字幕设置 (lines 249-272)
+
+**D5 -- Burn warning 显示/隐藏无过渡 (line 266, line 589)**
+
+```javascript
+// line 589
+$('burnWarn').style.display=State.settings.burn?'block':'none';
+```
+
+警告框突然出现/消失，无任何高度/透明度过渡。视觉上生硬。
+
+### Region 2b: 字幕样式 (lines 275-289)
+
+**D6 -- 字幕预览框背景硬编码 (line 127)**
+
+```css
+/* line 127 */
+.style-preview-box{background:#1a1a1a;color:#fff;...}
+```
+
+日间模式下 `#1a1a1a` 是页面中唯一的大面积深色块，视觉上割裂但可以接受（模拟视频黑底）。暗色模式下，`#1a1a1a` 与 `--bg: #1c1c1e` 几乎无法区分 -- 预览框失去边界感。
+
+**建议：** 暗色模式下给预览框添加 `border:1px solid #555` 或浅色 outline。
+
+**D7 -- 5 个 select 在窄屏下换行不整齐 (line 277-283)**
+
+5 个 `<select>` 元素（字体/字号/颜色/描边/描边宽度）放在一个 `flex-wrap:wrap` 的 `.row` 中。在 680px 宽度下可以一行排开（~550px 总宽）。但在 480px 模拟窗口下会换行成 3+2 或 2+2+1，看起来凌乱。
+
+### Region 3: Whisper 模型滑块 (lines 292-302)
+
+**D8 -- 圆点无 hover 状态 (line 82-84, line 598)**
+
+```css
+/* line 82-84 */
+.model-dot-circle{width:20px;height:20px;border-radius:50%;background:var(--card);border:2px solid var(--border);transition:all .2s}
+.model-dot-circle.active{...}
+```
+
+`.model-dot-circle` 只有 `.active` 状态样式，没有 `:hover` 伪类。鼠标悬停时无视觉反馈。对比 toggle 按钮有完整的 `.active` 颜色变化。
+
+**建议：** 添加 `.model-dot-wrap:hover .model-dot-circle { border-color: var(--blue); }`
+
+**D9 -- 等距视觉可能误导性能差异的非线性 (line 79, line 594-600)**
+
+5 个圆点均匀分布在线条上。但 tiny (150MB) 到 base (300MB) 差距 150MB，medium (1.5GB) 到 large-v3 (3GB) 差距 1.5GB -- 差了 10 倍。视觉等距暗示性能等距，实际不是。这是产品设计选择而非视觉 bug，但值得注意。
+
+### Region 4: 翻译模式 (lines 305-315)
+
+**D10 -- Priority 拖拽排序反馈弱 (line 97-98, line 615-618)**
+
+```css
+/* line 97 */
+.priority-item{...cursor:grab;...}
+```
+
+`dragstart` 时只设置 `opacity:0.5`（line 615），被拖拽元素没有"抬起"效果（`box-shadow` / `scale`）。用户在拖拽时可能不确定是否成功开始拖拽。
+
+**建议：** 拖拽中的元素添加 `box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: scale(1.02);`
+
+### Region 5: API Key 管理 (lines 318-333)
+
+**D11 -- API 行元素动态显示/隐藏造成布局跳动 (line 107-116, line 630-669)**
+
+```css
+/* line 115 */
+.api-custom-model{display:none;...}
+.api-custom-model.visible{display:inline-block}
+```
+
+用户在平台下拉中选择不同平台时，模型下拉框、自定义模型输入框、API 端点输入框会突然出现/消失。Flex 布局中的其他元素会随之跳动。无过渡也无占位保留。
+
+**建议：** 使用 `visibility:hidden` + `position:absolute` 或保留 flex 占位来避免跳动。
+
+**D12 -- API 行在小窗口下换行凌乱 (line 107-108, line 322-329)**
+
+```html
+<!-- line 322-329: 6 个元素在一个 flex-wrap row 里 -->
+<select id="apiPlatform"><!-- ~100px --></select>
+<select id="apiModel" style="display:none"><!-- ~120px --></select>
+<input id="apiCustomModel" ...><!-- ~120px -->
+<input id="apiModelName" ... style="display:none"><!-- 隐藏 -->
+<input class="api-name-input" ...><!-- max-width:100px -->
+<input type="password" id="apiKeyInput" ...><!-- flex:1 -->
+<input id="apiEndpoint" ... style="display:none"><!-- 隐藏 -->
+<button ...>添加</button>
+```
+
+可见元素（platform select + name input + key input + button）在 680px 宽度可以一行排开。但在 480px 下会换行。换行后 button 可能会单独一行 -- 看起来像是布局错误。
+
+**D13 -- API Key 密码框无显示/隐藏切换 (line 327)**
+
+```html
+<input type="password" id="apiKeyInput" placeholder="粘贴 API Key">
+```
+
+用户粘贴 API Key 后无法确认内容是否正确。`type="password"` 是正确的安全选择，但缺少一个眼睛图标切换明文/密文。
+
+### Region 6: 高级设置 (lines 336-348)
+
+**D14 -- 非 dev 模式下整个区域被隐藏 (line 522)**
+
+```javascript
+// line 522
+$('advCard').style.display='none';
+```
+
+对于非 dev 模式用户，高级设置区域完全不显示。但高级设置中只有"上下文感知翻译"这一项，且它依赖 LLM。正确做法是保留折叠区域但禁用其中的控件（灰色+locked），并附说明"需要 LLM API Key"。
+
+**当前行为：** 免费用户看不到 `advCard`。他们不会知道这个功能存在。
+
+### Region 7: 任务卡片 + 进度条 (lines 177-193, 907-918)
+
+**D15 -- 主进度条与卡片进度条高度不一致 (line 141 vs line 183)**
+
+```css
+/* line 141 -- main progress section */
+.progress-bar{height:5px;...}
+/* line 183 -- job card */
+.job-card .progress-bar{height:4px;...}
+```
+
+5px vs 4px 是无意的差异还是刻意的层级区分？如果是刻意的，应该在注释中说明。
+
+**D16 -- 进度条 pulse 动画仅限 transcribe 阶段 (line 143, line 940)**
+
+```javascript
+// line 940
+if(msg.stage==='transcribe'&&msg.percent>=10&&msg.percent<35){
+  if(fill)fill.classList.add('working')
+}else{
+  if(fill)fill.classList.remove('working')
 }
 ```
 
-**Strengths:**
-- 遵循 Apple 暗色模式层级：bg < surface < card（从暗到亮递进）
-- 不对 accent colors（blue/red/green/yellow）做暗色调整——这些颜色在暗色背景上仍然可读
+`working` class 只在 `transcribe` 阶段 (10-35%) 才添加脉冲动画。其他阶段（extract 0-5%, translate 35-80%, subtitle 80-90%, burn 90-100%）进度条是静态的。用户可能以为处理卡住了--尤其是长耗时阶段（translate 可能占 45% 的时间却没有动画）。
 
-**Issues:**
-- 🟡 **D13**: 黑底预览框 `#1a1a1a` 在日间模式下是明显的暗色区域，正确。但在暗色模式下，`#1a1a1a` 与 `#1c1c1e` 背景几乎一样——字幕预览框失去了视觉分隔。
-- 🟢 **D14**: 没有手动切换暗色/日间模式的按钮——完全依赖系统设置。Windows 用户可能不知道如何切换。建议在设置/开发者工具栏加一个切换开关。
-- 🟢 **D15**: `box-shadow` 在暗色模式下仍使用 `rgba(0,0,0,...)`——暗色模式下的阴影应该是更深的暗色或更柔和的发光效果，而不是黑色阴影。
+**建议：** 所有 `running/queued` 状态都添加 pulse 动画，或者只在"等待"状态（排队、模型下载）使用动画。
 
 ---
 
-## Phase 6: AI Slop 检测
+## 3. 视觉一致性
 
-| 黑名单模式 | 状态 |
-|------------|------|
-| 紫色渐变背景 | ✅ 无 |
-| 3 列特性网格 | ✅ 无（单列布局） |
-| 彩色圆圈图标 | ✅ 无 |
-| 全居中布局 | ⚠️ header 居中，但内容区左对齐 |
-| 均匀圆角 | ✅ 有层次（6px→10px→12px→16px→20px） |
-| 装饰性 blob | ✅ 无 |
-| 大量 emoji | ⚠️ 有但功能性的（⚠️ℹ️✅💡🔧） |
-| 彩色左边框卡片 | ✅ 无 |
-| 通用 hero 文案 | ✅ "拖进去，等一会，就能看懂"——独特 |
-| 模板化区域节奏 | ✅ 单页应用，不适用 |
-| system-ui 主字体 | ⚠️ `-apple-system`，但桌面工具适用 |
+### 3.1 颜色系统
 
-**AI Slop Score: A-**（仅 emoji 使用略多）
+**Strengths:** 12 个 CSS 自定义属性定义完善，日间/暗色双主题覆盖。
+
+**违规（硬编码颜色）：**
+
+| 位置 | 行号 | 代码 | 问题 |
+|------|------|------|------|
+| 字幕预览框 | L127 | `background:#1a1a1a;color:#fff` | 不响应暗色模式 |
+| Toast | L774 | `background:#333;color:#fff` | 不响应主题 |
+| Error overlay | L159 | `background:rgba(0,0,0,.4)` | 日间/暗色统一用黑色遮罩 |
+| Dev login overlay | L165 | `background:rgba(0,0,0,.5)` | 与 error overlay 透明度不一致 |
+| Dropzone hover | L52 | `background:rgba(0,113,227,.04)` | 硬编码蓝色 alpha |
+
+**D17 -- 两个 overlay 背景透明度不一致 (line 159 vs line 165)**
+
+Error overlay 用 `0.4` 透明度，dev login overlay 用 `0.5`。功能相同的遮罩层，视觉参数应统一。
+
+### 3.2 按钮样式
+
+三种按钮体系共存：
+
+| 类型 | CSS 类 / 来源 | 使用位置 |
+|------|--------------|---------|
+| 主按钮 | `.btn-primary` | 开始按钮、添加 API Key |
+| Toggle 分段 | `.toggle button` | 字幕有无、翻译模式、上下文感知 |
+| Outline 次级 | `.style-confirm-btn` | 样式确认 |
+| **行内样式按钮** | 无类 | dev logout (L219), save path (L270), dev activate (L374), dev cancel (L375), LLM fallback 两个 (L387-388) |
+
+**D18 -- 5 个按钮无类名，使用行内 style (lines 219, 270, 374-375, 387-388)**
+
+这些按钮各自独立写了一套 inline CSS。如果将来要统一调整按钮风格（比如把圆角从 6px 改成 8px），需要改 5 个不同位置。维护成本高。
+
+### 3.3 输入框样式
+
+基础规则（L72）定义了 `min-height:36px; padding:8px 12px`，但以下输入框用行内样式覆盖：
+
+- L58: local path input -- `padding:6px 10px; font-size:12px`（与基础规则不同）
+- L325-328: API 行的所有输入框 -- `font-size:12px; padding:6px 10px`（与基础规则不同）
+- L372: dev code input -- 独立的完整行内样式
+- L579: save path 动态创建的 input -- 行内样式
+
+**D19 -- 输入框 padding/font-size 不一致 (L72 vs L58, L325-328)**
+
+基础规则 `padding:8px 12px` vs 实际输入框 `padding:6px 10px`。在同一个页面中，有的输入框 8px padding，有的 6px。这种微妙的不一致让页面视觉上"不对劲"但用户很难说出原因。
+
+### 3.4 间距体系
+
+使用的间距值（从 CSS 中提取）：
+
+```
+3px, 4px, 5px, 6px, 8px, 10px, 12px, 14px, 16px, 18px, 20px, 
+22px, 24px, 28px, 32px, 44px, 60px
+```
+
+**17 种不同的间距值** 分布在一个 995 行的单文件中。没有形成 4px 基础网格或 8px 基础网格。大多数值集中在 4-20px 范围，但 3px、5px、14px、18px、22px 各出现 1-2 次 -- 这些很可能是临时调整而非刻意设计。
+
+### 3.5 字体大小
+
+```
+10px, 11px, 12px, 13px, 14px, 15px, 16px, 18px, 20px, 24px, 28px
+```
+
+**11 种字体大小。** 没有形成清晰的 typographic scale。14px 和 15px、12px 和 13px 之间的差异在视觉上几乎不可分辨。建议收敛到 5-6 个层级。
 
 ---
 
-## Phase 7: Triage
+## 4. 交互逻辑
 
-| ID | 严重度 | 类别 | 问题 | 建议修复 |
-|----|--------|------|------|---------|
-| D1 | 🟡 | 颜色 | 暗色模式虚线边框不可见 | 暗色模式增加 `--border` 对比度 |
-| D3 | 🟡 | 交互 | 模型间距视觉上等距但实际差距不等 | 低优先级，属产品设计选择 |
-| D4 | 🟡 | 交互 | 拖拽排序缺少"抬起"反馈 | 加上 `box-shadow` + `scale(1.02)` |
-| D5 | 🟡 | 文案 | 免费用户提示含糊 | 改为"升级后可用 LLM 智能翻译" |
-| D8 | 🟡 | 布局 | 500px 高度下内容拥挤 | 增加 `min_size` 高度或折叠次要区域 |
-| D10 | 🟡 | 交互 | 上传无进度条 | 加一个独立的上传进度条 |
-| D11 | 🟡 | 交互 | 设置锁定无锁图标 | lockUI 时显示锁图标 + tooltip |
-| D13 | 🟡 | 暗色模式 | 字幕预览在暗色模式下不可见 | 预览背景改为 `#111` 或加边框 |
-| D2 | 🟢 | 布局 | 环境栏换行时不对齐 | `justify-content: flex-start` |
-| D6 | 🟢 | 交互 | 无 Key 显示/隐藏切换 | 加眼睛图标切换 `type` |
-| D7 | 🟢 | 文案 | 字号选择器不够直观 | 加预览描述 |
-| D9 | 🟢 | 性能 | `*` 选择器过渡导致初始闪烁 | 限定过渡范围 |
-| D12 | 🟢 | 交互 | 原生 confirm() 弹窗 | 自定义确认弹窗 |
-| D14 | 🟢 | 暗色模式 | 无手动切换开关 | 开发工具中加 toggle |
-| D15 | 🟢 | 暗色模式 | 阴影在暗色模式不自然 | 暗色模式用发光替代阴影 |
+### 4.1 Free / Paid_1 / Paid_3 三态切换
+
+**当前实现 (lines 509-532):**
+
+```javascript
+// line 510-513: paid_3
+$('apiTip').innerHTML='...（平台提供 API，无需配置）';
+$('apiRow').style.display='none';
+// line 515-517: paid_1
+$('apiRow').style.display='flex';
+// line 519-523: free (非 dev)
+$('apiRow').style.display='none';
+$('advCard').style.display='none';
+```
+
+**问题：**
+
+1. **Tier 切换没有 UI** -- 对普通用户而言，tier 完全不可见。`paid_1` 和 `paid_3` 的区别只在 dev 工具条中的一个文字标签里。用户不知道自己当前在哪个 tier，也不知道升级后能得到什么。
+
+2. **无过渡动画** -- API row、advCard 的显示/隐藏是瞬时的（`display:none` / `display:flex`），无任何过渡。
+
+3. **Tier 切换驱动 UI 变化时，没有 toast 或通知**告诉用户发生了什么。URL 参数 `?tier=paid_3` 被静默应用。
+
+4. **`advCard` 对免费用户完全不可见**（见 D14）-- 用户不知道这个功能存在。
+
+### 4.2 灰色不可操作状态 (lines 172-174, 843-858)
+
+```css
+/* line 172-173 */
+.disabled-ctl{pointer-events:none;opacity:.45}
+.disabled-ctl input,.disabled-ctl select,.disabled-ctl button{cursor:not-allowed}
+```
+
+**实现正确：** `pointer-events:none` 阻止所有交互，`opacity:0.45` 视觉表达禁用。
+
+**问题：**
+- 有 7 个元素被 `lockUI()` 锁定：subToggle, burnSelect, modelSection, modeToggle, priorityList, apiPlatform, apiName, apiKeyInput, apiAddBtn, ctxToggle, styleConfirmBtn
+- 但 `savePathBtn`（L270）没有被锁定 -- 任务进行中用户仍然可以改保存路径
+- `dz`（上传区）也没有被 `lockUI()` 锁定 -- 注释掉的代码（line 857 的 `.locked-dz` 清理）暗示曾经有过但被移除了
+- 锁定后只在 start 按钮下方显示一个 banner（"任务进行中，设置暂不可修改"）-- 但没有在被锁定的区域内显示任何锁定图标或说明
+
+**建议：** 在每个被锁定区域的卡片标题旁加一个小锁图标，并确保所有可修改设置的控件都被覆盖。
+
+### 4.3 Toast 通知 (lines 772-776)
+
+```javascript
+function showToast(msg){
+  const t=document.createElement('div');t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:10px 20px;border-radius:5px;z-index:9999;animation:fadein .3s';
+  document.body.appendChild(t);setTimeout(()=>t.remove(),2000);
+}
+```
+
+**问题清单：**
+
+| 问题 | 细节 |
+|------|------|
+| 无退出动画 | `t.remove()` 瞬间消失，建议先 `opacity:0; transition:opacity .3s` 再 remove |
+| 多 Toast 重叠 | 无堆叠逻辑，第 2 个 Toast 会盖在第 1 个上面 |
+| 无关闭按钮 | 用户无法手动关闭，只能等 2 秒 |
+| 无类型区分 | 所有 Toast 同样的样式，无法区分成功/错误/信息 |
+| 硬编码颜色 | `#333` / `#fff` 不响应暗色模式 |
+| `z-index:9999` | 任意大值，与 modal 的 `z-index:99/100` 对比显得突兀 |
+
+### 4.4 任务卡片进度条 (lines 141-148, 183-186, 907-967)
+
+**正面：**
+- 每个任务独立卡片，有自己的进度条、状态文字、下载链接、关闭按钮
+- `flash-highlight` 动画（line 146）用于已完成任务的视觉反馈 -- 好细节
+- `processDead` 检测（line 926）-- 进程异常退出时进度条变红 -- 好边界处理
+- `interrupted` 状态（line 767）-- 黄色进度条 + "任务中断"提示 -- 状态覆盖完整
+
+**问题：**
+
+1. **D16 (重复):** pulse 动画只在 transcribe 阶段
+2. **进度条 transition 0.3s 与实际 2s 轮询不匹配** -- 进度条会在 0.3s 内跳到新位置，然后静止 1.7s 再跳。视觉上是 "停顿式" 更新。
+3. **无 indeterminate 状态** -- 当阶段从 "queued" 进入 "running" 但还没有第一个进度数据时，进度条从 0% 开始。没有表示"正在准备，不知道要多久"的加载条样式。
+4. **卡片关闭按钮在 done 后被隐藏** (line 193: `.job-card-done .job-card-close{display:none}`) -- 完成后无法关闭/清理卡片。只能通过刷新页面清除。
+
+### 4.5 其他交互问题
+
+**D20 -- 原生 confirm() 弹窗 (line 968)**
+
+```javascript
+if(!confirm(`确定要取消「${name}」吗？已完成的进度将丢失。`))return;
+```
+
+2026 年的桌面应用中使用浏览器原生 `confirm()` dialog。样式与整个 Apple-inspired 界面格格不入。在 webview 中尤其突兀。
+
+**D21 -- 无键盘导航支持**
+
+- 页面无 skip-to-content 链接
+- 7 个卡片区域之间无 `tabindex` 或 `<section>` landmark
+- 可折叠的高级设置用 `<button>` 实现（正确），但 aria-expanded 未设置
+- Model slider 圆点用 `<div>` + click 实现，无 `role="radio"` 无键盘选择
+
+**D22 -- Modal 无 focus trap (lines 159-168, 368-391)**
+
+Error overlay、dev login overlay、LLM fallback overlay 都没有 focus trap。用户在 modal 打开时按 Tab 会 focus 到 modal 后面的元素。
 
 ---
 
-## Quick Wins（< 30 分钟，高影响）
+## 5. 暗色模式完整审查
 
-1. **D5 文案修复**：改一行 HTML 文字，让免费用户知道 LLM 是付费功能而非"未来会上线"
-2. **D13 预览框修复**：暗色模式下预览框加白色边框 `border: 1px solid #555`
-3. **D11 锁图标**：lockUI() 中添加一个小锁 emoji 或 SVG 图标 + "任务进行中" tooltip
+### 已做对的事
+
+- `@media(prefers-color-scheme:dark)` 覆盖 5 个核心颜色 token
+- bg (亮) < surface (中) < card (暗) -- Apple 暗色模式层级正确
+- Accent 颜色 (blue/red/green/yellow) 不做暗色调整 -- 在暗背景上仍然可读
+- `prefers-reduced-motion:reduce` 全局禁用动画 -- 无障碍意识
+
+### 暗色模式问题汇总
+
+| ID | 位置 | 问题 | 严重度 |
+|----|------|------|--------|
+| D3 | L51 | 上传区虚线边框 `#636366` 对比度不足 | 中 |
+| D6 | L127 | 字幕预览框 `#1a1a1a` 与背景 `#1c1c1e` 融为一体 | 中 |
+| D17 | L159/L165 | Overlay 遮罩透明度不统一 | 低 |
+| Toast | L774 | `#333` 文字和 `#fff` 在暗色背景上可用但不优雅 | 低 |
+| 阴影 | L43 | `box-shadow` 仍使用 `rgba(0,0,0,.3)` -- 暗色模式无效果 | 低 |
+
+---
+
+## 6. Bug 与 Triage
+
+| ID | 严重度 | 行号 | 类别 | 描述 |
+|----|--------|------|------|------|
+| D1 | 🔴 | L28,L158 | 窗口 | 500px 最小高度不够，内容约需 1182px |
+| D3 | 🟡 | L51,L18-22 | 视觉 | 暗色模式虚线边框不可见 |
+| D6 | 🟡 | L127 | 暗色 | 字幕预览框在暗色模式中消失 |
+| D16 | 🟡 | L143,L940 | 交互 | 进度条 pulse 动画仅限 transcribe 阶段 |
+| D17 | 🟡 | L159,L165 | 视觉 | 两个 overlay 遮罩透明度不一致 |
+| D18 | 🟡 | L219,270,374-375,387-388 | 视觉 | 5 个按钮使用行内样式无类名 |
+| D19 | 🟡 | L72 vs L58,L325-328 | 视觉 | 输入框 padding 不一致 (8px vs 6px) |
+| D20 | 🟡 | L968 | 交互 | 原生 confirm() 弹窗破坏视觉一致性 |
+| D2 | 🟡 | L774 | 交互 | Toast 无退出动画/堆叠/关闭/类型 |
+| D8 | 🟢 | L82-84 | 交互 | 模型圆点无 hover 状态 |
+| D10 | 🟢 | L97-98 | 交互 | 拖拽排序缺少抬起视觉反馈 |
+| D11 | 🟢 | L630-669 | 交互 | API 元素显示隐藏造成布局跳动 |
+| D12 | 🟢 | L322-329 | 布局 | API 行小窗口下换行凌乱 |
+| D13 | 🟢 | L327 | 交互 | API Key 密码框无显示/隐藏切换 |
+| D14 | 🟢 | L522 | 功能 | 免费用户看不到高级设置区域 |
+| D15 | 🟢 | L141,L183 | 视觉 | 主进度条 5px vs 卡片 4px 不一致 |
+| D21 | 🟢 | 全局 | 无障碍 | 无键盘导航 / landmark / aria |
+| D22 | 🟢 | L159-168 | 无障碍 | Modal 无 focus trap |
+
+---
+
+## 7. Quick Wins（高影响，< 30 分钟）
+
+| # | 修改 | 行号 | 时间 |
+|---|------|------|------|
+| 1 | 暗色模式虚线边框改为 `#8e8e93` | L18 (--border dark 值) | 1 min |
+| 2 | 字幕预览框暗色模式加 `border:1px solid #555` | L127 | 1 min |
+| 3 | Toast 改用 CSS 变量而非硬编码颜色 | L774 | 5 min |
+| 4 | 两个 overlay 遮罩统一为 `rgba(0,0,0,0.5)` | L159, L165 | 1 min |
+| 5 | 模型圆点添加 `:hover{border-color:var(--blue)}` | L82 | 1 min |
+| 6 | 输入框行内样式统一为基础规则 | L58, L325-328 | 5 min |
+| 7 | `min_size` 从 `(800, 500)` 改为 `(800, 650)` | desktop.py L162 | 1 min |
+| 8 | 进度条 pulse 动画扩展到所有 running 状态 | L940 | 5 min |
 
 ---
 
 ## 总结
 
-这是一个**有设计意图的界面**，不是 AI 生成的模板。Apple HIG 的影响显而易见（配色、字体、圆角系统），在 macOS 上会看起来很原生。主要功课在：（1）Windows 平台的视觉适应（字体回退、窗口尺寸），（2）暗色模式的几个对比度 bug，（3）交互反馈的精细度（拖拽反馈、上传进度条）。
+V2.11 的 UI 仍然是 **有设计意图的界面**，不是 AI 模板。Apple HIG 的影响贯穿始终。总体品质保持在 B 级别。
 
-**Design Score: B+ → 修完 Quick Wins + 暗色模式 issue 可到 A-。**
+与 V2.10 设计审查相比，本次发现了很多新的微观问题（输入框 padding 不一致、5 个行内样式按钮、进度条动画阶段限制、Toast 缺少退出动画等）-- 这些不是回归，而是之前没有审查到的角落。
+
+**核心建议：**
+1. 修 8 个 Quick Wins（约 20 分钟）将 Design Score 从 B 提升到 B+
+2. 将 `min_size` 高度从 500 提高到 650，解决窗口高度不足这个最大的用户体验问题
+3. 配合 Steve Jobs Review 中的 C1-C6 修复后，即可进入内测

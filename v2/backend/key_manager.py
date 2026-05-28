@@ -3,7 +3,7 @@
 Key bound to machine via PBKDF2 over machine-id + fixed salt.
 Keys NEVER logged or written to disk in plaintext.
 """
-import hashlib, base64, os, platform, re, logging
+import hashlib, base64, os, platform, re, logging, getpass, uuid
 from pathlib import Path
 
 _log = logging.getLogger("key_manager")
@@ -21,7 +21,7 @@ _SALT = b'video-subber-v2-fixed-salt-2026'
 
 def _derive_key() -> bytes:
     """PBKDF2 key derivation from machine identity — 100,000 iterations."""
-    material = f"{platform.node()}-{os.getuid()}".encode()
+    material = f"{platform.node()}-{getpass.getuser()}-{uuid.getnode()}".encode()
     key_bytes = hashlib.pbkdf2_hmac(
         'sha256', material, _SALT, 100_000, dklen=32
     )

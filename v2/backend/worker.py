@@ -225,7 +225,7 @@ def main():
             raise ValueError(f"config.translationMode 无效: {cfg['translationMode']}")
         if "subtitles" in cfg and cfg["subtitles"] not in ("yes", "no", None):
             raise ValueError(f"config.subtitles 无效: {cfg['subtitles']}")
-        if "tier" in cfg and cfg["tier"] not in ("free", "paid_1", "paid_3", None):
+        if "tier" in cfg and cfg["tier"] not in ("free", "vip", "svip", None):
             raise ValueError(f"config.tier 无效: {cfg['tier']}")
 
     _validate_config(config)
@@ -325,8 +325,8 @@ def main():
         segments = None
         if stage in ("start", "extract_audio", "transcribe") and not transcript_path.exists():
             _MODEL_TIME = {"tiny": "1-3 分钟", "base": "2-5 分钟", "small": "5-15 分钟", "medium": "10-25 分钟", "large-v3": "20-40 分钟"}
-            _time_est = _MODEL_TIME.get(model, "10-30 分钟")
-            stderr_progress("transcribe", 10, f"正在识别语音…（{model} 约需 {_time_est}）", f"模型: {model}")
+            time_est = _MODEL_TIME.get(model, "10-30 分钟")
+            stderr_progress("transcribe", 10, f"正在识别语音…（{model} 约需 {time_est}）", f"模型: {model}")
             def _trans_progress(n):
                 if n == -1:
                     stderr_progress("transcribe", 10, "正在启动语音识别…", f"模型: {model}")
@@ -385,6 +385,44 @@ def main():
             for s, zh in zip(segments, zh_list):
                 s.zh = zh
             failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
+
+            # ── LLM 失败降级弹窗 ──
+            _is_paid = tier in ("vip", "svip")
+            _all_failed = len(failed) == total and total > 0
+            if _is_paid and _all_failed:
+                stderr_progress("translate", 40, "LLM 翻译全部失败，等待用户选择…")
+                msg = json.dumps({
+                    "type": "llm_failed",
+                    "message": "LLM 翻译全部失败，是否改用免费引擎（Google/百度）继续？",
+                    "total": total,
+                }, ensure_ascii=False)
+                _real_stdout.write(msg + "\n")
+                _real_stdout.flush()
+
+                decision_file = job_dir / "llm_fallback.json"
+                _deadline = time.time() + 120
+                _decision = "keep_failed"
+                while time.time() < _deadline:
+                    if decision_file.exists():
+                        try:
+                            _dec = json.loads(decision_file.read_text(encoding="utf-8"))
+                            _decision = _dec.get("decision", "keep_failed")
+                            break
+                        except Exception:
+                            pass
+                    time.sleep(1)
+
+                if _decision == "use_free":
+                    stderr_progress("translate", 40, "已切换为免费引擎，正在重新翻译…")
+                    zh_list, failed_indices, token_usage = translate_with_orchestrator(
+                        texts=texts, mode=translation_mode, priority=translation_priority,
+                        api_keys=api_keys, context_aware=False,
+                        tier="free", progress_callback=prog,
+                    )
+                    for s, zh in zip(segments, zh_list):
+                        s.zh = zh
+                    failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
+                decision_file.unlink(missing_ok=True)
 
             with open(translated_path, "w", encoding="utf-8") as f:
                 json.dump([{

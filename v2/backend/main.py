@@ -3,7 +3,7 @@ import sys, json, uuid, asyncio, time, hashlib
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -57,12 +57,12 @@ def _task_key(file_hash: str, cfg: dict) -> str:
 
 # === Tier definitions ===
 # "free": Google + Baidu only. No LLM. Speed/Quality modes both work.
-# "paid_1": user provides own LLM API keys. Context-aware translation unlocks.
-# "paid_3": platform provides LLM keys. Full features.
+# "vip": user provides own LLM API keys. Context-aware translation unlocks.
+# "svip": platform provides LLM keys. Full features.
 TIER_FEATURES = {
-    "free":    {"llm": False, "context_aware": False, "max_llm_keys": 0},
-    "paid_1":  {"llm": True,  "context_aware": True,  "max_llm_keys": 10},
-    "paid_3":  {"llm": True,  "context_aware": True,  "max_llm_keys": 0, "platform_keys": True},
+    "free":  {"llm": False, "context_aware": False, "max_llm_keys": 0},
+    "vip":   {"llm": True,  "context_aware": True,  "max_llm_keys": 10},
+    "svip":  {"llm": True,  "context_aware": True,  "max_llm_keys": 0, "platform_keys": True},
 }
 
 # Available LLM backends — add new ones here and they appear in the UI automatically.
@@ -226,7 +226,7 @@ def _fetch_remote_models():
         )
 
 
-# ── Platform keys (paid_3 tier) ────────────────────────────
+# ── Platform keys (SVIP tier) ──────────────────────────────
 
 _PLATFORM_KEYS_CACHE: list[dict] = []
 
@@ -369,10 +369,10 @@ async def startup():
     except (json.JSONDecodeError, IOError):
         current = {}
 
-    if current.get("version") != "2.08":
+    if current.get("version") != "2.12":
         import datetime
         version_data = {
-            "version": "2.08",
+            "version": "2.12",
             "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
             "last_compatible_version": "2.00",
         }
@@ -456,7 +456,7 @@ def _effective_tier(requested: str) -> str:
     """
     if _dev_mode_active:
         tier = requested if requested in TIER_FEATURES else "free"
-        # In dev mode with platform keys set, allow paid_3
+        # In dev mode with platform keys set, allow svip
         return tier
 
     # Production: everyone is free. LLM access is gated by whether the
@@ -466,7 +466,54 @@ def _effective_tier(requested: str) -> str:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "2.08"}
+    return {"ok": True, "version": _detect_version()}
+
+
+def _detect_version() -> str:
+    """Auto-detect version from git tag → dir scan → pyproject.toml → fallback."""
+    import subprocess, re, glob as _glob
+
+    # 1) Git tag: git describe --tags --abbrev=0
+    try:
+        r = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            capture_output=True, text=True, timeout=3,
+            cwd=str(Path(__file__).parent.parent),
+        )
+        tag = r.stdout.strip()
+        if tag and re.match(r"v?\d+\.\d+", tag):
+            return tag.lstrip("v")
+    except Exception:
+        pass
+
+    # 2) Scan version dirs: find highest v2.XX/ in project root
+    try:
+        root = Path(__file__).parent.parent
+        best = (0, 0)
+        for d in root.glob("v[0-9]*.[0-9]*"):
+            m = re.match(r"v(\d+)\.(\d+)", d.name)
+            if m:
+                v = (int(m.group(1)), int(m.group(2)))
+                if v > best:
+                    best = v
+        if best != (0, 0):
+            return f"{best[0]}.{best[1]:02d}"
+    except Exception:
+        pass
+
+    # 3) pyproject.toml
+    try:
+        ppt = Path(__file__).parent.parent / "pyproject.toml"
+        if ppt.exists():
+            import tomllib
+            data = tomllib.loads(ppt.read_text())
+            v = data.get("project", {}).get("version")
+            if v:
+                return v
+    except Exception:
+        pass
+
+    return "dev"
 
 
 @app.get("/api/env")
@@ -484,11 +531,34 @@ def get_env(simulate: str = ""):
     return data
 
 
+# ── Model download ──
+
+@app.get("/api/models/status")
+def model_status():
+    """Return download status for all 5 models."""
+    from .model_manager import get_model_status
+    return get_model_status()
+
+
+@app.post("/api/models/download/{model_id}")
+def model_download(model_id: str):
+    """Start downloading a model."""
+    from .model_manager import start_download
+    return start_download(model_id)
+
+
+@app.delete("/api/models/download/{model_id}")
+def model_cancel(model_id: str):
+    """Cancel an in-progress model download."""
+    from .model_manager import cancel_download
+    return cancel_download(model_id)
+
+
 @app.get("/api/backends")
 def get_backends(tier: str = "free"):
     """Return ENABLED backends + current tier info.
 
-    Dev mode: ?tier=paid_3 works (for testing).
+    Dev mode: ?tier=svip works (for testing).
     Production: tier is always 'free'. LLM access is gated by user's own API keys.
     """
     from .translation.google import GoogleBackend
@@ -510,9 +580,14 @@ def get_backends(tier: str = "free"):
 
 @app.get("/api/config")
 def get_config():
-    """Return user config from ~/.video-subber/config.json"""
+    """Return user config from ~/.video-subber/config.json. API keys are masked."""
     from .config_manager import load_config
-    return load_config()
+    from .key_manager import mask_key
+    cfg = load_config()
+    for k in cfg.get("apiKeys", []):
+        if "key" in k:
+            k["key"] = mask_key(k["key"])
+    return cfg
 
 
 @app.put("/api/config")
@@ -761,7 +836,7 @@ def get_job(job_id: str):
                 }
             except Exception:
                 pass
-        return JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse({"error": "未找到该任务"}, status_code=404)
     j["process_alive"] = worker_manager.is_alive(job_id)
     return j
 
@@ -777,7 +852,7 @@ def download_video(job_id: str):
     if job_dir.exists():
         for f in job_dir.glob("*_zh.mp4"):
             return FileResponse(str(f), filename=f.name)
-    return JSONResponse({"error": "not found"}, status_code=404)
+    return JSONResponse({"error": "未找到下载文件"}, status_code=404)
 
 
 @app.get("/api/jobs/{job_id}/download/srt")
@@ -817,6 +892,17 @@ def cancel_job(job_id: str):
         for input_file in job_dir.glob("input.*"):
             input_file.unlink(missing_ok=True)
 
+    return {"ok": True}
+
+
+# ── LLM fallback decision ──
+
+@app.post("/api/jobs/{job_id}/llm-fallback")
+def llm_fallback_decision(job_id: str, payload: dict):
+    """Worker polls this file after emitting 'llm_failed' message."""
+    decision = payload.get("decision", "keep_failed")
+    decision_file = JOBS_DIR / job_id / "llm_fallback.json"
+    decision_file.write_text(json.dumps({"decision": decision}, ensure_ascii=False))
     return {"ok": True}
 
 

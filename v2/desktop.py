@@ -10,6 +10,7 @@ import os
 import threading
 import time
 import json
+import socket
 from pathlib import Path
 
 
@@ -18,6 +19,32 @@ from pathlib import Path
 # ═══════════════════════════════════════════════════════════
 
 FROZEN = getattr(sys, "frozen", False)
+
+# ── 单实例锁：使用 TCP 端口锁，确保只有一个实例在运行 ──
+_SINGLETON_PORT = 18766
+_SINGLETON_SOCKET = None
+
+
+def _acquire_singleton():
+    """尝试绑定一个专属端口。成功 → 当前是唯一实例。失败 → 已有实例在运行。"""
+    global _SINGLETON_SOCKET
+    try:
+        _SINGLETON_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _SINGLETON_SOCKET.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        _SINGLETON_SOCKET.bind(("127.0.0.1", _SINGLETON_PORT))
+        return True
+    except OSError:
+        return False
+
+
+def _release_singleton():
+    global _SINGLETON_SOCKET
+    if _SINGLETON_SOCKET:
+        try:
+            _SINGLETON_SOCKET.close()
+        except Exception:
+            pass
+        _SINGLETON_SOCKET = None
 
 # ═══════════════════════════════════════════════════════════
 # 1. 打包模式：修正 V1.3 路径
@@ -77,6 +104,7 @@ if FROZEN:
 
         # 替换 worker.emit：跳过 stdout JSON IPC，消息直送 ws_manager
         _orig_emit = _worker.emit
+        _orig_stderr_progress = _worker.stderr_progress
 
         def _direct_emit(event_type, **kwargs):
             msg = {"type": event_type, **kwargs}
@@ -88,6 +116,12 @@ if FROZEN:
                 )
 
         _worker.emit = _direct_emit
+
+        def _direct_stderr_progress(stage, percent, message, detail=""):
+            _direct_emit("progress", stage=stage, percent=percent,
+                         message=message, detail=detail)
+
+        _worker.stderr_progress = _direct_stderr_progress
 
         def _run():
             _old_stdout = sys.stdout
@@ -101,6 +135,7 @@ if FROZEN:
                 sys.argv = _old_argv
                 sys.stdout = _old_stdout
                 _worker.emit = _orig_emit
+                _worker.stderr_progress = _orig_stderr_progress
 
         t = threading.Thread(target=_run, daemon=True)
         _worker_threads[job_id] = t
@@ -133,22 +168,35 @@ def _start_server():
 
 
 def main():
+    # ── 单实例锁 ──
+    if not _acquire_singleton():
+        print("Video Subber 已在运行中。请查看系统托盘或任务栏中的已有窗口。")
+        sys.exit(0)
+
     print("Video Subber 正在启动...")
 
     # 后端后台线程
     server = threading.Thread(target=_start_server, daemon=True)
     server.start()
 
-    # 等后端就绪（最多 5 秒）
-    for _ in range(50):
+    # 等后端就绪（最多 15 秒，比之前的 5 秒更宽容）
+    backend_ready = False
+    for _ in range(150):
         time.sleep(0.1)
         try:
             import urllib.request
             r = urllib.request.urlopen(URL + "/api/health", timeout=0.5)
             if r.status == 200:
+                backend_ready = True
                 break
         except Exception:
             pass
+
+    if not backend_ready:
+        print("启动失败：后端服务未能就绪。")
+        print("请检查端口 8766 是否被其他程序占用，或尝试重启电脑后重试。")
+        _release_singleton()
+        sys.exit(1)
 
     print("后端就绪，打开窗口...")
 
@@ -159,11 +207,12 @@ def main():
         width=1100,
         height=750,
         resizable=True,
-        min_size=(800, 500),
+        min_size=(800, 650),
     )
     webview.start()
 
     # 用户关闭窗口 → 退出
+    _release_singleton()
     print("已退出。")
 
 
