@@ -121,15 +121,18 @@ import json as _json
 import urllib.request as _urllib
 
 # ── Remote config base URL ────────────────────────────────
-# Set one URL, both activation codes and model lists are fetched from the
-# same GitHub repo.  Format expected:
+# Files are served from the GitHub repo.  The app fetches them via GitHub's
+# raw URL (raw.githubusercontent.com).  Private repos need a token in the
+# VSUB_GITHUB_TOKEN env var.  If the repo is public, no token needed.
+# Files expected:
 #   activation_codes.json → {"codes": ["CODE1", ...]}
-#   models.json           → {"models": [{"id":"claude","models":[{"id":"...","name":"..."}]}]}
-# Change this to your actual GitHub raw URL root before release.
+#   models.json           → {"models": [...]}
+#   platform_keys.json    → {"keys": [...]}
 _REMOTE_BASE = _os.environ.get(
     "VSUB_REMOTE_CONFIG_URL",
-    "",  # 默认不启用远程配置；部署时设置环境变量以启用
+    "https://raw.githubusercontent.com/andy-sherlock/video-subber/main",
 )
+_GITHUB_TOKEN = _os.environ.get("VSUB_GITHUB_TOKEN", "")
 
 
 def _fetch_remote_json(filename: str) -> dict | None:
@@ -138,7 +141,10 @@ def _fetch_remote_json(filename: str) -> dict | None:
         return None
     try:
         url = f"{_REMOTE_BASE}/{filename}"
-        req = _urllib.Request(url, headers={"User-Agent": "VideoSubber"})
+        headers = {"User-Agent": "VideoSubber"}
+        if _GITHUB_TOKEN:
+            headers["Authorization"] = f"token {_GITHUB_TOKEN}"
+        req = _urllib.Request(url, headers=headers)
         resp = _urllib.urlopen(req, timeout=5)
         return _json.loads(resp.read().decode())
     except Exception:
@@ -369,10 +375,10 @@ async def startup():
     except (json.JSONDecodeError, IOError):
         current = {}
 
-    if current.get("version") != "2.11":
+    if current.get("version") != "2.12":
         import datetime
         version_data = {
-            "version": "2.11",
+            "version": "2.12",
             "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
             "last_compatible_version": "2.00",
         }
@@ -466,7 +472,54 @@ def _effective_tier(requested: str) -> str:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "2.11"}
+    return {"ok": True, "version": _detect_version()}
+
+
+def _detect_version() -> str:
+    """Auto-detect version from git tag → dir scan → pyproject.toml → fallback."""
+    import subprocess, re, glob as _glob
+
+    # 1) Git tag: git describe --tags --abbrev=0
+    try:
+        r = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            capture_output=True, text=True, timeout=3,
+            cwd=str(Path(__file__).parent.parent),
+        )
+        tag = r.stdout.strip()
+        if tag and re.match(r"v?\d+\.\d+", tag):
+            return tag.lstrip("v")
+    except Exception:
+        pass
+
+    # 2) Scan version dirs: find highest v2.XX/ in project root
+    try:
+        root = Path(__file__).parent.parent
+        best = (0, 0)
+        for d in root.glob("v[0-9]*.[0-9]*"):
+            m = re.match(r"v(\d+)\.(\d+)", d.name)
+            if m:
+                v = (int(m.group(1)), int(m.group(2)))
+                if v > best:
+                    best = v
+        if best != (0, 0):
+            return f"{best[0]}.{best[1]:02d}"
+    except Exception:
+        pass
+
+    # 3) pyproject.toml
+    try:
+        ppt = Path(__file__).parent.parent / "pyproject.toml"
+        if ppt.exists():
+            import tomllib
+            data = tomllib.loads(ppt.read_text())
+            v = data.get("project", {}).get("version")
+            if v:
+                return v
+    except Exception:
+        pass
+
+    return "dev"
 
 
 @app.get("/api/env")

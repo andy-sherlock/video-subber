@@ -121,15 +121,18 @@ import json as _json
 import urllib.request as _urllib
 
 # ── Remote config base URL ────────────────────────────────
-# Set one URL, both activation codes and model lists are fetched from the
-# same GitHub repo.  Format expected:
+# Files are served from the GitHub repo.  The app fetches them via GitHub's
+# raw URL (raw.githubusercontent.com).  Private repos need a token in the
+# VSUB_GITHUB_TOKEN env var.  If the repo is public, no token needed.
+# Files expected:
 #   activation_codes.json → {"codes": ["CODE1", ...]}
-#   models.json           → {"models": [{"id":"claude","models":[{"id":"...","name":"..."}]}]}
-# Change this to your actual GitHub raw URL root before release.
+#   models.json           → {"models": [...]}
+#   platform_keys.json    → {"keys": [...]}
 _REMOTE_BASE = _os.environ.get(
     "VSUB_REMOTE_CONFIG_URL",
-    "",  # 默认不启用远程配置；部署时设置环境变量以启用
+    "https://raw.githubusercontent.com/andy-sherlock/video-subber/main",
 )
+_GITHUB_TOKEN = _os.environ.get("VSUB_GITHUB_TOKEN", "")
 
 
 def _fetch_remote_json(filename: str) -> dict | None:
@@ -138,7 +141,10 @@ def _fetch_remote_json(filename: str) -> dict | None:
         return None
     try:
         url = f"{_REMOTE_BASE}/{filename}"
-        req = _urllib.Request(url, headers={"User-Agent": "VideoSubber"})
+        headers = {"User-Agent": "VideoSubber"}
+        if _GITHUB_TOKEN:
+            headers["Authorization"] = f"token {_GITHUB_TOKEN}"
+        req = _urllib.Request(url, headers=headers)
         resp = _urllib.urlopen(req, timeout=5)
         return _json.loads(resp.read().decode())
     except Exception:
