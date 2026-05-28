@@ -121,18 +121,14 @@ import json as _json
 import urllib.request as _urllib
 
 # ── Remote config base URL ────────────────────────────────
-# Files are served from the GitHub repo.  The app fetches them via GitHub's
-# raw URL (raw.githubusercontent.com).  Private repos need a token in the
-# VSUB_GITHUB_TOKEN env var.  If the repo is public, no token needed.
-# Files expected:
+# Public repo — no auth needed.  Change VSUB_REMOTE_CONFIG_URL env var
+# to point to your own fork if needed.
 #   activation_codes.json → {"codes": ["CODE1", ...]}
 #   models.json           → {"models": [...]}
-#   platform_keys.json    → {"keys": [...]}
 _REMOTE_BASE = _os.environ.get(
     "VSUB_REMOTE_CONFIG_URL",
-    "https://raw.githubusercontent.com/andy-sherlock/video-subber/main",
+    "https://raw.githubusercontent.com/andy-sherlock/video-subber-config/main",
 )
-_GITHUB_TOKEN = _os.environ.get("VSUB_GITHUB_TOKEN", "")
 
 
 def _fetch_remote_json(filename: str) -> dict | None:
@@ -141,10 +137,7 @@ def _fetch_remote_json(filename: str) -> dict | None:
         return None
     try:
         url = f"{_REMOTE_BASE}/{filename}"
-        headers = {"User-Agent": "VideoSubber"}
-        if _GITHUB_TOKEN:
-            headers["Authorization"] = f"token {_GITHUB_TOKEN}"
-        req = _urllib.Request(url, headers=headers)
+        req = _urllib.Request(url, headers={"User-Agent": "VideoSubber"})
         resp = _urllib.urlopen(req, timeout=5)
         return _json.loads(resp.read().decode())
     except Exception:
@@ -152,11 +145,11 @@ def _fetch_remote_json(filename: str) -> dict | None:
 
 
 # ── Activation codes ──────────────────────────────────────
+# Format: {"codes": ["ANDY", "MENG", "BETA001"]}
+# Built-in codes always valid. Remote codes fetched from public GitHub repo.
 
-# Built-in developer codes — always valid, no env var needed.
 _BUILTIN_CODES: set[str] = {"ANDY", "MENG"}
 
-# Additional codes from env var (comma-separated), merged at runtime.
 _raw_dev = _os.environ.get("VSUB_DEV_CODES", "")
 _LOCAL_CODES: set[str] = set(
     c.strip().upper() for c in _raw_dev.split(",") if c.strip()
@@ -193,8 +186,6 @@ def _fetch_remote_codes():
             _json.dumps({"codes": remote_codes, "fetched_at": time.time()}, ensure_ascii=False),
             encoding="utf-8",
         )
-        # 远程码写入缓存文件即可。_all_valid_codes() 会带 24h TTL 读取。
-        # 不写入 _LOCAL_CODES，确保吊销的码在 24h 后自动失效。
 
 
 # ── Remote model list ─────────────────────────────────────
