@@ -14,3 +14,8 @@ __pycache__/
 .git.broken/
 .git.old/
 .git.backup/
+v1/
+vs/
+.gstack/
+test/
+CLAUDE.md
