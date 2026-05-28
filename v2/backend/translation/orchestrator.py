@@ -15,10 +15,10 @@ FREE_BACKENDS: dict[str, TranslationBackend] = {
 }
 
 # SVIP tier platform-provided LLM keys (injected automatically for svip users).
-# Priority: VSUB_PLATFORM_KEYS env var (dev) → remote GitHub fetch (production).
+# Encrypted in public GitHub repo, decrypted at startup by credential_manager.
 
 def _get_platform_keys() -> list[dict]:
-    """获取平台 Key。环境变量优先（开发调试），否则从主进程远程拉取缓存获取。"""
+    """获取平台 Key。环境变量优先（开发调试），否则从 credential_manager 获取。"""
     raw = _os.environ.get("VSUB_PLATFORM_KEYS", "")
     if raw:
         try:
@@ -26,7 +26,7 @@ def _get_platform_keys() -> list[dict]:
         except Exception:
             pass
     try:
-        from backend.main import get_platform_keys
+        from backend.credential_manager import get_platform_keys
         return get_platform_keys()
     except ImportError:
         return []

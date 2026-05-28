@@ -19,3 +19,4 @@ vs/
 .gstack/
 test/
 CLAUDE.md
+credentials_plaintext.json

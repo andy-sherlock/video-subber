@@ -223,52 +223,61 @@ def _fetch_remote_models():
         )
 
 
-# ── Platform keys (SVIP tier) ──────────────────────────────
+# ── Encrypted credentials (Baidu + platform LLM keys) ──────────
+# Fetched from public repo, encrypted with Fernet. Decryption key
+# is embedded in credential_manager.py and compiled into the EXE.
 
-_PLATFORM_KEYS_CACHE: list[dict] = []
+_CREDENTIAL_CACHE_PATH = Path.home() / ".video-subber" / "credentials_cache.json"
 
-def _fetch_platform_keys():
-    """从远程拉取平台 API Key。失败则使用 72 小时本地缓存兜底。
-    优先级：环境变量 VSUB_PLATFORM_KEYS > 远程 GitHub > 本地缓存。
+
+def _fetch_encrypted_credentials():
+    """Pull encrypted credentials from remote, decrypt, cache locally.
+    Falls back to local cache (72h) if remote is unreachable.
+    Dev override: VSUB_PLATFORM_KEYS env var (plain JSON, same format as
+    decrypted payload) or BAIDU_APP_ID + BAIDU_SECRET env vars.
     """
-    global _PLATFORM_KEYS_CACHE
-    # 最高优先级：环境变量（本地开发/测试用）
-    env_keys_raw = _os.environ.get("VSUB_PLATFORM_KEYS", "")
-    if env_keys_raw:
-        try:
-            keys = _json.loads(env_keys_raw)
-            if isinstance(keys, list) and keys:
-                _PLATFORM_KEYS_CACHE = keys
-                return
-        except Exception:
-            pass
-    data = _fetch_remote_json("platform_keys.json")
-    if data:
-        keys = data.get("keys", [])
-        if keys:
-            _PLATFORM_KEYS_CACHE = keys
-            # 写入本地缓存，供下次离线启动使用
-            cache_path = Path.home() / ".video-subber" / "platform_keys_cache.json"
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(
-                _json.dumps({"keys": keys, "fetched_at": time.time()}, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            return
-    # 拉取失败 → 尝试从本地缓存恢复
-    cache_path = Path.home() / ".video-subber" / "platform_keys_cache.json"
-    if cache_path.exists():
-        try:
-            cached = _json.loads(cache_path.read_text(encoding="utf-8"))
-            age_h = (time.time() - cached.get("fetched_at", 0)) / 3600
-            if age_h < 72:
-                _PLATFORM_KEYS_CACHE = cached.get("keys", [])
-        except Exception:
-            pass
+    from .credential_manager import load_credentials_from_remote
 
-def get_platform_keys() -> list[dict]:
-    """供 orchestrator 调用，返回当前有效的平台 Key 列表。"""
-    return list(_PLATFORM_KEYS_CACHE)
+    # Dev override: env vars
+    env_keys = _os.environ.get("VSUB_PLATFORM_KEYS", "")
+    env_baidu_id = _os.environ.get("BAIDU_APP_ID", "")
+    if env_keys or env_baidu_id:
+        payload = {}
+        if env_baidu_id:
+            payload["baidu"] = {
+                "app_id": env_baidu_id,
+                "secret": _os.environ.get("BAIDU_SECRET", ""),
+            }
+        if env_keys:
+            try:
+                payload["platform_keys"] = _json.loads(env_keys)
+            except Exception:
+                pass
+        if payload:
+            load_credentials_from_remote(payload)  # env vars are already plaintext
+            return
+
+    # Try remote encrypted config
+    data = _fetch_remote_json("credentials.json")
+    if data and isinstance(data, dict):
+        load_credentials_from_remote(data)
+        # Cache decrypted config locally for offline use
+        try:
+            _CREDENTIAL_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            _CREDENTIAL_CACHE_PATH.write_text(
+                _json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+        return
+
+    # Fallback: local cache (72h)
+    if _CREDENTIAL_CACHE_PATH.exists():
+        try:
+            cached = _json.loads(_CREDENTIAL_CACHE_PATH.read_text(encoding="utf-8"))
+            if isinstance(cached, dict):
+                load_credentials_from_remote(cached)
+        except Exception:
+            pass
 
 
 def _machine_fingerprint() -> str:
@@ -303,11 +312,11 @@ def _load_activation() -> str | None:
 async def startup():
     global _dev_mode_active
 
-    # ── 0a. 后台拉取远程配置（激活码 + 模型列表 + 平台 Key），不阻塞启动 ──
+    # ── 0a. 后台拉取远程配置（激活码 + 模型列表 + 加密凭据），不阻塞启动 ──
     import threading
     threading.Thread(target=_fetch_remote_codes, daemon=True).start()
     threading.Thread(target=_fetch_remote_models, daemon=True).start()
-    threading.Thread(target=_fetch_platform_keys, daemon=True).start()
+    threading.Thread(target=_fetch_encrypted_credentials, daemon=True).start()
 
     if _load_activation():
         _dev_mode_active = True

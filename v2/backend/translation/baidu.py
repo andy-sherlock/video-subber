@@ -2,10 +2,19 @@
 import os, json, time, hashlib, random, logging, urllib.request, urllib.parse
 from .base import TranslationBackend, TranslationResult
 
-BAIDU_APP_ID = os.environ.get("BAIDU_APP_ID", "")
-BAIDU_SECRET = os.environ.get("BAIDU_SECRET", "")
-
 _log = logging.getLogger("baidu")
+
+
+def _get_baidu_creds():
+    """Try remote credential manager first, fall back to env vars (dev)."""
+    try:
+        from backend.credential_manager import get_baidu_config
+        cfg = get_baidu_config()
+        if cfg and cfg.get("app_id") and cfg.get("secret"):
+            return cfg["app_id"], cfg["secret"]
+    except Exception:
+        pass
+    return os.environ.get("BAIDU_APP_ID", ""), os.environ.get("BAIDU_SECRET", "")
 
 
 class BaiduBackend(TranslationBackend):
@@ -28,8 +37,9 @@ class BaiduBackend(TranslationBackend):
                 duration_ms=0,
             )
 
-        if not BAIDU_APP_ID or not BAIDU_SECRET:
-            _log.warning("百度翻译未配置 (BAIDU_APP_ID/BAIDU_SECRET)，跳过")
+        app_id, secret = _get_baidu_creds()
+        if not app_id or not secret:
+            _log.warning("百度翻译未配置，跳过")
             return TranslationResult(
                 translated=["[翻译失败]"] * len(texts),
                 backend_name=self.name,
@@ -37,11 +47,11 @@ class BaiduBackend(TranslationBackend):
             )
 
         salt = str(random.randint(10000, 99999))
-        sign_raw = BAIDU_APP_ID + query + salt + BAIDU_SECRET
+        sign_raw = app_id + query + salt + secret
         sign = hashlib.md5(sign_raw.encode()).hexdigest()
         params = {
             "q": query, "from": "auto", "to": "zh",
-            "appid": BAIDU_APP_ID, "salt": salt, "sign": sign,
+            "appid": app_id, "salt": salt, "sign": sign,
         }
         url = (
             "https://fanyi-api.baidu.com/api/trans/vip/translate?"
