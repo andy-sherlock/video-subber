@@ -85,28 +85,14 @@ class LLMBackend(TranslationBackend):
         }).encode()
 
     def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
-        """发送 prompt 到 LLM API，返回原始文本。子类通常不需要重写。
-
-        遇到 429 限速 / 5xx 临时故障时指数退避重试（1s/2s/4s），最多 4 次。
-        免费模型在高并发下会限速，靠这个把"硬失败"变成"稍等重试"。
-        """
-        import json as _json, urllib.request as _urllib, urllib.error as _urlerr, time as _time
+        """发送 prompt 到 LLM API，返回原始文本。子类通常不需要重写。"""
+        import json as _json, urllib.request as _urllib
         body = self._build_body(prompt, max_tokens)
-        last_err = None
-        for attempt in range(4):
-            req = _urllib.Request(
-                self._api_url, data=body, headers=self._build_headers()
-            )
-            try:
-                with _urllib.urlopen(req, timeout=120) as resp:
-                    return self._call_api_parse(_json.loads(resp.read().decode()))
-            except _urlerr.HTTPError as e:
-                last_err = e
-                if e.code in (429, 500, 502, 503, 504) and attempt < 3:
-                    _time.sleep(2 ** attempt)
-                    continue
-                raise
-        raise last_err
+        req = _urllib.Request(
+            self._api_url, data=body, headers=self._build_headers()
+        )
+        with _urllib.urlopen(req, timeout=120) as resp:
+            return self._call_api_parse(_json.loads(resp.read().decode()))
 
     # ── 基类统一提供（子类不需要动）──────────────────────
 

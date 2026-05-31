@@ -448,10 +448,9 @@ def dev_deactivate():
 
 @app.get("/api/dev-status")
 def dev_status():
-    from .credential_manager import get_platform_keys
     return {
         "dev_mode": _dev_mode_active,
-        "has_platform_keys": bool(get_platform_keys()),
+        "has_platform_keys": bool(_PLATFORM_KEYS_CACHE),
     }
 
 
@@ -569,21 +568,11 @@ def get_backends(tier: str = "free"):
     Production: tier is always 'free'. LLM access is gated by user's own API keys.
     """
     from .translation.google import GoogleBackend
-    from .translation.baidu import BaiduBackend, _get_baidu_creds
+    from .translation.baidu import BaiduBackend
     _name_map = {"google": GoogleBackend(), "baidu": BaiduBackend()}
-
-    def _is_available(key, b):
-        if not b.enabled:
-            return False
-        if key == "baidu":
-            # 百度仅在配好账号密钥（远程凭据或环境变量）后才显示为可选，避免用户选了没反应
-            app_id, secret = _get_baidu_creds()
-            return bool(app_id and secret)
-        return True
-
     enabled_free = [
         {"id": key, "name": b.name, "free": True}
-        for key, b in _name_map.items() if _is_available(key, b)
+        for key, b in _name_map.items() if b.enabled
     ]
     current = _effective_tier(tier)
     return {
@@ -593,73 +582,6 @@ def get_backends(tier: str = "free"):
         "current_tier": current,
         "dev_mode": _dev_mode_active,
     }
-
-
-def _curate_model_ids(ids: list) -> list:
-    """过滤掉非聊天模型（embedding/语音/图像等），去重，保留官方 ID 原样。"""
-    bad = ("embedding", "whisper", "tts", "audio", "realtime", "dall-e", "dalle",
-           "moderation", "rerank", "-search-", "image", "vision-", "babbage",
-           "davinci", "text-ada", "stable-", "sora", "veo", "imagen", "aqa", "guard",
-           "lyria", "nano-banana", "robotics", "computer-use", "deep-research",
-           "antigravity", "native-audio", "-live", "gemma")
-    seen = set()
-    out = []
-    for mid in ids:
-        if not isinstance(mid, str) or not mid:
-            continue
-        if any(b in mid.lower() for b in bad):
-            continue
-        if mid in seen:
-            continue
-        seen.add(mid)
-        out.append({"id": mid, "name": mid})
-    return out
-
-
-@app.post("/api/llm-models")
-def list_llm_models(payload: dict):
-    """用用户填的 Key 调【对应那一个平台】的"列出模型"接口，返回该 Key 真实可用的模型。
-    只调用户当前选的平台，不碰其他家。失败返回 {"models":[], "error":...}，前端据此回退内置列表。"""
-    import urllib.request as _u, json as _j
-    platform = (payload.get("platform") or "").lower()
-    key = (payload.get("key") or "").strip()
-    endpoint = (payload.get("endpoint") or "").strip()
-    if not key:
-        return {"models": [], "error": "no_key"}
-
-    if platform == "claude":
-        url = "https://api.anthropic.com/v1/models?limit=1000"
-        headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
-        def _parse(d): return [m.get("id", "") for m in d.get("data", [])]
-    elif platform == "gemini":
-        url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
-        headers = {"x-goog-api-key": key}
-        def _parse(d): return [m.get("name", "").split("/")[-1] for m in d.get("models", [])
-                               if "generateContent" in (m.get("supportedGenerationMethods") or [])]
-    else:
-        # OpenAI 兼容：gpt / deepseek / doubao / glm / custom —— 把 chat 地址换成 /models
-        _chat = {
-            "gpt": "https://api.openai.com/v1/chat/completions",
-            "deepseek": "https://api.deepseek.com/v1/chat/completions",
-            "doubao": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
-            "glm": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-            "custom": endpoint,
-        }.get(platform, endpoint)
-        if not _chat:
-            return {"models": [], "error": "no_endpoint"}
-        url = _chat.replace("/chat/completions", "/models")
-        headers = {"Authorization": f"Bearer {key}"}
-        def _parse(d): return [m.get("id", "") for m in d.get("data", [])]
-
-    try:
-        req = _u.Request(url, headers={**headers, "User-Agent": "VideoSubber"})
-        with _u.urlopen(req, timeout=10) as resp:
-            data = _j.loads(resp.read().decode())
-        raw_ids = _parse(data)
-    except Exception as e:
-        return {"models": [], "error": f"fetch_failed: {e}"}
-
-    return {"models": _curate_model_ids(raw_ids)}
 
 
 @app.get("/api/config")
