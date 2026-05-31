@@ -6,14 +6,7 @@ _log = logging.getLogger("baidu")
 
 
 def _get_baidu_creds():
-    """Try remote credential manager first, fall back to env vars (dev)."""
-    try:
-        from backend.credential_manager import get_baidu_config
-        cfg = get_baidu_config()
-        if cfg and cfg.get("app_id") and cfg.get("secret"):
-            return cfg["app_id"], cfg["secret"]
-    except Exception:
-        pass
+    """Get Baidu API credentials from env vars or user config."""
     return os.environ.get("BAIDU_APP_ID", ""), os.environ.get("BAIDU_SECRET", "")
 
 

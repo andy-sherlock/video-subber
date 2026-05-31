@@ -62,7 +62,7 @@ def _task_key(file_hash: str, cfg: dict) -> str:
 TIER_FEATURES = {
     "free":  {"llm": False, "context_aware": False, "max_llm_keys": 0},
     "vip":   {"llm": True,  "context_aware": True,  "max_llm_keys": 10},
-    "svip":  {"llm": True,  "context_aware": True,  "max_llm_keys": 0, "platform_keys": True},
+    "svip":  {"llm": True,  "context_aware": True,  "max_llm_keys": 0},
 }
 
 # Available LLM backends — add new ones here and they appear in the UI automatically.
@@ -223,61 +223,6 @@ def _fetch_remote_models():
         )
 
 
-# ── Encrypted credentials (Baidu + platform LLM keys) ──────────
-# Fetched from public repo, encrypted with Fernet. Decryption key
-# is embedded in credential_manager.py and compiled into the EXE.
-
-_CREDENTIAL_CACHE_PATH = Path.home() / ".video-subber" / "credentials_cache.json"
-
-
-def _fetch_encrypted_credentials():
-    """Pull encrypted credentials from remote, decrypt, cache locally.
-    Falls back to local cache (72h) if remote is unreachable.
-    Dev override: VSUB_PLATFORM_KEYS env var (plain JSON, same format as
-    decrypted payload) or BAIDU_APP_ID + BAIDU_SECRET env vars.
-    """
-    from .credential_manager import load_credentials_from_remote
-
-    # Dev override: env vars
-    env_keys = _os.environ.get("VSUB_PLATFORM_KEYS", "")
-    env_baidu_id = _os.environ.get("BAIDU_APP_ID", "")
-    if env_keys or env_baidu_id:
-        payload = {}
-        if env_baidu_id:
-            payload["baidu"] = {
-                "app_id": env_baidu_id,
-                "secret": _os.environ.get("BAIDU_SECRET", ""),
-            }
-        if env_keys:
-            try:
-                payload["platform_keys"] = _json.loads(env_keys)
-            except Exception:
-                pass
-        if payload:
-            load_credentials_from_remote(payload)  # env vars are already plaintext
-            return
-
-    # Try remote encrypted config
-    data = _fetch_remote_json("credentials.json")
-    if data and isinstance(data, dict):
-        load_credentials_from_remote(data)
-        # Cache decrypted config locally for offline use
-        try:
-            _CREDENTIAL_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            _CREDENTIAL_CACHE_PATH.write_text(
-                _json.dumps(data, ensure_ascii=False), encoding="utf-8")
-        except Exception:
-            pass
-        return
-
-    # Fallback: local cache (72h)
-    if _CREDENTIAL_CACHE_PATH.exists():
-        try:
-            cached = _json.loads(_CREDENTIAL_CACHE_PATH.read_text(encoding="utf-8"))
-            if isinstance(cached, dict):
-                load_credentials_from_remote(cached)
-        except Exception:
-            pass
 
 
 def _machine_fingerprint() -> str:
@@ -312,11 +257,10 @@ def _load_activation() -> str | None:
 async def startup():
     global _dev_mode_active
 
-    # ── 0a. 后台拉取远程配置（激活码 + 模型列表 + 加密凭据），不阻塞启动 ──
+    # ── 0a. 后台拉取远程配置（激活码 + 模型列表），不阻塞启动 ──
     import threading
     threading.Thread(target=_fetch_remote_codes, daemon=True).start()
     threading.Thread(target=_fetch_remote_models, daemon=True).start()
-    threading.Thread(target=_fetch_encrypted_credentials, daemon=True).start()
 
     if _load_activation():
         _dev_mode_active = True
@@ -375,12 +319,12 @@ async def startup():
     except (json.JSONDecodeError, IOError):
         current = {}
 
-    if current.get("version") != "2.12":
+    if current.get("version") != "3.0":
         import datetime
         version_data = {
-            "version": "2.12",
+            "version": "3.0",
             "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
-            "last_compatible_version": "2.00",
+            "last_compatible_version": "2.12",
         }
         version_file.write_text(json.dumps(version_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -450,7 +394,7 @@ def dev_deactivate():
 def dev_status():
     return {
         "dev_mode": _dev_mode_active,
-        "has_platform_keys": bool(_PLATFORM_KEYS_CACHE),
+        "has_platform_keys": False,
     }
 
 
