@@ -120,7 +120,8 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 
 /* ── API Keys ── */
 .api-tip{font-size:12px;color:var(--sub);margin-bottom:10px}
-.api-row{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.api-row{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.api-line{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .api-row select,.api-row input{font-size:12px;padding:6px 10px}
 .api-row input{flex:1;min-width:80px}
 .api-row .api-name-input{max-width:100px}
@@ -343,14 +344,18 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="card-label">LLM 智能翻译</div>
   <div class="api-tip" id="apiTip">暂未配置 LLM API Key</div>
   <div class="api-row" id="apiRow">
-    <select id="apiPlatform"></select>
-    <select id="apiModel" style="display:none"></select>
-    <input type="text" id="apiCustomModel" class="api-custom-model" placeholder="输入模型名…">
-    <input type="text" id="apiModelName" placeholder="模型名（如 moonshot-v1-8k）" style="display:none;flex:1">
-    <input type="text" class="api-name-input" id="apiName" placeholder="命名">
-    <input type="password" id="apiKeyInput" placeholder="粘贴 API Key">
-    <input type="text" id="apiEndpoint" placeholder="API 端点 URL（如 https://api.moonshot.cn/v1/chat/completions）" style="display:none;flex:1.5">
-    <button class="btn-primary" id="apiAddBtn" style="width:auto;margin:0;padding:6px 16px;font-size:12px">添加</button>
+    <div class="api-line">
+      <input type="password" id="apiKeyInput" placeholder="① 先粘贴 API Key（填好自动识别可用模型）">
+    </div>
+    <div class="api-line">
+      <select id="apiPlatform"></select>
+      <select id="apiModel" style="display:none"></select>
+      <input type="text" id="apiCustomModel" class="api-custom-model" placeholder="输入模型名…">
+      <input type="text" id="apiModelName" placeholder="模型名（如 moonshot-v1-8k）" style="display:none;flex:1">
+      <input type="text" id="apiEndpoint" placeholder="API 端点 URL（如 https://api.moonshot.cn/v1/chat/completions）" style="display:none;flex:1.5">
+      <input type="text" class="api-name-input" id="apiName" placeholder="命名">
+      <button class="btn-primary" id="apiAddBtn" style="width:auto;margin:0;padding:6px 16px;font-size:12px">添加</button>
+    </div>
   </div>
   <div class="model-hint" id="modelHint" style="display:none"></div>
   <ul class="api-key-list" id="apiKeyList"></ul>
@@ -475,6 +480,9 @@ function onDevTierChange(tier){
   $('devTierSwitch').value=tier;
   const url=new URL(location);url.searchParams.set('tier',tier);history.replaceState(null,'',url);
   syncUI();
+  // B5: 切换角色后立即重渲染分级 UI（svip/vip/免费 显示不同功能），无需手动刷新
+  if(State.availableBackends&&State.availableBackends.llm)updateBackendLists(State.availableBackends);
+  else fetch('/api/backends').then(r=>r.json()).then(updateBackendLists);
 }
 function syncDevTierSwitch(){
   const current=State.settings.tier||'free';
@@ -544,6 +552,8 @@ function updateBackendLists(data){
   });
   onPlatformChange();
   // ── Production / Dev tier UI ──
+  // 修复：每次渲染先恢复"上下文感知"按钮可用，下方免费分支会按需再禁用（否则一旦被禁用，切回 VIP/SVIP 也永久变灰、无法切回）
+  document.querySelectorAll('#ctxToggle button').forEach(b=>{b.disabled=false;b.style.opacity='1'});
   if(isDev && State.settings.tier==='svip'){
     $('apiTip').innerHTML='✅ <b>LLM 智能翻译已启用</b>（平台提供 API，无需配置）';
     $('apiRow').style.display='none';$('modelHint').style.display='none';
@@ -564,9 +574,14 @@ function updateBackendLists(data){
     ctxBtns.forEach(b=>{if(b.dataset.v==='true')b.disabled=true;b.style.opacity=b.dataset.v==='true'?'0.35':'1'});
     if(State.settings.contextAware){State.settings.contextAware=false;ctxBtns.forEach(b=>b.classList.toggle('active',b.dataset.v==='false'))}
   }else{
-    $('apiTip').textContent=`升级即可启用 LLM 智能翻译。可用平台: ${data.llm.map(b=>b.name).join(' / ')}`;
-    $('apiRow').style.display='flex';$('modeRow').style.display='flex';
+    // 开发者预览"免费"角色 → 显示与真实免费用户完全一致的 UI（隐藏 LLM 板块和高级设置）
+    $('apiTip').textContent=`升级后可启用 LLM 智能翻译。可用平台: ${data.llm.map(b=>b.name).join(' / ')}`;
+    $('apiRow').style.display='none';$('modeRow').style.display='flex';
+    $('modelHint').style.display='none';$('advCard').style.display='none';
     $('transModeTitle').textContent='翻译模式';
+    const ctxBtns=document.querySelectorAll('#ctxToggle button');
+    ctxBtns.forEach(b=>{if(b.dataset.v==='true')b.disabled=true;b.style.opacity=b.dataset.v==='true'?'0.35':'1'});
+    if(State.settings.contextAware){State.settings.contextAware=false;ctxBtns.forEach(b=>b.classList.toggle('active',b.dataset.v==='false'))}
   }
 }
 
@@ -745,6 +760,15 @@ $('ctxToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')retur
 
 // ============ Platform / Model select ============
 // Model list removed — now sourced from backend via State._llmModels
+// 各平台官方模型 ID 的格式示例（用于"其他模型…"手填时的规范提示）
+const MODEL_ID_FORMAT={
+  claude:'例：claude-opus-4-8、claude-sonnet-4-6',
+  gpt:'例：gpt-4o、gpt-4.1、gpt-4o-mini',
+  gemini:'例：gemini-2.5-pro、gemini-2.0-flash',
+  deepseek:'例：deepseek-chat、deepseek-reasoner',
+  glm:'例：glm-4-flash、glm-4-plus',
+  doubao:'例：填豆包接入点 ID（ep-… 或官方模型 ID）',
+};
 
 function onPlatformChange(){
   const platform=$('apiPlatform').value;
@@ -772,7 +796,9 @@ function onPlatformChange(){
   if(models.length===0)return;
 
   modelSel.innerHTML='';
-  models.forEach((m,i)=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;if(i===0)o.selected=true;modelSel.appendChild(o)});
+  // 默认选中"最强"款（名称含"最强"），找不到则退回第一个
+  const strongestIdx=Math.max(0,models.findIndex(m=>(m.name||'').includes('最强')));
+  models.forEach((m,i)=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;if(i===strongestIdx)o.selected=true;modelSel.appendChild(o)});
   const sep=document.createElement('option');sep.disabled=true;sep.textContent='──────────';modelSel.appendChild(sep);
   const customOpt=document.createElement('option');customOpt.value='__custom__';customOpt.textContent='其他模型…';modelSel.appendChild(customOpt);
 
@@ -783,13 +809,40 @@ function onPlatformChange(){
 function onModelChange(){
   const modelSel=$('apiModel');
   const customModel=$('apiCustomModel');
-  if(modelSel.value==='__custom__'){customModel.classList.add('visible');customModel.focus()}
-  else{customModel.classList.remove('visible')}
+  const modelHint=$('modelHint');
+  const platform=$('apiPlatform').value;
+  if(modelSel.value==='__custom__'){
+    customModel.classList.add('visible');customModel.focus();
+    // 手填时给出规范的模型 ID 格式提示（按所选平台给真实示例）
+    if(modelHint){modelHint.style.display='';modelHint.textContent='请填官方模型 ID（区分大小写，通常全小写、单词用连字符「-」连接，勿用空格或下划线）。'+(MODEL_ID_FORMAT[platform]?' '+MODEL_ID_FORMAT[platform]:'')}
+  }else{
+    customModel.classList.remove('visible');
+    if(modelHint){modelHint.textContent='以上为推荐模型。如需其他版本（旧版/私有模型），选「其他模型…」按规范填写模型 ID。'}
+  }
 }
 
 // ============ API Keys ============
-$('apiPlatform').addEventListener('change',()=>{onPlatformChange();onModelChange()});
+// 方案A：填好 Key（失焦）或切换平台时，拿这把 Key 去问对应平台"能用哪些模型"，用真实列表替换下拉
+async function fetchAndFillModels(){
+  const platform=$('apiPlatform').value;
+  const key=$('apiKeyInput').value.trim();
+  const hint=$('modelHint');
+  if(!platform||platform==='custom'||!key)return;  // 自定义平台让用户手填，不自动拉
+  State._llmModels=State._llmModels||{};
+  if(hint){hint.style.display='';hint.textContent='正在识别可用模型…'}
+  try{
+    const r=await fetch('/api/llm-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform,key})});
+    const d=await r.json();
+    if(d&&d.models&&d.models.length){
+      State._llmModels[platform]=d.models;
+      onPlatformChange();
+      if(hint){hint.style.display='';hint.textContent='✓ 已识别 '+d.models.length+' 个可用模型'}
+    }else{onPlatformChange();}   // 失败/空 → 静默回退内置列表，不报错
+  }catch(e){onPlatformChange();} // 网络错误 → 静默回退，不报错
+}
+$('apiPlatform').addEventListener('change',()=>{onPlatformChange();onModelChange();fetchAndFillModels()});
 $('apiModel').addEventListener('change',onModelChange);
+$('apiKeyInput').addEventListener('blur',fetchAndFillModels);
 
 let keyCounter=0;
 $('apiAddBtn').addEventListener('click',()=>{

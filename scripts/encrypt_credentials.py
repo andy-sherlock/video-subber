@@ -23,8 +23,10 @@ def encrypt():
     try:
         from cryptography.fernet import Fernet
     except ImportError:
-        print("Error: cryptography not installed. Run: pip install cryptography")
-        sys.exit(1)
+        import subprocess
+        print("cryptography 未安装，正在自动安装...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "cryptography"], check=True)
+        from cryptography.fernet import Fernet
 
     if not os.path.exists(PLAINTEXT_FILE):
         print(f"Plaintext file not found: {PLAINTEXT_FILE}")

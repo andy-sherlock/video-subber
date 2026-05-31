@@ -27,14 +27,25 @@ class GeminiBackend(LLMBackend):
         }).encode()
 
     def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
+        import urllib.error as _urlerr
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
             f"models/{self._model}:generateContent"
         )
         body = self._build_body(prompt, max_tokens)
-        req = urllib.request.Request(url, data=body, headers=self._build_headers())
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return self._call_api_parse(json.loads(resp.read().decode()))
+        last_err = None
+        for attempt in range(4):  # 遇 429 限速 / 5xx 临时故障 指数退避重试，与基类一致
+            req = urllib.request.Request(url, data=body, headers=self._build_headers())
+            try:
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    return self._call_api_parse(json.loads(resp.read().decode()))
+            except _urlerr.HTTPError as e:
+                last_err = e
+                if e.code in (429, 500, 502, 503, 504) and attempt < 3:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
+        raise last_err
 
     def _call_api_parse(self, data: dict) -> str:
         return data["candidates"][0]["content"]["parts"][0]["text"]
