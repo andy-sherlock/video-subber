@@ -2464,3 +2464,27 @@ if len(parts) != len(non_empty):
 **原因**：pyvideotrans 等竞品的"免费微软翻译"是逆向 Edge 浏览器内置翻译（`edge.microsoft.com/translate/auth` → `api-edge.cognitive.microsofttranslator.com`），不是官方 API。与之前砍掉剪映/必剪逆向 API 的理由相同
 **解决方案**：① 承认所有竞品的"免费翻译"都是逆向接口（包括我们已有的 Google）② 实现 Bing 逆向引擎（`bing.py`）+ 有道逆向引擎（`youdao.py`）③ 定性为"尽力而为"降级方案，不作为核心保证 ④ 做好多引擎降级链：Google → Bing → 有道 → 百度 BYOK
 **已修** ✅
+
+---
+
+## P130 | 2026-06-03 | 版本号 | main.py 硬编码版本号导致前端永远显示旧版本
+**问题**：V3.01 迭代完成后，前端版本号仍显示 "v3.0"。用户以为版本号会自动跟着迭代更新，实际不会
+**原因**：`main.py` startup 里硬编码 `"3.0"` 写到 `~/.video-subber/.version` 文件，`_detect_version()` 优先读这个文件就返回了，永远不会走到后面的 pyproject.toml 读取。版本号分散在三处（main.py 硬编码、.version 文件、pyproject.toml），互相不同步
+**解决方案**：① `_detect_version()` 从四级 fallback（.version→git tag→目录扫描→pyproject.toml）简化为只读 `pyproject.toml`（唯一版本号来源）② startup 写 .version 改为写检测结果而非硬编码值 ③ 每次迭代时 Claude 自动更新 pyproject.toml 版本号作为流程的一部分
+**已修** ✅
+
+---
+
+## P131 | 2026-06-03 | 快照 | v2.10/v2.11 快照包含 .venv 占 1.85GB 磁盘
+**问题**：v2.10 和 v2.11 快照各 926MB，因为创建快照时把 `.venv/`（Python 虚拟环境，含 PyTorch 237MB、ONNX 27MB 等第三方库）也复制进去了
+**原因**：早期快照用 `cp -r` 全量复制，没有排除 .venv。v2.12 起改用 rsync 排除，本问题不再复发
+**解决方案**：删除 `v2/v2.10/.venv/` 和 `v2/v2.11/.venv/`，释放 1.85GB。.venv 不是源代码，可随时用 `uv sync` 重建
+**已修** ✅
+
+---
+
+## P132 | 2026-06-03 | 目录结构 | V3 代码放在 v2/ 文件夹内，目录命名混乱
+**问题**：V3 的活跃代码在 `v2/` 目录下开发，V3.01 快照也存放在 `v2/v3.01/`。用户指出 V2 和 V3 应该是同级文件夹，当前结构不直观
+**原因**：V2→V3 升级时没有新建 `v3/` 目录，直接在 `v2/` 里继续开发并改版本号。`v2/` 从"V2 版本代码"变成了"活跃代码目录"，但文件夹名仍叫 v2，造成语义混乱
+**解决方案**：**推迟到 V3 Phase 2（PySide6 桌面应用重写前端）时一并整理**。届时需要：① 将 `v2/` 重命名或迁移为 `v3/` ② 将 v2.XX 快照移到与 v3/ 同级 ③ 更新 CLAUDE.md 和所有路径引用。当前阶段（Phase 1B 多模型转录）不动目录结构，避免引入不必要的变更风险
+**已修** ❌（计划推迟到 Phase 2）

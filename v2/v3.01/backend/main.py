@@ -211,19 +211,20 @@ async def startup():
     # ── 3. Store main event loop for worker_manager reader threads ──
     worker_manager.set_main_loop(asyncio.get_running_loop())
 
-    # ── 4. P3: 写入 .version 标记文件（V3 升级时读取，触发迁移逻辑）──
+    # ── 4. 同步 .version 缓存文件（供外部工具读取）──
     version_file = Path.home() / ".video-subber" / ".version"
     try:
         current = json.loads(version_file.read_text(encoding="utf-8")) if version_file.exists() else {}
     except (json.JSONDecodeError, IOError):
         current = {}
 
-    if current.get("version") != "3.0":
+    _detected = _detect_version()
+    if current.get("version") != _detected:
         import datetime
         version_data = {
-            "version": "3.0",
+            "version": _detected,
             "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
-            "last_compatible_version": "2.12",
+            "last_compatible_version": current.get("version", "unknown"),
         }
         version_file.write_text(json.dumps(version_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -267,62 +268,14 @@ def health():
 
 
 def _detect_version() -> str:
-    """Auto-detect version from .version file → git tag → dir scan → pyproject.toml → fallback."""
-    import subprocess, re, glob as _glob
-
-    # 0) .version file (authoritative source)
+    """Read version from pyproject.toml (single source of truth)."""
     try:
-        vf = Path.home() / ".video-subber" / ".version"
-        if vf.exists():
-            import json as _json
-            data = _json.loads(vf.read_text(encoding="utf-8"))
-            v = data.get("version")
-            if v:
-                return v
-    except Exception:
-        pass
-
-    # 1) Git tag: git describe --tags --abbrev=0
-    try:
-        r = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0"],
-            capture_output=True, text=True, timeout=3,
-            cwd=str(Path(__file__).parent.parent),
-        )
-        tag = r.stdout.strip()
-        if tag and re.match(r"v?\d+\.\d+", tag):
-            return tag.lstrip("v")
-    except Exception:
-        pass
-
-    # 2) Scan version dirs: find highest v2.XX/ in project root
-    try:
-        root = Path(__file__).parent.parent
-        best = (0, 0)
-        for d in root.glob("v[0-9]*.[0-9]*"):
-            m = re.match(r"v(\d+)\.(\d+)", d.name)
-            if m:
-                v = (int(m.group(1)), int(m.group(2)))
-                if v > best:
-                    best = v
-        if best != (0, 0):
-            return f"{best[0]}.{best[1]:02d}"
-    except Exception:
-        pass
-
-    # 3) pyproject.toml
-    try:
+        import tomllib
         ppt = Path(__file__).parent.parent / "pyproject.toml"
-        if ppt.exists():
-            import tomllib
-            data = tomllib.loads(ppt.read_text())
-            v = data.get("project", {}).get("version")
-            if v:
-                return v
+        data = tomllib.loads(ppt.read_text())
+        return data.get("project", {}).get("version", "dev")
     except Exception:
-        pass
-
-    return "dev"
+        return "dev"
 
 
 @app.get("/api/env")
