@@ -115,9 +115,16 @@ class WorkerManager:
 
     async def _forward(self, job_id: str, msg: dict):
         """Forward a progress message to all WebSocket clients for this job.
-        This runs on the main event loop, so send_json is safe."""
+        This runs on the main event loop, so send_json is safe.
+        Also syncs progress to JOBS dict so polling returns fresh data after restart."""
         from .ws_manager import ws_manager
+        from .main import JOBS
         await ws_manager.send(job_id, msg)
+        # Sync progress to JOBS for polling fallback
+        if msg.get("type") == "progress" and job_id in JOBS:
+            JOBS[job_id]["progress"] = msg.get("percent", 0)
+            JOBS[job_id]["stage"] = msg.get("stage", "")
+            JOBS[job_id]["message"] = msg.get("message", "")
 
     def _read_stderr(self, job_id: str, proc: subprocess.Popen):
         for line in proc.stderr:

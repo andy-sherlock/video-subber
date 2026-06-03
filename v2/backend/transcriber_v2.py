@@ -86,10 +86,10 @@ def _detect_speaker_changes(audio_path: str, segments: list) -> list:
     def _get_emb(start: float, end: float):
         try:
             dur = end - start
-            if dur < 0.3:
+            if dur < 1.0:
                 return None
             y, _sr = librosa.load(audio_path, sr=16000, offset=start, duration=dur)
-            if len(y) < 16000 * 0.3:
+            if len(y) < 16000 * 1.0:
                 return None
             wav = preprocess_wav(y, source_sr=16000)
             return encoder.embed_utterance(wav)

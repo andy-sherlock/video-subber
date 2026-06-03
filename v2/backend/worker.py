@@ -101,6 +101,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from backend.core.extractor import extract_audio
 from backend.core.subtitler import build_srt, build_ass, burn_subtitles
 from backend.core.checkpoint import Checkpoint, find_versioned_cache, cleanup_old_versions
+from backend.core.sentence_splitter import word_align_segments, llm_split_segments
 from backend.transcriber_v2 import transcribe as transcribe_v2, Segment
 from backend.key_manager import scrub_logs
 
@@ -111,83 +112,6 @@ def emit(event_type: str, **kwargs):
     sys.stdout.flush()
 
 
-_ZH_SENT_RE = _re.compile(r'[。！？!?]+')
-
-
-def _split_zh_simple(text: str) -> list[str]:
-    """Split Chinese text on sentence-ending punctuation."""
-    parts, last = [], 0
-    for m in _ZH_SENT_RE.finditer(text):
-        p = text[last:m.end()].strip()
-        if p:
-            parts.append(p)
-        last = m.end()
-    remainder = text[last:].strip()
-    if remainder:
-        if parts:
-            parts[-1] += remainder
-        else:
-            parts.append(remainder)
-    return [p for p in parts if p] or [text]
-
-
-def _word_align_segments(segments: list) -> list:
-    """Re-split segments using English word timestamps for accurate Chinese timing.
-
-    Each Whisper segment may contain multiple sentences (e.g. A+B+C in 4.56s).
-    Without alignment, all Chinese text is distributed proportionally by char count.
-    With word timestamps, each Chinese sentence gets the time of its corresponding
-    English sentence — same start/end as when the English words were actually spoken.
-    Falls back silently to the original segment when words are unavailable.
-    """
-    result = []
-    for seg in segments:
-        words = getattr(seg, 'words', [])
-        zh = getattr(seg, 'zh', '').strip()
-
-        if not words or not zh or zh == '[翻译失败]':
-            result.append(seg)
-            continue
-
-        zh_parts = _split_zh_simple(zh)
-        if len(zh_parts) <= 1:
-            result.append(seg)
-            continue
-
-        sent_end_idxs = [
-            i for i, w in enumerate(words)
-            if _re.search(r'[.!?]\s*$', w['word'] if isinstance(w, dict) else getattr(w, 'word', ''))
-        ]
-
-        if len(sent_end_idxs) < len(zh_parts) - 1:
-            result.append(seg)
-            continue
-
-        boundaries = sent_end_idxs[:len(zh_parts) - 1]
-        t = seg.start
-        prev_boundary = -1
-        for i, zh_part in enumerate(zh_parts):
-            if i < len(boundaries):
-                bw = words[boundaries[i]]
-                t_end = round(bw['end'] if isinstance(bw, dict) else bw.end, 2)
-                en_words = words[prev_boundary + 1: boundaries[i] + 1]
-                prev_boundary = boundaries[i]
-            else:
-                t_end = seg.end
-                en_words = words[prev_boundary + 1:]
-            en_text = " ".join(
-                (w['word'] if isinstance(w, dict) else getattr(w, 'word', '')).strip()
-                for w in en_words
-            ).strip() or seg.text
-            sub = Segment(id=seg.id * 1000 + i, start=t, end=t_end, text=en_text)
-            sub.zh = zh_part
-            sub.speaker_change = seg.speaker_change if i == 0 else False
-            sub.uncertain = False
-            sub.words = []
-            result.append(sub)
-            t = t_end
-
-    return result
 
 
 def main():
@@ -209,11 +133,11 @@ def main():
     subtitles = config.get("subtitles", "no")
     model = config.get("model", "medium")
     translation_mode = config.get("translationMode", "speed")
-    translation_priority = config.get("translationPriority", ["google", "bing", "baidu", "youdao"])
+    translation_priority = config.get("translationPriority", ["google", "bing", "youdao"])
     api_keys = config.get("apiKeys", [])
     context_aware = config.get("contextAware", False)
-    tier = config.get("tier", "free")
     style = config.get("style", None)
+    speaker_detect = config.get("speakerDetect", False)  # 实验性功能，默认关闭
 
     # ── v2.05: Config schema 校验，防止静默降级 ──
     def _validate_config(cfg: dict):
@@ -225,9 +149,8 @@ def main():
             raise ValueError(f"config.translationMode 无效: {cfg['translationMode']}")
         if "subtitles" in cfg and cfg["subtitles"] not in ("yes", "no", None):
             raise ValueError(f"config.subtitles 无效: {cfg['subtitles']}")
-        if "tier" in cfg and cfg["tier"] not in ("free", "vip", "svip", None):
-            raise ValueError(f"config.tier 无效: {cfg['tier']}")
-
+        if "speakerDetect" in cfg and not isinstance(cfg.get("speakerDetect"), (bool, type(None))):
+            raise ValueError(f"config.speakerDetect 应为 bool，实际为 {type(cfg['speakerDetect']).__name__}")
     _validate_config(config)
 
     # Redirect V1.3 print() to stderr so stdout stays clean JSON.
@@ -256,10 +179,10 @@ def main():
     SETTING_STAGE = {
         "subtitles": "extract_audio",
         "model": "transcribe",
+        "speakerDetect": "transcribe",
         "translationMode": "translate",
         "translationPriority": "translate",
         "apiKeys": "translate",
-        "tier": "translate",
         "contextAware": "translate",
         "style": "subtitle",
         "burn": "burn",
@@ -315,6 +238,12 @@ def main():
         stderr_progress("start", 0, "正在准备…")
 
         # ── Step 1: Extract Audio (0-5%) ──
+        video_width, video_height = 1920, 1080
+        from backend.core.extractor import get_video_resolution
+        try:
+            video_width, video_height = get_video_resolution(video_path)
+        except Exception:
+            pass
         if stage in ("start", "extract_audio") and not Path(audio_path).exists():
             stderr_progress("extract", 2, "正在分析视频…")
             extract_audio(video_path, audio_path)
@@ -336,7 +265,7 @@ def main():
             segments = transcribe_v2(
                 audio_path, model_size=model, source_lang="auto",
                 skip_vad=True, vad_threshold=0.0,
-                filter_keywords=True, speaker_detect=True,
+                filter_keywords=True, speaker_detect=speaker_detect,
                 progress_callback=_trans_progress,
             )
             with open(transcript_path, "w", encoding="utf-8") as f:
@@ -372,7 +301,7 @@ def main():
                 zh_list, failed_indices, token_usage = translate_with_orchestrator(
                     texts=texts, mode=translation_mode, priority=translation_priority,
                     api_keys=api_keys, context_aware=context_aware,
-                    tier=tier, progress_callback=prog,
+                    progress_callback=prog,
                 )
                 if token_usage:
                     msg = json.dumps({"type": "token_usage", "usage": token_usage}, ensure_ascii=False)
@@ -387,13 +316,13 @@ def main():
             failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
 
             # ── LLM 失败降级弹窗 ──
-            _is_paid = tier in ("vip", "svip")
+            _has_llm_keys = bool(api_keys)
             _all_failed = len(failed) == total and total > 0
-            if _is_paid and _all_failed:
+            if _has_llm_keys and _all_failed:
                 stderr_progress("translate", 40, "LLM 翻译全部失败，等待用户选择…")
                 msg = json.dumps({
                     "type": "llm_failed",
-                    "message": "LLM 翻译全部失败，是否改用免费引擎（Google/百度）继续？",
+                    "message": "LLM 翻译全部失败，是否改用免费引擎（Google/Bing/有道）继续？",
                     "total": total,
                 }, ensure_ascii=False)
                 _real_stdout.write(msg + "\n")
@@ -416,8 +345,8 @@ def main():
                     stderr_progress("translate", 40, "已切换为免费引擎，正在重新翻译…")
                     zh_list, failed_indices, token_usage = translate_with_orchestrator(
                         texts=texts, mode=translation_mode, priority=translation_priority,
-                        api_keys=api_keys, context_aware=False,
-                        tier="free", progress_callback=prog,
+                        api_keys=[], context_aware=False,
+                        progress_callback=prog,
                     )
                     for s, zh in zip(segments, zh_list):
                         s.zh = zh
@@ -452,7 +381,19 @@ def main():
         for s in segments:
             s.uncertain = False
 
-        subtitle_segments = _word_align_segments(segments)
+        subtitle_segments = word_align_segments(segments)
+
+        # T4: LLM sentence splitting for long Chinese subtitles
+        llm_backend = None
+        if api_keys:
+            try:
+                from backend.translation.orchestrator import _build_llm_backends
+                llm_list = _build_llm_backends(api_keys)
+                if llm_list:
+                    llm_backend = llm_list[0]
+            except Exception:
+                pass
+        subtitle_segments = llm_split_segments(subtitle_segments, llm_backend=llm_backend)
 
         stderr_progress("subtitle", 85, "正在生成字幕文件…")
         build_srt(subtitle_segments, srt_path)
@@ -464,12 +405,15 @@ def main():
                 try:
                     from backend.subtitle_style import build_ass_styled
                     stderr_progress("subtitle", 88, "正在排版字幕样式…")
-                    build_ass_styled(subtitle_segments, ass_path, alignment=alignment, style=style)
+                    build_ass_styled(subtitle_segments, ass_path, alignment=alignment, style=style,
+                                     video_width=video_width, video_height=video_height)
                 except ImportError:
-                    build_ass(subtitle_segments, ass_path, alignment=alignment)
+                    build_ass(subtitle_segments, ass_path, alignment=alignment,
+                              video_width=video_width, video_height=video_height)
             else:
                 stderr_progress("subtitle", 88, "正在排版字幕样式…")
-                build_ass(subtitle_segments, ass_path, alignment=alignment)
+                build_ass(subtitle_segments, ass_path, alignment=alignment,
+                          video_width=video_width, video_height=video_height)
 
             # ── Step 5: Burn (90-100%) ──
             stderr_progress("burn", 92, "正在合成最终视频…")

@@ -6,7 +6,7 @@ CONFIG_PATH = Path.home() / ".video-subber" / "config.json"
 
 DEFAULT_CONFIG = {
     "translationMode": "speed",
-    "translationPriority": ["google", "baidu"],
+    "translationPriority": ["google", "bing", "youdao"],
     "model": "medium",
     "style": {
         "font": "Microsoft YaHei" if sys.platform == "win32" else "PingFang SC",

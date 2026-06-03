@@ -120,7 +120,8 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 
 /* ── API Keys ── */
 .api-tip{font-size:12px;color:var(--sub);margin-bottom:10px}
-.api-row{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.api-row{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.api-line{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .api-row select,.api-row input{font-size:12px;padding:6px 10px}
 .api-row input{flex:1;min-width:80px}
 .api-row .api-name-input{max-width:100px}
@@ -128,6 +129,16 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .api-key-list li{display:flex;align-items:center;gap:8px;padding:4px 0}
 .api-key-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;opacity:.6;transition:opacity .15s}
 .api-key-del:hover{opacity:1}
+.api-key-card{display:flex;align-items:center;gap:8px;padding:8px 12px;margin:4px 0;background:var(--surface);border-radius:8px;cursor:pointer;transition:all .15s;list-style:none}
+.api-key-card:hover{background:color-mix(in srgb,var(--blue) 15%,var(--surface))}
+.api-key-card.editing{border:1px solid var(--blue);background:color-mix(in srgb,var(--blue) 10%,var(--surface));cursor:default}
+.api-key-card .card-name{flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.api-cancel-btn{display:none;width:auto;margin:0;padding:6px 16px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;transition:all .15s}
+.api-cancel-btn:hover{background:var(--border)}
+.api-key-wrap{position:relative;flex:1;display:flex}
+.api-key-wrap input{padding-right:36px!important;width:100%}
+.key-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--sub);line-height:1;display:flex;align-items:center}
+.key-eye:hover{color:var(--text)}
 .api-custom-model{display:none;font-size:12px;padding:6px 10px;border:1px solid var(--blue);border-radius:6px;background:var(--card);color:var(--text);flex:1;min-width:120px}
 .api-custom-model.visible{display:inline-block}
 .model-hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.5}
@@ -181,7 +192,6 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .dev-login-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center}
 .dev-login-overlay.active{display:flex}
 .dev-login-box{background:var(--card);border-radius:12px;padding:24px;max-width:360px;width:90%}
-#devLoginTrigger:hover{opacity:0.9!important}
 .hidden{display:none!important}
 
 /* ── Locked controls ── */
@@ -208,9 +218,6 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .job-card-error.show{display:block}
 .job-card-done .job-card-close{display:none}
 
-/* ── Dev Gear ── */
-.dev-gear{position:fixed;bottom:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:99;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.dev-gear:hover{color:var(--text);border-color:var(--text);box-shadow:0 2px 16px rgba(0,0,0,.12);transform:rotate(30deg)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
 </style>
 </head>
@@ -222,23 +229,6 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <h1>Video Subber</h1>
   <p>拖进去，等一会，就能看懂 <span style="font-size:10px;color:var(--sub);opacity:.5" id="versionTag"></span></p>
 </header>
-
-<!-- Dev toolbar -->
-<div id="devToolbar" style="display:none;background:var(--card);border-radius:8px;padding:8px 14px;margin-bottom:8px;font-size:11px;color:var(--sub);text-align:center">
-  🔧 开发者模式 —
-  模拟环境检测：
-  <label style="margin:0 6px"><input type="checkbox" id="devNoFfmpeg" onchange="reloadEnv()"> 无视频处理</label>
-  <label style="margin:0 6px"><input type="checkbox" id="devNoLibass" onchange="reloadEnv()"> 无烧录</label>
-  <label style="margin:0 6px"><input type="checkbox" id="devNoWhisper" onchange="reloadEnv()"> 无语音识别</label>
-  &nbsp;|&nbsp;
-  <span id="devTierBadge" style="color:var(--blue)"></span>
-  <select id="devTierSwitch" onchange="onDevTierChange(this.value)" style="display:none;font-size:11px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px;margin-left:4px;cursor:pointer">
-    <option value="free">免费用户</option>
-    <option value="vip">VIP</option>
-    <option value="svip">SVIP</option>
-  </select>
-  <button onclick="devLogout()" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--sub);cursor:pointer;padding:2px 8px;border-radius:4px;margin-left:6px">退出开发者</button>
-</div>
 
 <!-- Environment Bar -->
 <div class="env-bar" id="envBar"></div>
@@ -343,14 +333,25 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="card-label">LLM 智能翻译</div>
   <div class="api-tip" id="apiTip">暂未配置 LLM API Key</div>
   <div class="api-row" id="apiRow">
-    <select id="apiPlatform"></select>
-    <select id="apiModel" style="display:none"></select>
-    <input type="text" id="apiCustomModel" class="api-custom-model" placeholder="输入模型名…">
-    <input type="text" id="apiModelName" placeholder="模型名（如 moonshot-v1-8k）" style="display:none;flex:1">
-    <input type="text" class="api-name-input" id="apiName" placeholder="命名">
-    <input type="password" id="apiKeyInput" placeholder="粘贴 API Key">
-    <input type="text" id="apiEndpoint" placeholder="API 端点 URL（如 https://api.moonshot.cn/v1/chat/completions）" style="display:none;flex:1.5">
-    <button class="btn-primary" id="apiAddBtn" style="width:auto;margin:0;padding:6px 16px;font-size:12px">添加</button>
+    <div class="api-line">
+      <div class="api-key-wrap">
+        <input type="password" id="apiKeyInput" placeholder="① 先粘贴 API Key（填好自动识别可用模型）">
+        <button type="button" id="apiKeyEye" class="key-eye" onclick="toggleKeyVisibility()" title="显示/隐藏">
+          <svg id="eyeOffIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          <svg id="eyeOnIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="api-line">
+      <select id="apiPlatform"></select>
+      <select id="apiModel" style="display:none"></select>
+      <input type="text" id="apiCustomModel" class="api-custom-model" placeholder="输入模型名…">
+      <input type="text" id="apiModelName" placeholder="模型名（如 moonshot-v1-8k）" style="display:none;flex:1">
+      <input type="text" id="apiEndpoint" placeholder="平台地址（如 https://apihub.agnes-ai.com/v1）" style="display:none;flex:1.5">
+      <input type="text" class="api-name-input" id="apiName" placeholder="命名">
+      <button class="btn-primary" id="apiAddBtn" style="width:auto;margin:0;padding:6px 16px;font-size:12px">添加</button>
+      <button class="api-cancel-btn" id="apiCancelBtn">取消</button>
+    </div>
   </div>
   <div class="model-hint" id="modelHint" style="display:none"></div>
   <ul class="api-key-list" id="apiKeyList"></ul>
@@ -368,6 +369,14 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
       </div>
     </div>
     <div class="info-note">上下文感知：LLM 先阅读完整字幕理解语境（主题、人物、术语），再逐段翻译。更准确，但耗时更长。</div>
+    <div class="row" style="margin-top:12px">
+      <span style="font-size:13px;min-width:70px">说话人检测</span>
+      <div class="toggle" id="speakerToggle">
+        <button class="active" data-v="false">关闭</button>
+        <button data-v="true">开启 🧪</button>
+      </div>
+    </div>
+    <div class="info-note">🧪 实验性功能。检测到可能的说话人切换时字幕加 <b>- </b> 横杠前缀。单人演讲、脱口秀等内容建议关闭。</div>
   </div>
 </div>
 
@@ -388,25 +397,11 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="error-box"><p id="errorText"></p><button onclick="closeError()">知道了</button></div>
 </div>
 
-<!-- Developer Login Modal -->
-<div class="dev-login-overlay" id="devLoginOverlay">
-  <div class="dev-login-box">
-    <h3 style="margin:0 0 8px">激活开发者模式</h3>
-    <p style="font-size:13px;color:var(--sub);margin:0 0 16px">输入激活码以启用开发者模式。<br>激活后绑定本机，重启自动恢复。</p>
-    <input type="text" id="devCodeInput" placeholder="激活码" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:14px;margin-bottom:12px;box-sizing:border-box;text-transform:uppercase" onkeydown="if(event.key==='Enter')devActivate()">
-    <div style="display:flex;gap:8px">
-      <button onclick="devActivate()" style="flex:1;padding:8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">激活</button>
-      <button onclick="closeDevLogin()" style="flex:1;padding:8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:14px;cursor:pointer">取消</button>
-    </div>
-    <p id="devLoginError" style="font-size:12px;color:var(--red);margin:8px 0 0;display:none"></p>
-  </div>
-</div>
-
 <!-- LLM Fallback Modal -->
 <div class="dev-login-overlay" id="llmFallbackOverlay">
   <div class="dev-login-box">
     <h3 style="margin:0 0 8px">LLM 翻译失败</h3>
-    <p style="font-size:13px;color:var(--sub);margin:0 0 16px" id="llmFallbackMsg">翻译全部失败，是否改用 Google/百度免费翻译继续？</p>
+    <p style="font-size:13px;color:var(--sub);margin:0 0 16px" id="llmFallbackMsg">翻译全部失败，是否改用 Google/Bing/有道免费翻译继续？</p>
     <div style="display:flex;gap:8px">
       <button onclick="llmFallbackDecide('use_free')" style="flex:1;padding:8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">降级为免费翻译</button>
       <button onclick="llmFallbackDecide('keep_failed')" style="flex:1;padding:8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:14px;cursor:pointer">保留失败结果</button>
@@ -414,10 +409,6 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   </div>
 </div>
 
-<!-- Dev gear (replaces ? button) -->
-<button class="dev-gear" id="devLoginTrigger" onclick="openDevLogin()" title="激活开发者模式">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-</button>
 
 </div>
 
@@ -429,68 +420,20 @@ const State={
   videoFile:null,
   localPath:null,
   doneJobConfig:null,
-  availableBackends:{free:[],llm:[],tiers:{}},
+  availableBackends:{free:[],llm:[]},
   settings:{
     subtitles:"no",burn:true,model:"medium",
-    translationMode:"speed",translationPriority:["google","baidu"],
-    tier:"free",contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
+    translationMode:"speed",translationPriority:["google","bing","youdao"],
+    contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
+    speakerDetect:false,
     style:{font:"PingFang SC",size:20,color:"white",outlineColor:"black",bgColor:"transparent"}
   }
 };
 const MODELS=["tiny","base","small","medium","large-v3"];
 const MODEL_INFO={"tiny":"tiny（最快，~150MB）","base":"base（快，~300MB）","small":"small（均衡，~900MB）","medium":"medium（推荐，~1.5GB）","large-v3":"large-v3（最准，~3GB）"};
-const DEFAULT_LABELS={google:"Google",baidu:"百度"};
+const DEFAULT_LABELS={google:"Google",bing:"Bing",youdao:"有道"};
 
-// ============ Dev Mode ============
-let isDev=false;
-async function checkDevStatus(){
-  try{
-    const r=await fetch('/api/dev-status',{cache:'no-store'});
-    const d=await r.json();
-    isDev=d.dev_mode;
-    $('devLoginTrigger').style.display='flex';
-    if(isDev){
-      $('devToolbar').style.display='block';
-      $('devTierBadge').textContent='开发者模式'+(d.has_platform_keys?' (含平台Key)':'');
-      $('devTierSwitch').style.display='inline-flex';
-      syncDevTierSwitch();
-    }
-    return d;
-  }catch(e){return {dev_mode:false};}
-}
-function openDevLogin(){$('devLoginOverlay').classList.add('active');$('devCodeInput').focus()}
-function closeDevLogin(){$('devLoginOverlay').classList.remove('active');$('devCodeInput').value='';$('devLoginError').style.display='none'}
-async function devActivate(){
-  const code=$('devCodeInput').value.trim();
-  if(!code)return;
-  try{
-    const r=await fetch('/api/dev/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
-    if(r.ok){$('devLoginError').style.display='none';closeDevLogin();location.reload()}
-    else{const d=await r.json();$('devLoginError').textContent=d.error||'激活码无效';$('devLoginError').style.display='block'}
-  }catch(e){$('devLoginError').textContent='网络错误，请重试';$('devLoginError').style.display='block'}
-}
-async function devLogout(){await fetch('/api/dev/deactivate',{method:'POST'});location.reload()}
-function onDevTierChange(tier){
-  State.settings.tier=tier;
-  $('devTierSwitch').value=tier;
-  const url=new URL(location);url.searchParams.set('tier',tier);history.replaceState(null,'',url);
-  syncUI();
-}
-function syncDevTierSwitch(){
-  const current=State.settings.tier||'free';
-  const sel=$('devTierSwitch');
-  if(sel)sel.value=current;
-}
-
-const urlParams=new URLSearchParams(location.search);
-const urlTier=urlParams.get('tier');
-function getSimulateParam(){
-  const parts=[];
-  if($('devNoFfmpeg')?.checked)parts.push('noffmpeg');
-  if($('devNoLibass')?.checked)parts.push('nolibass');
-  if($('devNoWhisper')?.checked)parts.push('nowhisper');
-  return parts.length?'?simulate='+parts.join(','):'';
-}
+function getSimulateParam(){ return ''; }
 
 // ============ Env Bar ============
 function reloadEnv(){
@@ -543,31 +486,19 @@ function updateBackendLists(data){
     if(b.models)State._llmModels[b.id]=b.models;
   });
   onPlatformChange();
-  // ── Production / Dev tier UI ──
-  if(isDev && State.settings.tier==='svip'){
-    $('apiTip').innerHTML='✅ <b>LLM 智能翻译已启用</b>（平台提供 API，无需配置）';
-    $('apiRow').style.display='none';$('modelHint').style.display='none';
-    $('modeRow').style.display='flex';$('advCard').style.display='block';
-    $('transModeTitle').textContent='翻译模式';
-  }else if(isDev && State.settings.tier==='vip'){
-    $('apiTip').textContent=`可用 LLM 平台: ${data.llm.map(b=>b.name).join(' / ')}。添加 API Key 即可启用。`;
-    $('apiRow').style.display='flex';$('modeRow').style.display='flex';
-    $('advCard').style.display='block';
-    $('transModeTitle').textContent='翻译模式';
-  }else if(!isDev){
-    $('apiTip').textContent=`升级后可启用 LLM 智能翻译。可用平台: ${data.llm.map(b=>b.name).join(' / ')}`;
-    $('apiRow').style.display='none';$('modeRow').style.display='flex';
-	    $('modelHint').style.display='none';$('advCard').style.display='none';
-    $('transModeTitle').textContent='翻译模式';
-    // Fix #16: disable contextAware when no LLM keys available
-    const ctxBtns=document.querySelectorAll('#ctxToggle button');
-    ctxBtns.forEach(b=>{if(b.dataset.v==='true')b.disabled=true;b.style.opacity=b.dataset.v==='true'?'0.35':'1'});
-    if(State.settings.contextAware){State.settings.contextAware=false;ctxBtns.forEach(b=>b.classList.toggle('active',b.dataset.v==='false'))}
-  }else{
-    $('apiTip').textContent=`升级即可启用 LLM 智能翻译。可用平台: ${data.llm.map(b=>b.name).join(' / ')}`;
-    $('apiRow').style.display='flex';$('modeRow').style.display='flex';
-    $('transModeTitle').textContent='翻译模式';
-  }
+  // LLM section always visible — user adds own API keys
+  $('apiTip').textContent=`可用 LLM 平台: ${data.llm.map(b=>b.name).join(' / ')}。添加 API Key 即可启用智能翻译。`;
+  $('apiRow').style.display='flex';$('modeRow').style.display='flex';
+  $('advCard').style.display='block';
+  $('transModeTitle').textContent='翻译模式';
+  syncContextAwareBtn();
+}
+
+function syncContextAwareBtn(){
+  const hasKeys=State.settings.apiKeys&&State.settings.apiKeys.length>0;
+  const ctxBtns=document.querySelectorAll('#ctxToggle button');
+  ctxBtns.forEach(b=>{if(b.dataset.v==='true'){b.disabled=!hasKeys;b.style.opacity=hasKeys?'1':'0.35'}});
+  if(!hasKeys&&State.settings.contextAware){State.settings.contextAware=false;ctxBtns.forEach(b=>b.classList.toggle('active',b.dataset.v==='false'))}
 }
 
 // ============ Upload ============
@@ -579,11 +510,11 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('active');
 fi.addEventListener('change',()=>{const f=fi.files[0];if(f)selectFile(f)});
 lpi.addEventListener('input',()=>{
   const p=lpi.value.trim();
-  if(p){State.localPath=p;State.videoFile=null;State.forceRerun=false;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
+  if(p){State.localPath=p;State.videoFile=null;State.forceRerun=false;State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
   else{State.localPath=null;sbtn.disabled=!State.videoFile;sbtn.textContent='选择视频文件开始'}
 });
 function selectFile(f){
-  State.videoFile=f;State.localPath=null;lpi.value='';State.forceRerun=false;
+  State.videoFile=f;State.localPath=null;lpi.value='';State.forceRerun=false;State.doneJobConfig=null;
   df.style.display='block';df.textContent=f.name+' ('+(f.size/1024/1024).toFixed(0)+'MB)';refreshStartBtn()
 }
 function _settingsMatchDone(){
@@ -725,9 +656,14 @@ $('modeToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')retu
 function buildPriorityList(){
   const list=$('priorityList');
   const labels={...DEFAULT_LABELS};
-  State.availableBackends.free.forEach(b=>{labels[b.id]=b.name});
+  const avail=State.availableBackends&&State.availableBackends.free||[];
+  avail.forEach(b=>{labels[b.id]=b.name});
+  // Ensure every available backend is in the priority list
+  const cur=State.settings.translationPriority;
+  const curSet=new Set(cur);
+  avail.forEach(b=>{if(!curSet.has(b.id)){cur.push(b.id);curSet.add(b.id)}});
   list.innerHTML='';
-  State.settings.translationPriority.forEach((bid,i)=>{
+  cur.forEach((bid,i)=>{
     if(!labels[bid])return;
     const item=document.createElement('div');item.className='priority-item';item.draggable=true;item.dataset.backend=bid;
     item.innerHTML=`<span class="drag-handle">≡</span><span class="priority-rank">${i+1}</span><span>${labels[bid]}</span>`;
@@ -742,9 +678,17 @@ function buildPriorityList(){
 // ============ Advanced ============
 $('advToggle').addEventListener('click',()=>{$('advToggle').classList.toggle('open');$('advBody').classList.toggle('open')});
 $('ctxToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.contextAware=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
+$('speakerToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.speakerDetect=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
 
 // ============ Platform / Model select ============
-// Model list removed — now sourced from backend via State._llmModels
+const MODEL_ID_FORMAT={
+  claude:'例：claude-opus-4-8、claude-sonnet-4-6',
+  gpt:'例：gpt-4o、gpt-4.1、gpt-4o-mini',
+  gemini:'例：gemini-2.5-pro、gemini-2.0-flash',
+  deepseek:'例：deepseek-chat、deepseek-reasoner',
+  glm:'例：glm-4-flash、glm-4-plus',
+  doubao:'例：填豆包接入点 ID（ep-… 或官方模型 ID）',
+};
 
 function onPlatformChange(){
   const platform=$('apiPlatform').value;
@@ -762,72 +706,244 @@ function onPlatformChange(){
 
   if(!platform)return;
 
-  if(platform==='custom'){
-    apiModelName.style.display='';
-    apiEndpoint.style.display='';
+  if(platform==='custom') apiEndpoint.style.display='';
+
+  const models=(State._llmModels&&State._llmModels[platform])||[];
+  if(models.length===0){
+    if(platform==='custom') apiModelName.style.display='';
     return;
   }
 
-  const models=(State._llmModels&&State._llmModels[platform])||[];
-  if(models.length===0)return;
-
   modelSel.innerHTML='';
-  models.forEach((m,i)=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;if(i===0)o.selected=true;modelSel.appendChild(o)});
+  models.forEach((m,i)=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;modelSel.appendChild(o)});
+  if(platform==='custom'){
+    const best=_pickBestModel(models);
+    modelSel.value=best.id;
+  }else{
+    const strongestIdx=Math.max(0,models.findIndex(m=>(m.name||'').includes('最强')));
+    modelSel.selectedIndex=strongestIdx;
+  }
   const sep=document.createElement('option');sep.disabled=true;sep.textContent='──────────';modelSel.appendChild(sep);
   const customOpt=document.createElement('option');customOpt.value='__custom__';customOpt.textContent='其他模型…';modelSel.appendChild(customOpt);
 
   modelSel.style.display='';
-  if(modelHint){modelHint.style.display='';modelHint.textContent='以上为推荐模型。如需使用其他版本（如 Opus 4.6、旧版、私有模型），请选择「其他模型…」并输入模型名。'}
+  if(modelHint){modelHint.style.display='';modelHint.textContent='以上为推荐模型。如需其他版本（旧版/私有模型），选「其他模型…」按规范填写模型 ID。'}
 }
 
 function onModelChange(){
   const modelSel=$('apiModel');
   const customModel=$('apiCustomModel');
-  if(modelSel.value==='__custom__'){customModel.classList.add('visible');customModel.focus()}
-  else{customModel.classList.remove('visible')}
+  const modelHint=$('modelHint');
+  const platform=$('apiPlatform').value;
+  if(modelSel.value==='__custom__'){
+    customModel.classList.add('visible');customModel.focus();
+    if(modelHint){modelHint.style.display='';modelHint.textContent='请填官方模型 ID（区分大小写，通常全小写、单词用连字符「-」连接，勿用空格或下划线）。'+(MODEL_ID_FORMAT[platform]?' '+MODEL_ID_FORMAT[platform]:'')}
+  }else{
+    customModel.classList.remove('visible');
+    if(modelHint){modelHint.textContent='以上为推荐模型。如需其他版本（旧版/私有模型），选「其他模型…」按规范填写模型 ID。'}
+  }
 }
 
 // ============ API Keys ============
-$('apiPlatform').addEventListener('change',()=>{onPlatformChange();onModelChange()});
-$('apiModel').addEventListener('change',onModelChange);
+let _editingKeyIdx=-1;
+function _restoreEditModel(){
+  if(_editingKeyIdx<0)return;
+  const k=State.settings.apiKeys[_editingKeyIdx];
+  if(!k||!k.model)return;
+  const sel=$('apiModel');
+  const hasOpt=Array.from(sel.options).some(o=>o.value===k.model);
+  if(hasOpt){sel.value=k.model}
+  else{
+    const retired=document.createElement('option');
+    retired.value=k.model;
+    retired.textContent=k.model+' (已下线)';
+    const customOpt=Array.from(sel.options).find(o=>o.value==='__custom__');
+    if(customOpt){sel.insertBefore(retired,customOpt)}
+    else{sel.appendChild(retired)}
+    sel.value=k.model;
+  }
+  onModelChange();
+}
+function _pickBestModel(models){
+  // 挑最好的：免费的优先，版本号大的优先，名字长的优先
+  let best=models[0];
+  for(let i=1;i<models.length;i++){
+    const m=models[i],mid=m.id.toLowerCase();
+    const bid=best.id.toLowerCase();
+    const mFree=mid.includes('免费')||(m.name||'').includes('免费');
+    const bFree=bid.includes('免费')||(best.name||'').includes('免费');
+    if(mFree&&!bFree){best=m;continue}
+    if(bFree&&!mFree)continue;
+    // 2.x > 1.x, 更新 > 更旧
+    const mHas2=mid.includes('2.'),bHas2=bid.includes('2.');
+    if(mHas2&&!bHas2){best=m;continue}
+    if(bHas2&&!mHas2)continue;
+    if(mid.length>bid.length)best=m;
+  }
+  return best;
+}
 
-let keyCounter=0;
+async function fetchAndFillModels(){
+  const platform=$('apiPlatform').value;
+  const key=$('apiKeyInput').value.trim();
+  const hint=$('modelHint');
+  if(!platform||!key)return;
+  State._llmModels=State._llmModels||{};
+  if(hint && _editingKeyIdx<0){hint.style.display='';hint.textContent='正在识别可用模型…'}
+  if(hint && _editingKeyIdx>=0){hint.style.display='';hint.textContent='正在刷新模型列表…'}
+  try{
+    const body={platform,key};
+    if(platform==='custom')body.endpoint=$('apiEndpoint').value.trim();
+    const r=await fetch('/api/llm-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d&&d.models&&d.models.length){
+      State._llmModels[platform]=d.models;
+      onPlatformChange();
+      _restoreEditModel();
+      if(hint){hint.style.display='';hint.textContent='✓ 已识别 '+d.models.length+' 个可用模型'}
+    }else{
+      onPlatformChange();_restoreEditModel();
+      if(platform==='custom' && hint){hint.style.display='';hint.textContent='没查到，请手动输入模型名';hint.style.color='var(--warn,#b8860b)'}
+      else if(hint)hint.style.display='none';
+    }
+  }catch(e){
+    onPlatformChange();_restoreEditModel();
+    if(platform==='custom' && hint){hint.style.display='';hint.textContent='没查到，请手动输入模型名';hint.style.color='var(--warn,#b8860b)'}
+    else if(hint)hint.style.display='none';
+  }
+}
+$('apiPlatform').addEventListener('change',()=>{onPlatformChange();onModelChange();fetchAndFillModels()});
+$('apiModel').addEventListener('change',onModelChange);
+$('apiKeyInput').addEventListener('blur',fetchAndFillModels);
+$('apiEndpoint').addEventListener('blur',fetchAndFillModels);
+
 $('apiAddBtn').addEventListener('click',()=>{
   const platform=$('apiPlatform').value;
-  const name=$('apiName').value.trim()||`Key ${++keyCounter}`;
+  const name=$('apiName').value.trim();
   const key=$('apiKeyInput').value.trim();
   if(!platform||!key)return;
 
   const entry={platform,name,key};
 
   if(platform==='custom'){
-    entry.model=$('apiModelName').value.trim()||'gpt-4o';
     entry.api_endpoint=$('apiEndpoint').value.trim()||'';
-    $('apiModelName').value='';$('apiEndpoint').value='';
-    $('apiModelName').style.display='none';$('apiEndpoint').style.display='none';
+  }
+  if($('apiModel').value==='__custom__'){
+    entry.model=$('apiCustomModel').value.trim();
+    if(!entry.model){showToast('请输入模型名称');return}
+    $('apiCustomModel').value='';$('apiCustomModel').classList.remove('visible');
   }else{
-    if($('apiModel').value==='__custom__'){
-      entry.model=$('apiCustomModel').value.trim();
-      if(!entry.model){showToast('请输入模型名称');return}
-      $('apiCustomModel').value='';$('apiCustomModel').classList.remove('visible');
-    }else{const m=$('apiModel').value;if(m)entry.model=m}
+    const m=$('apiModel').value;
+    if(m)entry.model=m;
+    else if(platform==='custom')entry.model='gpt-4o';
   }
 
-  State.settings.apiKeys.push(entry);
-  $('apiKeyInput').value='';$('apiName').value='';
-  buildKeyList();saveConfig();refreshStartBtn();
+  if(_editingKeyIdx>=0){
+    State.settings.apiKeys[_editingKeyIdx]=entry;
+  }else{
+    State.settings.apiKeys.push(entry);
+  }
+  cancelEdit();
+  buildKeyList();saveConfig();refreshStartBtn();syncContextAwareBtn();
+});
+
+$('apiCancelBtn').addEventListener('click', cancelEdit);
+
+['apiPlatform','apiModel','apiCustomModel','apiModelName','apiEndpoint','apiName','apiKeyInput'].forEach(id=>{
+  $(id).addEventListener('input',_checkFormDirty);
+  $(id).addEventListener('change',_checkFormDirty);
 });
 function buildKeyList(){
-  const labels={};State.availableBackends.llm.forEach(b=>{labels[b.id]=b.name});
   $('apiKeyList').innerHTML=State.settings.apiKeys.map((k,i)=>{
-    let platformLabel=labels[k.platform]||k.platform;
-    let modelLabel='';
-    if(k.platform==='custom'){modelLabel=' · '+(k.model||'gpt-4o')}
-    else if(k.model){modelLabel=' · '+k.model}
-    return `<li><span>${platformLabel}${modelLabel} · ${k.name} · ${maskKey(k.key)}</span><button class="api-key-del" onclick="State.settings.apiKeys.splice(${i},1);buildKeyList();saveConfig();refreshStartBtn()">✕</button></li>`;
+    const isEditing=(_editingKeyIdx===i);
+    const displayName=k.name||k.model||k.platform;
+    return `<li class="api-key-card${isEditing?' editing':''}" onclick="editKey(${i})"><span class="card-name">${displayName}</span><button class="api-key-del" onclick="event.stopPropagation();deleteKey(${i})">✕</button></li>`;
   }).join('');
 }
+function deleteKey(i){
+  if(_editingKeyIdx===i) cancelEdit();
+  else if(_editingKeyIdx>i) _editingKeyIdx--;
+  State.settings.apiKeys.splice(i,1);
+  buildKeyList();saveConfig();refreshStartBtn();syncContextAwareBtn();
+}
 function maskKey(k){return k.length>8?'···'+k.slice(-4):'···'}
+
+function toggleKeyVisibility(){
+  const inp=$('apiKeyInput');
+  const show=inp.type==='password';
+  inp.type=show?'text':'password';
+  $('eyeOffIcon').style.display=show?'none':'';
+  $('eyeOnIcon').style.display=show?'':'none';
+}
+
+function _getFormEntry(){
+  const platform=$('apiPlatform').value;
+  const result={
+    platform:platform,
+    key:$('apiKeyInput').value.trim(),
+    name:$('apiName').value.trim()
+  };
+  if(platform==='custom'){
+    result.api_endpoint=$('apiEndpoint').value.trim();
+  }
+  if($('apiModel').value==='__custom__') result.model=$('apiCustomModel').value.trim();
+  else result.model=$('apiModel').value;
+  return result;
+}
+
+function _checkFormDirty(){
+  if(_editingKeyIdx<0) return;
+  const stored=State.settings.apiKeys[_editingKeyIdx];
+  if(!stored){$('apiAddBtn').disabled=false;return}
+  const current=_getFormEntry();
+  const same=(current.platform===stored.platform
+    && current.key===stored.key
+    && current.name===(stored.name||'')
+    && (current.model||'')===(stored.model||'')
+    && (current.api_endpoint||'')===(stored.api_endpoint||''));
+  $('apiAddBtn').disabled=same;
+}
+
+function editKey(i){
+  const k=State.settings.apiKeys[i];
+  if(!k) return;
+  _editingKeyIdx=i;
+
+  $('apiPlatform').value=k.platform;
+  onPlatformChange();
+
+  $('apiKeyInput').value=k.key||'';
+  $('apiName').value=k.name||'';
+
+  if(k.platform==='custom'){
+    $('apiEndpoint').value=k.api_endpoint||'';
+  }
+  fetchAndFillModels();
+
+  $('apiAddBtn').textContent='保存修改';
+  $('apiAddBtn').disabled=true;
+  $('apiCancelBtn').style.display='inline-block';
+
+  buildKeyList();
+  $('apiRow').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function cancelEdit(){
+  _editingKeyIdx=-1;
+
+  $('apiKeyInput').value='';$('apiKeyInput').type='password';
+  $('apiName').value='';
+  $('apiCustomModel').value='';$('apiCustomModel').classList.remove('visible');
+  $('apiModel').style.display='none';
+  $('apiModelName').value='';$('apiModelName').style.display='none';
+  $('apiEndpoint').value='';$('apiEndpoint').style.display='none';
+
+  $('apiAddBtn').textContent='添加';
+  $('apiAddBtn').disabled=false;
+  $('apiCancelBtn').style.display='none';
+
+  buildKeyList();
+}
 
 // ============ Style Preview ============
 function _readStyleFromDOM(){
@@ -853,7 +969,7 @@ $('styleConfirmBtn').addEventListener('click',()=>{
 
 // ============ Config Persistence ============
 async function saveConfig(){
-  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,burn:State.settings.burn,subtitles:State.settings.subtitles,savePath:State.settings.savePath};
+  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,burn:State.settings.burn,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect};
   // localStorage: strip key values, save metadata only
   const safeCfg={...cfg,apiKeys:(cfg.apiKeys||[]).map(k=>({platform:k.platform,name:k.name,model:k.model,api_endpoint:k.api_endpoint}))};
   localStorage.setItem('video-subber-config',JSON.stringify(safeCfg));
@@ -863,10 +979,8 @@ function loadConfig(){
   if(raw){try{const c=JSON.parse(raw);Object.assign(State.settings,c)}catch(e){}}
   fetch('/api/config').then(r=>r.json()).then(c=>{
     if(c&&c.translationMode)Object.assign(State.settings,c);
-    if(isDev && urlTier)State.settings.tier=urlTier;
-    syncUI();updateSavePathDisplay();syncDevTierSwitch();
+    syncUI();updateSavePathDisplay();
   }).catch(()=>{});
-  if(isDev && urlTier)State.settings.tier=urlTier;syncDevTierSwitch();
 }
 
 // ============ Job ============
@@ -960,7 +1074,7 @@ sbtn.addEventListener('click',async()=>{
 
 function resetAllJobs(){Object.keys(activeJobs).forEach(jid=>cancelCard(jid));sbtn.disabled=true;sbtn.textContent='选择视频文件开始';settingsLocked=false;unlockUI()}
 function lockUI(){
-  ['subToggle','burnSelect','modelSection','modeToggle','priorityList','apiPlatform','apiName','apiKeyInput','apiAddBtn','ctxToggle','styleConfirmBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('disabled-ctl')});
+  ['subToggle','burnSelect','modelSection','modeToggle','priorityList','apiPlatform','apiName','apiKeyInput','apiAddBtn','apiCancelBtn','ctxToggle','styleConfirmBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('disabled-ctl')});
   sbtn.disabled=true;
   const existing=document.getElementById('lockBanner');
   if(!existing){
@@ -986,6 +1100,7 @@ function renderSettingsToDOM(){
   document.querySelectorAll('#modeToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.translationMode)});
   const pl=document.getElementById('priorityList');pl.classList.toggle('show',State.settings.translationMode==='quality');
   document.querySelectorAll('#ctxToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.contextAware))});
+  document.querySelectorAll('#speakerToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.speakerDetect))});
   document.getElementById('styleConfirmed').style.display='none';
   if(State.settings.style){
     const s=State.settings.style;
@@ -1005,20 +1120,9 @@ function rebuildDynamicWidgets(){
   fetchModelStatus();
 }
 
-function syncUrlAndTier(){
-  if(!State.settings.tier||State.settings.tier==='free')return;
-  const p=new URLSearchParams(location.search);
-  if(isDev&&!p.get('tier')){
-    const url=new URL(location);url.searchParams.set('tier',State.settings.tier);
-    history.replaceState(null,'',url);
-    fetch('/api/backends').then(r=>r.json()).then(updateBackendLists);
-  }
-}
-
 function syncUI(){
   try{ renderSettingsToDOM(); }catch(e){}
   try{ rebuildDynamicWidgets(); }catch(e){}
-  try{ syncUrlAndTier(); }catch(e){}
 }
 
 // ── Multi-job ──
@@ -1095,11 +1199,7 @@ function closeError(){$('errorOverlay').classList.remove('active')}
 
 // ============ Init ============
 document.addEventListener('DOMContentLoaded',async()=>{
-  const urlParams=new URLSearchParams(location.search);
-  const isFresh=urlParams.has('fresh');
-  await checkDevStatus();
   fetch('/api/health').then(r=>r.json()).then(d=>{const v=$('versionTag');if(v)v.textContent='v'+d.version}).catch(()=>{});
-  if(isFresh){localStorage.clear();try{await fetch('/api/reset',{method:'POST'})}catch(e){}urlParams.delete('fresh');const qs=urlParams.toString();location.replace(location.pathname+(qs?'?'+qs:''));return}
   const burnSelect=document.getElementById('burnSelect');if(burnSelect)burnSelect.dispatchEvent(new Event('change'));
   if(typeof loadConfig==='function')loadConfig();
   try{const res=await fetch('/api/backends');if(res.ok){const data=await res.json();if(typeof updateBackendLists==='function')updateBackendLists(data)}}catch(err){}
@@ -1108,7 +1208,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
   const rawActive=localStorage.getItem('activeJobs');
   if(!rawActive||rawActive==='[]'){try{const res=await fetch('/api/active-jobs');if(res.ok){const data=await res.json();if(data.jobs&&data.jobs.length>0){const ids=data.jobs.map(j=>j.job_id);localStorage.setItem('activeJobs',JSON.stringify(ids))}}}catch(e){}}
   if(typeof reconnectJobs==='function')reconnectJobs();
-  const mockJobs=parseInt(urlParams.get('mockjobs'));if(mockJobs&&typeof isDev!=='undefined'&&isDev){for(let i=0;i<Math.min(mockJobs,5);i++){const jid='mock'+Date.now()+i;if(typeof addJobCard==='function')addJobCard(jid,'test-video-'+i+'.mp4');if(typeof activeJobs!=='undefined')activeJobs[jid]={pollTimer:1}}if(typeof lockUI==='function')lockUI();if(typeof settingsLocked!=='undefined')settingsLocked=true}
 });
 </script>
 </body>

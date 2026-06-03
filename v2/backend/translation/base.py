@@ -98,20 +98,33 @@ class LLMBackend(TranslationBackend):
 
     def translate_raw(self, prompt: str, max_tokens: int = 8192) -> TranslationResult:
         """直接发送 prompt，返回原始文本。不做任何切分。"""
-        import time as _time
+        import time as _time, logging
+        _tlog = logging.getLogger("backend.translation")
         t0 = _time.monotonic()
         try:
             content = self._call_api(prompt, max_tokens)
+            dur_ms = int((_time.monotonic() - t0) * 1000)
+            content_len = len(content) if content else 0
+            _tlog.debug(
+                "LLM translate_raw 成功 (%s): %dms, 返回%d字, 内容前300字: %s",
+                self.name, dur_ms, content_len,
+                content[:300] if content else "(空)"
+            )
             return TranslationResult(
                 translated=[content],
                 backend_name=self.name,
-                duration_ms=int((_time.monotonic() - t0) * 1000),
+                duration_ms=dur_ms,
             )
-        except Exception:
+        except Exception as e:
+            dur_ms = int((_time.monotonic() - t0) * 1000)
+            _tlog.warning(
+                "LLM translate_raw 调用失败 (%s): %s (耗时 %dms)",
+                self.name, e, dur_ms
+            )
             return TranslationResult(
                 translated=[""],
                 backend_name=self.name,
-                duration_ms=int((_time.monotonic() - t0) * 1000),
+                duration_ms=dur_ms,
             )
 
     def translate_batch(self, texts: list[str], source_lang: str = "auto",

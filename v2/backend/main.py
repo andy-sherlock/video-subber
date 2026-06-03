@@ -1,5 +1,5 @@
 """V2 Web App — FastAPI backend."""
-import sys, json, uuid, asyncio, time, hashlib
+import sys, json, uuid, asyncio, time, hashlib, threading
 from pathlib import Path
 
 import uvicorn
@@ -46,6 +46,7 @@ def _config_hash(cfg: dict) -> str:
         "burn": cfg.get("burn", False),
         "style": cfg.get("style", {}),
         "savePath": cfg.get("savePath", ""),
+        "speakerDetect": cfg.get("speakerDetect", False),
     }
     raw = json.dumps(relevant, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()[:12]
@@ -55,15 +56,6 @@ def _task_key(file_hash: str, cfg: dict) -> str:
     return f"{file_hash}_{_config_hash(cfg)}"
 
 
-# === Tier definitions ===
-# "free": Google + Baidu only. No LLM. Speed/Quality modes both work.
-# "vip": user provides own LLM API keys. Context-aware translation unlocks.
-# "svip": platform provides LLM keys. Full features.
-TIER_FEATURES = {
-    "free":  {"llm": False, "context_aware": False, "max_llm_keys": 0},
-    "vip":   {"llm": True,  "context_aware": True,  "max_llm_keys": 10},
-    "svip":  {"llm": True,  "context_aware": True,  "max_llm_keys": 0},
-}
 
 # Available LLM backends — add new ones here and they appear in the UI automatically.
 # "models": list of {id, name} — first one is the default.
@@ -82,10 +74,10 @@ LLM_BACKEND_LIST = [
      ]},
     {"id": "gemini",   "name": "Gemini",
      "models": [
-         {"id": "gemini-2.0-flash",         "name": "2.0 Flash（推荐）"},
-         {"id": "gemini-2.0-flash-lite",    "name": "2.0 Flash Lite（最快）"},
+         {"id": "gemini-2.0-flash",         "name": "2.0 Flash（推荐·免费）"},
+         {"id": "gemini-2.0-flash-lite",    "name": "2.0 Flash Lite（最快·免费）"},
          {"id": "gemini-2.5-pro",           "name": "2.5 Pro（最强）"},
-         {"id": "gemini-2.5-flash",         "name": "2.5 Flash（新·快）"},
+         {"id": "gemini-2.5-flash",         "name": "2.5 Flash（新·快·免费）"},
      ]},
     {"id": "deepseek", "name": "DeepSeek",
      "models": [
@@ -111,20 +103,10 @@ LLM_BACKEND_LIST = [
 ]
 
 
-# ═══════════════════════════════════════════════════════════
-# Developer mode — activation code system.
-# ═══════════════════════════════════════════════════════════
-
 import os as _os
-import uuid as _uuid
 import json as _json
 import urllib.request as _urllib
 
-# ── Remote config base URL ────────────────────────────────
-# Public repo — no auth needed.  Change VSUB_REMOTE_CONFIG_URL env var
-# to point to your own fork if needed.
-#   activation_codes.json → {"codes": ["CODE1", ...]}
-#   models.json           → {"models": [...]}
 _REMOTE_BASE = _os.environ.get(
     "VSUB_REMOTE_CONFIG_URL",
     "https://raw.githubusercontent.com/andy-sherlock/video-subber-config/main",
@@ -132,7 +114,6 @@ _REMOTE_BASE = _os.environ.get(
 
 
 def _fetch_remote_json(filename: str) -> dict | None:
-    """Fetch a JSON file from the remote config URL. Returns parsed dict or None."""
     if not _REMOTE_BASE:
         return None
     try:
@@ -144,59 +125,10 @@ def _fetch_remote_json(filename: str) -> dict | None:
         return None
 
 
-# ── Activation codes ──────────────────────────────────────
-# Format: {"codes": ["ANDY", "MENG", "BETA001"]}
-# Built-in codes always valid. Remote codes fetched from public GitHub repo.
-
-_BUILTIN_CODES: set[str] = {"ANDY", "MENG"}
-
-_raw_dev = _os.environ.get("VSUB_DEV_CODES", "")
-_LOCAL_CODES: set[str] = set(
-    c.strip().upper() for c in _raw_dev.split(",") if c.strip()
-) if _raw_dev else set()
-
-_ACTIVATION_FILE = Path.home() / ".video-subber" / "activation.json"
-_ACTIVATION_CACHE = Path.home() / ".video-subber" / "activation_cache.json"
-
-_dev_mode_active = False
-
-
-def _all_valid_codes() -> set[str]:
-    """Merge built-in + local + cached remote codes."""
-    codes = set(_BUILTIN_CODES) | set(_LOCAL_CODES)
-    if _ACTIVATION_CACHE.exists():
-        try:
-            cached = _json.loads(_ACTIVATION_CACHE.read_text(encoding="utf-8"))
-            age_h = (time.time() - cached.get("fetched_at", 0)) / 3600
-            if age_h < 24:
-                codes.update(cached.get("codes", []))
-        except Exception:
-            pass
-    return codes
-
-
-def _fetch_remote_codes():
-    """Pull latest activation codes from remote. Non-blocking, fail-safe."""
-    data = _fetch_remote_json("activation_codes.json")
-    if not data:
-        return
-    remote_codes = data.get("codes", [])
-    if remote_codes:
-        _ACTIVATION_CACHE.write_text(
-            _json.dumps({"codes": remote_codes, "fetched_at": time.time()}, ensure_ascii=False),
-            encoding="utf-8",
-        )
-
-
-# ── Remote model list ─────────────────────────────────────
-
 _MODELS_CACHE = Path.home() / ".video-subber" / "models_cache.json"
 
 
 def _get_merged_models() -> list[dict]:
-    """Merge hardcoded model list with cached remote updates.
-    Remote entries with the same platform id REPLACE the local entry entirely.
-    """
     merged = {b["id"]: dict(b) for b in LLM_BACKEND_LIST}
     if _MODELS_CACHE.exists():
         try:
@@ -211,7 +143,6 @@ def _get_merged_models() -> list[dict]:
 
 
 def _fetch_remote_models():
-    """Pull latest model definitions from remote. Non-blocking, fail-safe."""
     data = _fetch_remote_json("models.json")
     if not data:
         return
@@ -223,49 +154,12 @@ def _fetch_remote_models():
         )
 
 
-
-
-def _machine_fingerprint() -> str:
-    """A hash that identifies this computer."""
-    parts = [
-        str(_uuid.getnode()),
-        _os.name,
-    ]
-    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
-
-
-def _load_activation() -> str | None:
-    """Check if this machine has a valid activation. Returns the code or None.
-
-    Once activated (file exists + fingerprint matches), trust it directly.
-    No need to re-validate the code against any list on every startup.
-    """
-    if not _ACTIVATION_FILE.exists():
-        return None
-    try:
-        data = _json.loads(_ACTIVATION_FILE.read_text(encoding="utf-8"))
-        code = data.get("code", "")
-        fp = data.get("fingerprint", "")
-        if fp == _machine_fingerprint() and code:
-            return code
-    except Exception:
-        pass
-    return None
-
-
 @app.on_event("startup")
 async def startup():
-    global _dev_mode_active
-
-    # ── 0a. 后台拉取远程配置（激活码 + 模型列表），不阻塞启动 ──
     import threading
-    threading.Thread(target=_fetch_remote_codes, daemon=True).start()
     threading.Thread(target=_fetch_remote_models, daemon=True).start()
 
-    if _load_activation():
-        _dev_mode_active = True
-
-    # ── 0b. P2: 清理 V2.04 旧版单日志残留（升级到 V2.05 后执行一次）──
+    # ── 清理旧版单日志残留 ──
     for old_log in LOG_DIR.glob("job-*.log"):
         try:
             old_log.unlink()
@@ -297,7 +191,9 @@ async def startup():
                     status = "done"
 
                 cfg = meta.get("config", {})
-                tk = meta.get("task_key") or _task_key(fh, cfg)
+                # Always recompute with current _config_hash so that hash function
+                # changes (e.g. new fields added) don't break dedup for old jobs.
+                tk = _task_key(fh, cfg)
                 GLOBAL_HASH_INDEX[tk] = {
                     "job_id": jid, "status": status,
                     "config": cfg, "file_hash": fh,
@@ -308,6 +204,9 @@ async def startup():
 
     # ── 2. Preload resemblyzer in background ──
     threading.Thread(target=preload_resemblyzer, daemon=True).start()
+
+    # ── 2b. Fetch community model pricing in background ──
+    threading.Thread(target=_fetch_community_pricing, daemon=True).start()
 
     # ── 3. Store main event loop for worker_manager reader threads ──
     worker_manager.set_main_loop(asyncio.get_running_loop())
@@ -362,66 +261,26 @@ def _cleanup_old_cache():
         pass
 
 
-# ── Frontend static files ──
-@app.post("/api/dev/activate")
-async def dev_activate(payload: dict):
-    """Activate developer mode using a code. Binds to this machine."""
-    global _dev_mode_active
-    code = payload.get("code", "").strip().upper()
-    if code not in _all_valid_codes():
-        return JSONResponse({"error": "激活码无效"}, status_code=403)
-
-    fp = _machine_fingerprint()
-    _ACTIVATION_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _ACTIVATION_FILE.write_text(
-        _json.dumps({"code": code, "fingerprint": fp}, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    _dev_mode_active = True
-    return {"ok": True}
-
-
-@app.post("/api/dev/deactivate")
-def dev_deactivate():
-    """Deactivate developer mode on this machine."""
-    global _dev_mode_active
-    _dev_mode_active = False
-    _ACTIVATION_FILE.unlink(missing_ok=True)
-    return {"ok": True}
-
-
-@app.get("/api/dev-status")
-def dev_status():
-    return {
-        "dev_mode": _dev_mode_active,
-        "has_platform_keys": False,
-    }
-
-
-def _effective_tier(requested: str) -> str:
-    """Resolve the real tier for this request.
-
-    Dev mode: trust the requested tier (for testing).
-    Normal mode: every user is 'free' + can bring their own LLM keys.
-    """
-    if _dev_mode_active:
-        tier = requested if requested in TIER_FEATURES else "free"
-        # In dev mode with platform keys set, allow svip
-        return tier
-
-    # Production: everyone is free. LLM access is gated by whether the
-    # user has configured their own API keys — not by tier.
-    return "free"
-
-
 @app.get("/api/health")
 def health():
     return {"ok": True, "version": _detect_version()}
 
 
 def _detect_version() -> str:
-    """Auto-detect version from git tag → dir scan → pyproject.toml → fallback."""
+    """Auto-detect version from .version file → git tag → dir scan → pyproject.toml → fallback."""
     import subprocess, re, glob as _glob
+
+    # 0) .version file (authoritative source)
+    try:
+        vf = Path.home() / ".video-subber" / ".version"
+        if vf.exists():
+            import json as _json
+            data = _json.loads(vf.read_text(encoding="utf-8"))
+            v = data.get("version")
+            if v:
+                return v
+    except Exception:
+        pass
 
     # 1) Git tag: git describe --tags --abbrev=0
     try:
@@ -505,45 +364,202 @@ def model_cancel(model_id: str):
 
 
 @app.get("/api/backends")
-def get_backends(tier: str = "free"):
-    """Return ENABLED backends + current tier info.
-
-    Dev mode: ?tier=svip works (for testing).
-    Production: tier is always 'free'. LLM access is gated by user's own API keys.
-    """
+def get_backends():
+    """Return enabled free backends + available LLM platforms."""
     from .translation.google import GoogleBackend
-    from .translation.baidu import BaiduBackend
-    _name_map = {"google": GoogleBackend(), "baidu": BaiduBackend()}
+    from .translation.bing import BingBackend
+    from .translation.youdao import YoudaoBackend
+    _name_map = {
+        "google": GoogleBackend(),
+        "bing": BingBackend(),
+        "youdao": YoudaoBackend(),
+    }
     enabled_free = [
         {"id": key, "name": b.name, "free": True}
         for key, b in _name_map.items() if b.enabled
     ]
-    current = _effective_tier(tier)
     return {
         "free": enabled_free,
         "llm": _get_merged_models(),
-        "tiers": TIER_FEATURES,
-        "current_tier": current,
-        "dev_mode": _dev_mode_active,
     }
+
+
+_LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+_FREE_MODEL_CACHE: dict[str, float] = {}  # {model_id: fetched_at_timestamp}
+_PRICING_LOCK = threading.Lock()
+_FETCH_IN_PROGRESS = False
+
+# Models confirmed free through official platform channels that LiteLLM may not
+# capture (e.g. free tier models not reflected in the community pricing JSON).
+_HARDCODED_FREE = frozenset({
+    "glm-4-flash", "glm-4-flashx",
+    "gemini-2.0-flash", "gemini-2.0-flash-lite",
+    "gemini-2.5-flash", "gemini-2.5-flash-lite",
+})
+
+
+def _is_free_model(model_id: str) -> bool:
+    """Check community pricing + hardcoded fallback for free status."""
+    mid = model_id.lower()
+    if mid in _HARDCODED_FREE:
+        return True
+    candidates = [
+        mid,
+        f"gemini/{mid}",
+        f"zai/{mid}", f"zai.{mid}",
+        f"openrouter/google/{mid}",
+        f"openrouter/z-ai/{mid}",
+    ]
+    with _PRICING_LOCK:
+        for c in candidates:
+            if c in _FREE_MODEL_CACHE:
+                return True
+        for k in _FREE_MODEL_CACHE:
+            if k.endswith(f"/{mid}") or k.endswith(f".{mid}"):
+                return True
+    return False
+
+
+def _fetch_community_pricing():
+    """Background: pull LiteLLM pricing JSON, cache free model IDs for 24h."""
+    global _FETCH_IN_PROGRESS
+    with _PRICING_LOCK:
+        if _FETCH_IN_PROGRESS:
+            return
+        if _FREE_MODEL_CACHE:
+            newest = max(_FREE_MODEL_CACHE.values())
+            if time.time() - newest < 86400:
+                return  # cache still fresh
+        _FETCH_IN_PROGRESS = True
+
+    try:
+        req = _urllib.Request(_LITELLM_URL, headers={"User-Agent": "VideoSubber"})
+        with _urllib.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read().decode())
+        now = time.time()
+        free = {}
+        for mid, info in data.items():
+            if not isinstance(info, dict):
+                continue
+            ic = info.get("input_cost_per_token", -1)
+            oc = info.get("output_cost_per_token", -1)
+            if ic == 0 and oc == 0:
+                free[mid] = now
+        with _PRICING_LOCK:
+            _FREE_MODEL_CACHE.clear()
+            _FREE_MODEL_CACHE.update(free)
+    except Exception:
+        pass  # silent fallback — no free labels shown
+    finally:
+        with _PRICING_LOCK:
+            _FETCH_IN_PROGRESS = False
+
+
+def _curate_model_ids(ids: list) -> list:
+    bad = ("embedding", "whisper", "tts", "audio", "realtime", "dall-e", "dalle",
+           "moderation", "rerank", "-search-", "image", "video", "vision-", "babbage",
+           "davinci", "text-ada", "stable-", "sora", "veo", "imagen", "aqa", "guard",
+           "lyria", "nano-banana", "robotics", "computer-use", "deep-research",
+           "antigravity", "native-audio", "-live", "gemma")
+    seen = set()
+    out = []
+    for mid in ids:
+        if not isinstance(mid, str) or not mid:
+            continue
+        if any(b in mid.lower() for b in bad):
+            continue
+        if mid in seen:
+            continue
+        seen.add(mid)
+        label = mid + "（免费）" if _is_free_model(mid) else mid
+        out.append({"id": mid, "name": label})
+    return out
+
+
+@app.post("/api/llm-models")
+def list_llm_models(payload: dict):
+    """用用户 Key 调对应平台的列模型接口，返回该 Key 真实可用的模型。"""
+    import urllib.request as _u
+    platform = (payload.get("platform") or "").lower()
+    key = (payload.get("key") or "").strip()
+    endpoint = (payload.get("endpoint") or "").strip()
+    if not key:
+        return {"models": [], "error": "no_key"}
+
+    if platform == "claude":
+        url = "https://api.anthropic.com/v1/models?limit=1000"
+        headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
+        def _parse(d): return [m.get("id", "") for m in d.get("data", [])]
+    elif platform == "gemini":
+        url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
+        headers = {"x-goog-api-key": key}
+        def _parse(d): return [m.get("name", "").split("/")[-1] for m in d.get("models", [])
+                               if "generateContent" in (m.get("supportedGenerationMethods") or [])]
+    else:
+        _chat = {
+            "gpt": "https://api.openai.com/v1/chat/completions",
+            "deepseek": "https://api.deepseek.com/v1/chat/completions",
+            "doubao": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+            "glm": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            "custom": endpoint,
+        }.get(platform, endpoint)
+        if not _chat:
+            return {"models": [], "error": "no_endpoint"}
+        # 用户可能贴 /v1 也可能贴 /v1/chat/completions，统一处理
+        _clean = _chat.rstrip("/")
+        if _clean.endswith("/chat/completions"):
+            url = _clean[:-len("/chat/completions")] + "/models"
+        else:
+            url = _clean + "/models"
+        headers = {"Authorization": f"Bearer {key}"}
+        def _parse(d): return [m.get("id", "") for m in d.get("data", [])]
+
+    try:
+        req = _urllib.Request(url, headers={**headers, "User-Agent": "VideoSubber"})
+        with _urllib.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read().decode())
+        raw_ids = _parse(data)
+    except Exception as e:
+        return {"models": [], "error": f"fetch_failed: {e}"}
+
+    return {"models": _curate_model_ids(raw_ids)}
 
 
 @app.get("/api/config")
 def get_config():
-    """Return user config from ~/.video-subber/config.json. API keys are masked."""
+    """Return user config from ~/.video-subber/config.json.
+    translationPriority is always merged with real available backends before returning.
+    """
     from .config_manager import load_config
-    from .key_manager import mask_key
+    from .translation.google import GoogleBackend
+    from .translation.bing import BingBackend
+    from .translation.youdao import YoudaoBackend
     cfg = load_config()
-    for k in cfg.get("apiKeys", []):
-        if "key" in k:
-            k["key"] = mask_key(k["key"])
+    available = [k for k, v in {"google": GoogleBackend(), "bing": BingBackend(), "youdao": YoudaoBackend()}.items() if v.enabled]
+    saved = cfg.get("translationPriority", [])
+    merged = [b for b in saved if b in available]
+    for b in available:
+        if b not in merged:
+            merged.append(b)
+    cfg["translationPriority"] = merged
     return cfg
+
 
 
 @app.put("/api/config")
 async def save_config(payload: dict):
     """Save user config to ~/.video-subber/config.json"""
     from .config_manager import save_config
+    from .translation.google import GoogleBackend
+    from .translation.bing import BingBackend
+    from .translation.youdao import YoudaoBackend
+    available = [k for k, v in {"google": GoogleBackend(), "bing": BingBackend(), "youdao": YoudaoBackend()}.items() if v.enabled]
+    saved = payload.get("translationPriority", [])
+    merged = [b for b in saved if b in available]
+    for b in available:
+        if b not in merged:
+            merged.append(b)
+    payload["translationPriority"] = merged
     save_config(payload)
     return {"ok": True}
 
@@ -590,7 +606,7 @@ async def create_job(request: Request):
     if content_type and "json" in content_type:
         body = await request.json()
         cfg = json.loads(body.get("config", "{}"))
-        cfg["tier"] = _effective_tier(cfg.get("tier", "free"))
+        cfg.pop("tier", None)
         local_path = cfg.pop("local_path", "")
 
         if not local_path or not _os_module.path.isfile(local_path):
@@ -630,7 +646,7 @@ async def create_job(request: Request):
         file = form.get("file")
         config_str = form.get("config", "{}")
         cfg = json.loads(config_str)
-        cfg["tier"] = _effective_tier(cfg.get("tier", "free"))
+        cfg.pop("tier", None)
         cfg["video_filename"] = file.filename if file else ""
 
         jid = uuid.uuid4().hex[:10]
@@ -715,27 +731,6 @@ async def create_job(request: Request):
     }
     worker_manager.start(jid, job_dir, str(video_path), cfg)
     return {"id": jid, "found": False}
-
-
-# ── Factory reset: wipe all state back to zero ──
-
-@app.post("/api/reset")
-def reset_all():
-    """Clear all jobs, cache, and memory indexes. Dev mode only."""
-    if not _dev_mode_active:
-        return JSONResponse({"error": "forbidden — developer mode required"}, status_code=403)
-    import shutil
-    # Kill all running workers
-    for jid in list(JOBS.keys()):
-        worker_manager.cancel(jid)
-    JOBS.clear()
-    GLOBAL_HASH_INDEX.clear()
-    JOB_ID_TO_HASH.clear()
-    # Delete all job directories from disk
-    if JOBS_DIR.exists():
-        shutil.rmtree(JOBS_DIR, ignore_errors=True)
-        JOBS_DIR.mkdir(parents=True, exist_ok=True)
-    return {"ok": True, "message": "All jobs, cache, and indexes cleared"}
 
 
 # ── v2.05: Active jobs recovery (fallback when localStorage is empty) ──
@@ -915,8 +910,15 @@ if FRONTEND.exists():
 
 
 def run():
-    print("Video Subber V2 -> http://localhost:8766")
-    uvicorn.run(app, host="127.0.0.1", port=8766)
+    import sys as _sys
+    reload_flag = "--no-reload" not in _sys.argv
+    print(f"Video Subber V3 -> http://localhost:8766  (reload={'on' if reload_flag else 'off'})")
+    uvicorn.run(
+        "backend.main:app" if reload_flag else app,
+        host="127.0.0.1", port=8766,
+        reload=reload_flag,
+        reload_dirs=[str(Path(__file__).parent.parent / "frontend"), str(Path(__file__).parent)] if reload_flag else None,
+    )
 
 
 if __name__ == "__main__":

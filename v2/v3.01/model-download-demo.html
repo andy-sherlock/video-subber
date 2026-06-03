@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型下载 Demo — Video Subber</title>
+<style>
+:root {
+  --bg: #1c1c1e;
+  --card: #2c2c2e;
+  --text: #e5e5e7;
+  --sub: #8e8e93;
+  --border: #48484a;
+  --blue: #0a84ff;
+  --red: #ff453a;
+  --green: #30d158;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text);
+  display: flex; justify-content: center; padding: 40px 20px;
+  min-height: 100vh;
+}
+.container { max-width: 720px; width: 100%; }
+
+/* ── 环境检测栏 ── */
+.env-bar {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  background: var(--card); border-radius: 12px; padding: 14px 20px;
+  margin-bottom: 8px; font-size: 12px;
+}
+.env-item { display: flex; align-items: center; gap: 6px; }
+.env-dot { width: 8px; height: 8px; border-radius: 50%; }
+.env-dot.ok { background: var(--green); }
+.env-dot.missing { background: var(--red); }
+
+/* ── Card ── */
+.card {
+  background: var(--card); border-radius: 16px;
+  padding: 24px 28px; margin-bottom: 14px;
+}
+.card-title { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+.card-subtitle {
+  font-size: 12px; color: var(--sub); margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+/* ── 模型选择器 ── */
+.model-line-wrap { position: relative; padding: 0 20px; margin: 32px 0 16px; }
+.model-line {
+  position: relative; height: 2px; background: var(--border);
+  margin: 0 0 12px;
+}
+.model-dots {
+  position: absolute; top: 50%; left: 0; right: 0;
+  transform: translateY(-50%);
+  display: flex; justify-content: space-between;
+}
+.model-dot {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--card);
+  cursor: pointer; position: relative; z-index: 1;
+  transition: all .2s;
+  outline: none;
+}
+.model-dot:hover { border-color: var(--blue); transform: scale(1.15); }
+.model-dot.selected {
+  background: var(--blue); border-color: var(--blue);
+  box-shadow: 0 0 8px rgba(10,132,255,.4);
+}
+.model-dot.selected.missing {
+  background: transparent; border-color: var(--blue);
+  box-shadow: 0 0 6px rgba(10,132,255,.5);
+}
+.model-dot.selected.downloaded {
+  background: var(--green); border-color: var(--green);
+  box-shadow: 0 0 8px rgba(48,209,88,.4);
+}
+.model-dot.downloaded { background: var(--green); border-color: var(--green); }
+.model-dot.missing { border-color: var(--red); background: transparent; }
+.model-dot.downloading { border-color: var(--blue); background: transparent; }
+
+/* 箭头标签 */
+.arrow-row {
+  display: flex; justify-content: space-between; padding: 0 20px;
+  font-size: 11px; color: var(--sub);
+}
+.arrow-row + .arrow-row { margin-top: 2px; }
+
+.model-labels {
+  display: flex; justify-content: space-between; padding: 0 12px;
+  margin-top: 10px; font-size: 10px; color: var(--sub);
+}
+.model-labels span { text-align: center; width: 20px; }
+
+/* ── 进度条 ── */
+.progress-wrap {
+  margin-top: 8px; display: flex; align-items: center; gap: 8px;
+  animation: slideDown .2s ease-out;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.progress-bar {
+  flex: 1; height: 6px; background: var(--border); border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--blue); border-radius: 3px;
+  transition: width .3s ease;
+}
+.progress-pct { font-size: 11px; color: var(--sub); min-width: 36px; text-align: right; }
+.progress-name { font-size: 11px; color: var(--sub); min-width: 50px; }
+.progress-cancel {
+  width: 18px; height: 18px; border: none; background: none;
+  color: var(--sub); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; padding: 0; line-height: 1;
+}
+.progress-cancel:hover { color: var(--red); background: rgba(255,69,58,.1); }
+
+/* ── 提示文字 ── */
+.hint {
+  font-size: 12px; color: var(--sub); margin-top: 4px;
+  display: none;
+}
+.hint.visible { display: block; }
+
+/* ── Reset 按钮 ── */
+.reset-btn {
+  margin-top: 16px; font-size: 12px; background: none;
+  border: 1px solid var(--border); color: var(--sub);
+  padding: 6px 14px; border-radius: 6px; cursor: pointer;
+}
+.reset-btn:hover { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 环境检测栏 -->
+  <div class="env-bar">
+    <div class="env-item"><span class="env-dot ok"></span> 视频处理</div>
+    <div class="env-item"><span class="env-dot ok"></span> 字幕烧录</div>
+    <div class="env-item"><span class="env-dot ok"></span> 语音识别引擎
+      <span style="color:var(--red);font-size:10px">（需下载模型）</span>
+    </div>
+    <div class="env-item"><span class="env-dot ok"></span> 说话人检测</div>
+  </div>
+
+  <!-- 模型选择 -->
+  <div class="card">
+    <div class="card-title">语音识别模型</div>
+
+    <div class="hint" id="hint">
+      ⚠ 部分模型未下载。点击下方红色圆点即可下载对应模型。已下载的模型显示为绿色。
+    </div>
+
+    <div class="model-line-wrap">
+      <div class="model-line">
+        <div class="model-dots" id="dots"></div>
+      </div>
+      <!-- 箭头行 -->
+      <div class="arrow-row"><span>← 快</span><span>慢 →</span></div>
+      <div class="arrow-row"><span>← 低准确度</span><span>高准确度 →</span></div>
+    </div>
+
+    <!-- 模型名标签 -->
+    <div class="model-labels" id="labels"></div>
+
+    <!-- 进度条区域 -->
+    <div id="progressArea"></div>
+  </div>
+
+  <button class="reset-btn" onclick="resetAll()">重置所有下载状态（模拟首次启动）</button>
+
+</div>
+
+<script>
+const MODELS = [
+  { id: 'tiny',    name: 'tiny',    size: '~75MB',  desc: '最快' },
+  { id: 'base',    name: 'base',    size: '~300MB', desc: '快' },
+  { id: 'small',   name: 'small',   size: '~900MB', desc: '均衡' },
+  { id: 'medium',  name: 'medium',  size: '~1.5GB', desc: '推荐' },
+  { id: 'large-v3',name: 'large-v3',size: '~2.9GB', desc: '最准' },
+];
+
+// 状态：已下载 / 下载中 / 未下载
+let modelState = {};   // model_id → { downloaded, downloading, progress, timer }
+let selected = 'medium';
+
+function init() {
+  MODELS.forEach(m => {
+    modelState[m.id] = { downloaded: false, downloading: false, progress: 0, timer: null };
+  });
+  // 新用户没有任何已下载的模型，medium 默认选中但未下载
+  selected = 'medium';
+  render();
+}
+
+function render() {
+  const dotsEl = document.getElementById('dots');
+  const labelsEl = document.getElementById('labels');
+  const progressArea = document.getElementById('progressArea');
+  const hint = document.getElementById('hint');
+
+  // 检查是否有未下载模型
+  const hasMissing = MODELS.some(m => !modelState[m.id].downloaded && !modelState[m.id].downloading);
+  hint.classList.toggle('visible', hasMissing);
+
+  // 圆点
+  dotsEl.innerHTML = MODELS.map(m => {
+    let cls = [];
+    if (modelState[m.id].downloaded) cls.push('downloaded');
+    else if (modelState[m.id].downloading) cls.push('downloading');
+    else cls.push('missing');
+    if (m.id === selected) cls.push('selected');
+    return `<button class="model-dot ${cls.join(' ')}"
+      onclick="onDotClick('${m.id}')"
+      title="${m.name} ${m.size} — ${modelState[m.id].downloaded ? '已下载' : modelState[m.id].downloading ? '下载中 '+modelState[m.id].progress+'%' : '点击下载'}"></button>`;
+  }).join('');
+
+  // 标签
+  labelsEl.innerHTML = MODELS.map(m =>
+    `<span>${m.name}<br><small>${m.size}</small></span>`
+  ).join('');
+
+  // 进度条
+  const downloading = MODELS.filter(m => modelState[m.id].downloading);
+  progressArea.innerHTML = downloading.map(m => `
+    <div class="progress-wrap" id="progress-${m.id}">
+      <span class="progress-name">${m.name}</span>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:${modelState[m.id].progress}%"></div>
+      </div>
+      <span class="progress-pct">${modelState[m.id].progress}%</span>
+      <button class="progress-cancel" onclick="cancelDownload('${m.id}')" title="取消下载">✕</button>
+    </div>
+  `).join('');
+}
+
+function onDotClick(modelId) {
+  const state = modelState[modelId];
+
+  // 已下载 → 选中
+  if (state.downloaded) {
+    selected = modelId;
+    render();
+    return;
+  }
+
+  // 正在下载 → 忽略（需要点取消按钮）
+  if (state.downloading) return;
+
+  // 未下载 → 开始下载
+  startDownload(modelId);
+}
+
+function startDownload(modelId) {
+  const state = modelState[modelId];
+  state.downloading = true;
+  state.progress = 0;
+  render();
+
+  // 模拟下载：每个 tick 随机增长 3-12%，约 2-6 秒完成
+  function tick() {
+    if (!modelState[modelId].downloading) return; // 被取消了
+    const inc = Math.floor(Math.random() * 10) + 3;
+    modelState[modelId].progress = Math.min(100, modelState[modelId].progress + inc);
+
+    if (modelState[modelId].progress >= 100) {
+      modelState[modelId].progress = 100;
+      modelState[modelId].downloading = false;
+      modelState[modelId].downloaded = true;
+      modelState[modelId].timer = null;
+      selected = modelId;
+      render();
+    } else {
+      render();
+      modelState[modelId].timer = setTimeout(tick, 300 + Math.random() * 400);
+    }
+  }
+
+  modelState[modelId].timer = setTimeout(tick, 200);
+}
+
+function cancelDownload(modelId) {
+  const state = modelState[modelId];
+  if (state.timer) clearTimeout(state.timer);
+  state.downloading = false;
+  state.timer = null;
+  // progress 保留，模拟断点续传（下次点击从当前进度继续）
+  render();
+}
+
+function resetAll() {
+  MODELS.forEach(m => {
+    if (modelState[m.id].timer) clearTimeout(modelState[m.id].timer);
+    modelState[m.id] = { downloaded: false, downloading: false, progress: 0, timer: null };
+  });
+  // medium 默认已下载
+  modelState['medium'].downloaded = true;
+  selected = 'medium';
+  render();
+}
+
+init();
+</script>
+</body>
+</html>

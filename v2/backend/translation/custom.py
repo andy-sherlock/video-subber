@@ -14,8 +14,11 @@ class CustomOpenAIBackend(LLMBackend):
 
     @property
     def _api_url(self) -> str:
-        # 用户给什么就用什么，不做字符串体操
-        return self._api_endpoint
+        # 用户可能贴 /v1 也可能贴 /v1/chat/completions，统一处理
+        url = self._api_endpoint.strip().rstrip("/")
+        if not url.endswith("/chat/completions"):
+            url += "/chat/completions"
+        return url
 
     def _build_headers(self) -> dict:
         return {

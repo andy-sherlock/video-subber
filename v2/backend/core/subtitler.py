@@ -106,12 +106,18 @@ def build_srt(segments: list, output_path: str) -> None:
 
 
 def build_ass(segments: list, output_path: str, alignment: int = 8,
-              font_name: str = None) -> None:
-    """Generate ASS with per-sentence splitting and speaker prefixes."""
+              font_name: str = None, video_width: int = 1920, video_height: int = 1080) -> None:
+    """Generate ASS with per-sentence splitting and speaker prefixes.
+
+    PlayRes fixed at 1920x1080 so font size stays consistent across resolutions.
+    video_width/video_height used only for aspect ratio detection (portrait vs landscape).
+    """
     font = font_name or _DEFAULT_FONT
+    play_res_x, play_res_y = 1920, 1080
     entries = _annotate_speaker_changes(_collect_entries(segments))
     lines = [
-        "[Script Info]", "ScriptType: v4.00+", "PlayResX: 640", "PlayResY: 360", "",
+        "[Script Info]", "ScriptType: v4.00+",
+        f"PlayResX: {play_res_x}", f"PlayResY: {play_res_y}", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "

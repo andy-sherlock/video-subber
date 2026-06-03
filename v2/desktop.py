@@ -164,7 +164,12 @@ def _start_server():
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
-    uvicorn.run(_main.app, host="127.0.0.1", port=PORT, log_level="warning")
+    _project_dir = Path(__file__).parent
+    uvicorn.run(
+        _main.app, host="127.0.0.1", port=PORT, log_level="warning",
+        reload=not FROZEN,
+        reload_dirs=[str(_project_dir / "backend"), str(_project_dir / "frontend")] if not FROZEN else None,
+    )
 
 
 def main():
