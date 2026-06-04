@@ -249,7 +249,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
         _qwen_holder = {}  # 只在 join() 后读取
         if is_qwen_asr_available():
             def _run_qwen():
-                _qwen_holder["data"] = transcribe_raw(audio_path)
+                _qwen_holder["data"] = transcribe_raw(audio_path, segments_hint=results)
             qwen_thread = threading.Thread(target=_run_qwen, daemon=True)
             qwen_thread.start()
 
@@ -257,7 +257,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
         _sv_holder = {}  # 只在 join() 后读取
         if is_sensevoice_available():
             def _run_sv():
-                _sv_holder["data"] = run_sensevoice(audio_path, device="cpu")
+                _sv_holder["data"] = run_sensevoice(audio_path, device="cpu", segments=results)
             sv_thread = threading.Thread(target=_run_sv, daemon=True)
             sv_thread.start()
 
@@ -268,7 +268,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
             run_sensevoice, is_sensevoice_available, trim_segments_by_sensevoice
         )
         if is_sensevoice_available():
-            sv_events = run_sensevoice(audio_path, device="cpu")
+            sv_events = run_sensevoice(audio_path, device="cpu", segments=results)
         else:
             _log.warning("SenseVoice 不可用，跳过声音分类")
 

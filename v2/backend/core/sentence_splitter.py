@@ -91,7 +91,7 @@ def word_align_segments(segments: list) -> list:
 # ── T4: LLM Semantic Sentence Splitting (4-signal decision) ──
 
 
-def llm_split_segments(segments: list, llm_backend=None) -> list:
+def llm_split_segments(segments: list, llm_backend=None, pre_splits: dict | None = None) -> list:
     """Split long Chinese subtitles using 4-signal decision logic.
 
     Signals:
@@ -100,9 +100,41 @@ def llm_split_segments(segments: list, llm_backend=None) -> list:
     3. Semantic completeness — LLM judges natural breakpoints (LLM mode only)
     4. Chinese length — max 20 chars per subtitle line
 
+    Args:
+        segments: list of Segment objects with .zh attribute.
+        llm_backend: Optional LLM backend for semantic splitting.
+        pre_splits: Optional dict {original_idx: [split_part_1, ...]} from
+                    LLM translation step. If provided, apply these splits directly
+                    instead of making a separate LLM splitting call.
+
     Falls back to rule-based splitting when no LLM is available.
     """
     from backend.transcriber_v2 import Segment
+
+    # Phase 1C: apply pre-computed splits from LLM translation step
+    if pre_splits:
+        _log.info("使用预计算断句 (LLM 翻译已拆 %d 条)", len(pre_splits))
+        result = []
+        for i, seg in enumerate(segments):
+            if i in pre_splits and len(pre_splits[i]) >= 2:
+                parts = pre_splits[i]
+                subs = _build_split_segments(seg, parts)
+                result.extend(subs)
+            else:
+                result.append(seg)
+        # Apply rule-based splitting to remaining long segments
+        # that were NOT pre-split (fallback gap-fill)
+        final_result = []
+        for seg in result:
+            zh = getattr(seg, 'zh', '').strip()
+            if (zh and zh != '[翻译失败]' and len(zh) > _MAX_ZH_CHARS
+                    and not any(seg.id == orig * 100 + j
+                                for orig, parts in pre_splits.items()
+                                for j in range(len(parts)))):
+                final_result.extend(_rule_based_split(seg))
+            else:
+                final_result.append(seg)
+        return final_result
 
     long_segs = []
     for i, seg in enumerate(segments):
@@ -129,6 +161,32 @@ def llm_split_segments(segments: list, llm_backend=None) -> list:
             result.append(seg)
 
     return result
+
+
+def _build_split_segments(seg, parts: list[str]) -> list:
+    """Create Segment objects from split parts, distributing duration by char count."""
+    from backend.transcriber_v2 import Segment
+
+    duration = seg.end - seg.start
+    total_chars = max(sum(len(p) for p in parts), 1)
+    subs = []
+    t = seg.start
+    for j, part in enumerate(parts):
+        t_end = t + duration * len(part) / total_chars
+        if j == len(parts) - 1:
+            t_end = seg.end
+        sub = Segment(
+            id=seg.id * 100 + j,
+            start=round(t, 2), end=round(t_end, 2),
+            text=seg.text,
+        )
+        sub.zh = part
+        sub.speaker_change = seg.speaker_change if j == 0 else False
+        sub.uncertain = False
+        sub.words = []
+        subs.append(sub)
+        t = t_end
+    return subs
 
 
 def _llm_batch_split(segments: list, llm_backend) -> list[list]:
@@ -173,27 +231,7 @@ def _llm_batch_split(segments: list, llm_backend) -> list[list]:
     results = []
     for i, seg in enumerate(segments):
         if i in split_map and len(split_map[i]) > 1:
-            parts = split_map[i]
-            duration = seg.end - seg.start
-            total_chars = max(sum(len(p) for p in parts), 1)
-            subs = []
-            t = seg.start
-            for j, part in enumerate(parts):
-                t_end = t + duration * len(part) / total_chars
-                if j == len(parts) - 1:
-                    t_end = seg.end
-                sub = Segment(
-                    id=seg.id * 100 + j,
-                    start=round(t, 2), end=round(t_end, 2),
-                    text=seg.text,
-                )
-                sub.zh = part
-                sub.speaker_change = seg.speaker_change if j == 0 else False
-                sub.uncertain = False
-                sub.words = []
-                subs.append(sub)
-                t = t_end
-            results.append(subs)
+            results.append(_build_split_segments(seg, split_map[i]))
         else:
             results.append(_rule_based_split(seg))
 

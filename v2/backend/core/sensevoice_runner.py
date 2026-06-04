@@ -3,15 +3,23 @@
 Runs SenseVoice (funasr) on full audio with its own sentence-level segmentation.
 Returns raw sound-event segments — each with text, tags, and timestamps.
 Downstream code uses these to trim non-speech intervals from Whisper segments.
+
+For long audio (> 20 min) the model is run on ~5-minute chunks whose boundaries
+align with Whisper segments so each chunk starts/ends on a natural sentence break.
 """
 import gc
 import logging
+import os
 import re
+import tempfile
 import time
 
 _log = logging.getLogger(__name__)
 
 _TAG_RE = re.compile(r"<\|(\w+)\|>")
+
+# Chunking constants (mirrors qwen_asr_runner)
+_LONG_AUDIO_THRESHOLD_S = 1200  # 20 minutes
 
 
 def is_sensevoice_available() -> bool:
@@ -31,15 +39,131 @@ def extract_tags(text: str) -> dict:
     return {"language": language, "emotion": emotion, "event": event, "clean_text": clean_text}
 
 
-def run_sensevoice(audio_path: str, device: str = "cpu") -> list[dict] | None:
+# ═══════════════════════════════════════════════════════════════════
+# Chunked SenseVoice (internal)
+# ═══════════════════════════════════════════════════════════════════
+
+def _run_sensevoice_chunked(audio_path: str, device: str,
+                            segments: list) -> list[dict] | None:
+    """Chunked SenseVoice for long audio.
+
+    Uses the same chunking strategy as Qwen3-ASR: batches Whisper segments
+    into ~5-minute groups, extracts each chunk's audio, and runs SenseVoice
+    independently.  Timestamps are offset by each chunk's start time.
+    """
+    from backend.core.qwen_asr_runner import _chunk_segments, _extract_audio_chunk
+
+    chunks = _chunk_segments(segments)
+    _log.info("SenseVoice 分段处理: %d chunks (%d segments)",
+              len(chunks), len(segments))
+
+    try:
+        from funasr import AutoModel
+    except ImportError:
+        _log.warning("SenseVoice 未安装 (funasr import failed)")
+        return None
+
+    _log.info("加载 SenseVoice 模型 (device=%s) ...", device)
+    t0 = time.time()
+    try:
+        model = AutoModel(
+            model="iic/SenseVoiceSmall",
+            trust_remote_code=True,
+            device=device,
+        )
+    except Exception:
+        _log.warning("SenseVoice 模型加载失败", exc_info=True)
+        return None
+    _log.info("SenseVoice 模型加载完成 (%.1fs)", time.time() - t0)
+
+    all_events = []
+
+    for idx, (_seg_start, _seg_end, t_start, t_end) in enumerate(chunks):
+        fd, chunk_path = tempfile.mkstemp(
+            suffix=".wav", prefix=f"sv_chunk_{idx}_")
+        os.close(fd)
+        try:
+            _extract_audio_chunk(audio_path, t_start, t_end, chunk_path)
+
+            res = model.generate(
+                input=chunk_path,
+                cache={},
+                language="auto",
+                use_itn=True,
+                batch_size_s=60,
+                sentence_timestamp=True,
+            )
+
+            if res:
+                for item in res:
+                    raw_text = item.get("text", "")
+                    parsed = extract_tags(raw_text)
+                    timestamp = item.get("timestamp") or []
+                    start_s = (timestamp[0][0] / 1000.0 + t_start
+                               if timestamp else t_start)
+                    end_s = (timestamp[-1][1] / 1000.0 + t_start
+                             if timestamp else t_end)
+
+                    all_events.append({
+                        "text": parsed["clean_text"],
+                        "tags": parsed,
+                        "start_s": start_s,
+                        "end_s": end_s,
+                        "event": parsed["event"],
+                    })
+
+            _log.info("SenseVoice chunk %d/%d 完成 (%.1fs–%.1fs)",
+                      idx + 1, len(chunks), t_start, t_end)
+        except Exception:
+            _log.warning("SenseVoice chunk %d/%d 失败",
+                         idx + 1, len(chunks), exc_info=True)
+        finally:
+            try:
+                os.unlink(chunk_path)
+            except OSError:
+                pass
+
+    del model
+    gc.collect()
+    _log.info("SenseVoice 模型已释放")
+
+    tag_counts = {}
+    for ev in all_events:
+        tag_counts[ev["event"]] = tag_counts.get(ev["event"], 0) + 1
+    _log.info("SenseVoice 分段处理完成, 标签分布: %s", tag_counts)
+
+    return all_events
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Public API
+# ═══════════════════════════════════════════════════════════════════
+
+def run_sensevoice(audio_path: str, device: str = "cpu",
+                   segments: list = None) -> list[dict] | None:
     """Run SenseVoice on audio and return raw sound-event segments.
 
     Each returned dict: {text, tags: {language, emotion, event, clean_text},
                          start_s, end_s, event}
 
+    Args:
+        audio_path: path to audio file.
+        device: "cpu" or "cuda".
+        segments: optional Whisper segments for chunking; if provided and
+                  total duration > 20 min, chunked mode is used.
+
     Returns None on failure so callers can distinguish "no speech events"
     from "model failed".
     """
+    # ── Chunked path ──
+    if segments:
+        total_duration = segments[-1].end
+        if total_duration > _LONG_AUDIO_THRESHOLD_S:
+            _log.info("SenseVoice 音频 %.0fs > 20min，启用分段处理",
+                      total_duration)
+            return _run_sensevoice_chunked(audio_path, device, segments)
+
+    # ── Direct path (original behaviour) ──
     try:
         from funasr import AutoModel
     except ImportError:

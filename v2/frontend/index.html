@@ -269,12 +269,14 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   </div>
   <div class="row" style="margin-top:8px">
     <span style="font-size:13px;min-width:80px">输出方式</span>
-    <select id="burnSelect">
-      <option value="true">烧录字幕到视频</option>
-      <option value="false">仅生成 SRT 文件</option>
+    <select id="outputModeSelect">
+      <option value="burn">烧录字幕到视频</option>
+      <option value="mux">封装字幕到视频 (可开关)</option>
+      <option value="srt">仅生成 SRT 文件</option>
     </select>
   </div>
   <div class="burn-warn" id="burnWarn">⚠ 烧录后字幕将永久固定在视频画面上，无法更改或去除。</div>
+  <div class="info-note" id="muxHint" style="display:none">💡 封装后可在播放器中开关字幕，视频画质不变，处理速度极快。</div>
   <div class="row" style="font-size:12px;color:var(--sub);margin-top:4px">
     <span style="min-width:80px">保存位置</span>
     <span id="savePathDisplay">~/Downloads/Video-Subber</span>
@@ -435,7 +437,7 @@ const State={
   doneJobConfig:null,
   availableBackends:{free:[],llm:[]},
   settings:{
-    subtitles:"no",burn:true,model:"medium",
+    subtitles:"no",outputMode:"burn",model:"medium",
     translationMode:"speed",translationPriority:["google","bing","youdao"],
     contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
     speakerDetect:false,
@@ -479,16 +481,26 @@ function renderEnv(d){
     `<div class="env-item"><span class="env-dot ${svDot}"></span><div><span>${svTxt}</span></div></div>`+
     `<div class="env-item"><span class="env-dot ${qaDot}"></span><div><span>${qaTxt}</span></div></div>`+
     `<div class="env-item"><span class="env-dot ${rzDot}"></span><div><span>${rzTxt}</span></div></div>`;
-  // Fix #9: disable burn when libass missing
+  // Fix #9: disable burn when libass missing; disable burn+mux when ffmpeg missing
+  window._hasFfmpeg=ff.installed;
   window._hasLibass=ff.installed&&ff.has_libass;
-  if(!window._hasLibass){
-    const bs=document.getElementById('burnSelect');
-    if(bs&&bs.value==='true'){bs.value='false';bs.dispatchEvent(new Event('change'))}
-    if(bs)bs.disabled=true;
-  }else{
-    const bs=document.getElementById('burnSelect');if(bs)bs.disabled=false;
+  const bs=document.getElementById('outputModeSelect');
+  if(bs){
+    const burnOpt=bs.querySelector('option[value="burn"]');
+    const muxOpt=bs.querySelector('option[value="mux"]');
+    if(!window._hasFfmpeg){
+      if(burnOpt)burnOpt.disabled=true;
+      if(muxOpt)muxOpt.disabled=true;
+      if(bs.value==='burn'||bs.value==='mux'){bs.value='srt';bs.dispatchEvent(new Event('change'));}
+    }else if(!window._hasLibass){
+      if(burnOpt)burnOpt.disabled=true;
+      if(muxOpt)muxOpt.disabled=false;
+      if(bs.value==='burn'){bs.value='mux';bs.dispatchEvent(new Event('change'));}
+    }else{
+      if(burnOpt)burnOpt.disabled=false;
+      if(muxOpt)muxOpt.disabled=false;
+    }
   }
-}
 reloadEnv();
 
 // ============ Backends ============
@@ -542,7 +554,7 @@ function selectFile(f){
 function _settingsMatchDone(){
   const c=State.doneJobConfig;if(!c)return false;const s=State.settings;
   if(String(s.subtitles)!==String(c.subtitles??'no'))return false;
-  if(String(s.burn)!==String(c.burn??false))return false;
+  if(String(s.outputMode??'burn')!==String(c.outputMode??(c.burn?'burn':'srt')))return false;
   if(String(s.model)!==String(c.model??'medium'))return false;
   if(String(s.translationMode)!==String(c.translationMode??'speed'))return false;
   if(String(s.contextAware)!==String(c.contextAware??false))return false;
@@ -559,7 +571,9 @@ function refreshStartBtn(){
     else{sbtn.disabled=false;sbtn.textContent='用新设置重跑';State.forceRerun=true}
     return;
   }
-  sbtn.disabled=false;sbtn.textContent=State.settings.burn?'开始翻译并烧录':'开始生成字幕'
+  sbtn.disabled=false;
+  const _modeLabels={burn:'开始翻译并烧录',mux:'开始翻译并封装字幕',srt:'开始生成字幕'};
+  sbtn.textContent=_modeLabels[State.settings.outputMode]||'开始生成字幕'
 }
 
 // ============ Save Path ============
@@ -577,7 +591,7 @@ function updateSavePathDisplay(){$('savePathDisplay').textContent=State.settings
 
 // ============ Subtitle ============
 $('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.subtitles=e.target.dataset.v;refreshStartBtn()});
-$('burnSelect').addEventListener('change',()=>{State.settings.burn=$('burnSelect').value==='true';$('burnWarn').style.display=State.settings.burn?'block':'none';$('styleSubSection').style.display=State.settings.burn?'block':'none';refreshStartBtn()});
+$('outputModeSelect').addEventListener('change',()=>{State.settings.outputMode=$('outputModeSelect').value;$('burnWarn').style.display=State.settings.outputMode==='burn'?'block':'none';$('muxHint').style.display=State.settings.outputMode==='mux'?'block':'none';$('styleSubSection').style.display=State.settings.outputMode==='burn'?'block':'none';refreshStartBtn();saveConfig()});
 
 // ============ Model Slider ============
 let modelDownloads={}; // model_id → {downloading, progress}
@@ -992,14 +1006,14 @@ $('styleConfirmBtn').addEventListener('click',()=>{
 
 // ============ Config Persistence ============
 async function saveConfig(){
-  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,burn:State.settings.burn,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect,transcriptionTier:State.settings.transcriptionTier};
+  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,outputMode:State.settings.outputMode,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect,transcriptionTier:State.settings.transcriptionTier};
   // localStorage: strip key values, save metadata only
   const safeCfg={...cfg,apiKeys:(cfg.apiKeys||[]).map(k=>({platform:k.platform,name:k.name,model:k.model,api_endpoint:k.api_endpoint}))};
   localStorage.setItem('video-subber-config',JSON.stringify(safeCfg));
   for(let attempt=0;attempt<2;attempt++){try{const r=await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(r.ok)return}catch(e){if(attempt===0)await new Promise(r=>setTimeout(r,1000))}}}
 function loadConfig(){
   const raw=localStorage.getItem('video-subber-config');
-  if(raw){try{const c=JSON.parse(raw);Object.assign(State.settings,c)}catch(e){}}
+  if(raw){try{const c=JSON.parse(raw);if(c.burn!==undefined&&c.outputMode===undefined){c.outputMode=c.burn?'burn':'srt'}Object.assign(State.settings,c)}catch(e){}}
   fetch('/api/config').then(r=>r.json()).then(c=>{
     if(c&&c.translationMode)Object.assign(State.settings,c);
     syncUI();updateSavePathDisplay();
@@ -1018,7 +1032,7 @@ function reconnectJobs(){
       if(firstReconnect&&j.config){State.settings={...State.settings,...j.config};syncUI();firstReconnect=false}
       const filename=j.video_filename||'恢复中…';
       if(j.status==='running'||j.status==='queued'){addJobCard(jid,filename);if(!settingsLocked){lockUI();settingsLocked=true}$('fill-'+jid).style.width=(j.progress||0)+'%';$('step-'+jid).textContent=j.message||j.stage||'处理中…';connectCard(jid)}
-      else if(j.status==='done'){addJobCard(jid,filename);renderCardDone(jid,{result_video:!!(j.config&&j.config.burn),result_srt:j.result_srt});removeActiveJobId(jid)}
+      else if(j.status==='done'){addJobCard(jid,filename);renderCardDone(jid,{result_video:!!(j.config&&(j.config.burn||j.config.outputMode==='burn'||j.config.outputMode==='mux')),result_srt:j.result_srt});removeActiveJobId(jid)}
       else if(j.status==='error'){addJobCard(jid,filename);const step=$('step-'+jid);const err=$('err-'+jid);if(step)step.textContent='处理失败';if(err){err.textContent=j.error||'未知错误';err.classList.add('show')}$('card-'+jid).classList.add('job-card-done');removeActiveJobId(jid)}
       else if(j.status==='interrupted'){addJobCard(jid,filename);const step=$('step-'+jid);const fill=$('fill-'+jid);if(step){step.textContent='任务中断，请重新拖入此视频恢复';step.style.color='var(--yellow)'}if(fill){fill.style.width='50%';fill.style.background='var(--yellow)'}$('card-'+jid).classList.add('job-card-done');removeActiveJobId(jid)}
       else{removeActiveJobId(jid)}
@@ -1034,7 +1048,7 @@ function showToast(msg){
 function handleFoundJob(d,filename){
   let card=document.getElementById('card-'+d.job_id);
   if(d.status==='done'){
-    if(!card){addJobCard(d.job_id,d.config?.video_filename||filename);renderCardDone(d.job_id,{result_video:!!(d.config&&d.config.burn)})}
+    if(!card){addJobCard(d.job_id,d.config?.video_filename||filename);renderCardDone(d.job_id,{result_video:!!(d.config&&(d.config.burn||d.config.outputMode==='burn'||d.config.outputMode==='mux'))})}
     else{card.scrollIntoView({behavior:'smooth'});card.classList.add('flash-highlight');setTimeout(()=>card.classList.remove('flash-highlight'),1000)}
     State.doneJobConfig={...d.config};unlockUI();settingsLocked=false;
     const _same=_settingsMatchDone();
@@ -1097,7 +1111,7 @@ sbtn.addEventListener('click',async()=>{
 
 function resetAllJobs(){Object.keys(activeJobs).forEach(jid=>cancelCard(jid));sbtn.disabled=true;sbtn.textContent='选择视频文件开始';settingsLocked=false;unlockUI()}
 function lockUI(){
-  ['subToggle','burnSelect','modelSection','modeToggle','priorityList','apiPlatform','apiName','apiKeyInput','apiAddBtn','apiCancelBtn','ctxToggle','styleConfirmBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('disabled-ctl')});
+  ['subToggle','outputModeSelect','modelSection','modeToggle','priorityList','apiPlatform','apiName','apiKeyInput','apiAddBtn','apiCancelBtn','ctxToggle','styleConfirmBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('disabled-ctl')});
   sbtn.disabled=true;
   const existing=document.getElementById('lockBanner');
   if(!existing){
@@ -1119,7 +1133,7 @@ function unlockUI(){
 // would still skip the rest without the try/catch. (V2.07)
 function renderSettingsToDOM(){
   document.querySelectorAll('#subToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.subtitles)});
-  const bs=document.getElementById('burnSelect');bs.value=State.settings.burn?'true':'false';bs.dispatchEvent(new Event('change'));
+  const bs=document.getElementById('outputModeSelect');bs.value=State.settings.outputMode||'burn';bs.dispatchEvent(new Event('change'));
   document.querySelectorAll('#modeToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.translationMode)});
   const pl=document.getElementById('priorityList');pl.classList.toggle('show',State.settings.translationMode==='quality');
   document.querySelectorAll('#ctxToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.contextAware))});
@@ -1224,7 +1238,7 @@ function closeError(){$('errorOverlay').classList.remove('active')}
 // ============ Init ============
 document.addEventListener('DOMContentLoaded',async()=>{
   fetch('/api/health').then(r=>r.json()).then(d=>{const v=$('versionTag');if(v)v.textContent='v'+d.version}).catch(()=>{});
-  const burnSelect=document.getElementById('burnSelect');if(burnSelect)burnSelect.dispatchEvent(new Event('change'));
+  const burnSelect=document.getElementById('outputModeSelect');if(burnSelect)burnSelect.dispatchEvent(new Event('change'));
   if(typeof loadConfig==='function')loadConfig();
   try{const res=await fetch('/api/backends');if(res.ok){const data=await res.json();if(typeof updateBackendLists==='function')updateBackendLists(data)}}catch(err){}
   if(typeof buildModelSlider==='function'){try{buildModelSlider()}catch(e){}}

@@ -99,7 +99,7 @@ builtins.input = _auto_yes_input
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend.core.extractor import extract_audio
-from backend.core.subtitler import build_srt, build_ass, burn_subtitles
+from backend.core.subtitler import build_srt, build_ass, burn_subtitles, mux_subtitles
 from backend.core.checkpoint import Checkpoint, find_versioned_cache, cleanup_old_versions
 from backend.core.sentence_splitter import word_align_segments, llm_split_segments
 from backend.transcriber_v2 import transcribe as transcribe_v2, Segment
@@ -139,7 +139,13 @@ def main():
         _ver = "dev"
     logging.getLogger("worker").info("版本: %s", _ver)
     video_path = config["video_path"]
-    burn_flag = config.get("burn", True)
+    # ── outputMode: "srt" | "burn" | "mux" (backward compat: derive from burn flag) ──
+    output_mode = config.get("outputMode")
+    if output_mode is None:
+        burn_old = config.get("burn", True)
+        output_mode = "burn" if burn_old else "srt"
+    burn_flag = (output_mode == "burn")
+    mux_flag = (output_mode == "mux")
     subtitles = config.get("subtitles", "no")
     model = config.get("model", "medium")
     translation_mode = config.get("translationMode", "speed")
@@ -164,6 +170,8 @@ def main():
             raise ValueError(f"config.speakerDetect 应为 bool，实际为 {type(cfg['speakerDetect']).__name__}")
         if "transcriptionTier" in cfg and cfg["transcriptionTier"] not in ("fast", "standard", "precise", None):
             raise ValueError(f"config.transcriptionTier 无效: {cfg['transcriptionTier']}")
+        if "outputMode" in cfg and cfg["outputMode"] not in ("srt", "burn", "mux", None):
+            raise ValueError(f"config.outputMode 无效: {cfg['outputMode']}")
     _validate_config(config)
 
     # Redirect V1.3 print() to stderr so stdout stays clean JSON.
@@ -179,6 +187,7 @@ def main():
     # Derive output filename from original video name (e.g. "1.ts" → "1")
     _video_filename = config.get("video_filename", "output")
     _video_stem = Path(_video_filename).stem
+    _video_suffix = Path(_video_filename).suffix
 
     audio_path = str(cache / "audio.wav")
     transcript_path = cache / "transcript.json"
@@ -186,6 +195,7 @@ def main():
     srt_path = str(job_dir / f"{_video_stem}.srt")
     ass_path = str(cache / f"{_video_stem}.ass")
     video_out = str(job_dir / f"{_video_stem}_zh.mp4")
+    video_out_mux = str(job_dir / f"{_video_stem}_zh_sub{_video_suffix}")
     ck_path = str(cache / "checkpoint.json")
 
     # Which setting affects which pipeline stage (earliest impact)
@@ -200,6 +210,7 @@ def main():
         "contextAware": "translate",
         "style": "subtitle",
         "burn": "burn",
+        "outputMode": "burn",
     }
     STAGE_ORDER = ["extract_audio", "transcribe", "translate", "subtitle", "burn"]
     # subtitle produces both .srt (job_dir, user-facing) and .ass (cache, used by
@@ -210,7 +221,7 @@ def main():
         "transcribe": [str(transcript_path)],
         "translate": [str(translated_path)],
         "subtitle": [srt_path, ass_path],
-        "burn": [video_out],
+        "burn": [video_out, video_out_mux],
     }
 
     ck = Checkpoint(ck_path, video_path)
@@ -309,6 +320,7 @@ def main():
 
         # ── Step 3: Translate (35-80%) ──
         failed = []
+        sub_splits = {}
         if stage in ("start", "extract_audio", "transcribe", "translate") and not translated_path.exists():
             texts = [s.text.strip() for s in segments]
             try:
@@ -317,7 +329,7 @@ def main():
                 def prog(pct: int, msg: str):
                     stderr_progress("translate", 40 + int(pct * 0.45), msg)
 
-                zh_list, failed_indices, token_usage = translate_with_orchestrator(
+                zh_list, failed_indices, token_usage, sub_splits = translate_with_orchestrator(
                     texts=texts, mode=translation_mode, priority=translation_priority,
                     api_keys=api_keys, context_aware=context_aware,
                     progress_callback=prog,
@@ -373,11 +385,12 @@ def main():
                         _real_stdout.flush()
                     else:
                         stderr_progress("translate", 40, "已切换为免费引擎，正在重新翻译…")
-                    zh_list, failed_indices, token_usage = translate_with_orchestrator(
+                    zh_list, failed_indices, token_usage, _ = translate_with_orchestrator(
                         texts=texts, mode=translation_mode, priority=translation_priority,
                         api_keys=[], context_aware=False,
                         progress_callback=prog,
                     )
+                    sub_splits = {}  # free engines don't do pre-splitting
                     for s, zh in zip(segments, zh_list):
                         s.zh = zh
                     failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
@@ -389,6 +402,38 @@ def main():
                     "text": s.text, "zh": s.zh,
                 } for s in segments], f, ensure_ascii=False, indent=2)
             ck.save("translate", meta=config)
+
+            # ── Phase 1C: reflection review (quality mode) ──
+            if api_keys and failed and translation_mode == "quality":
+                _reflection_mode = config.get("reflection", False)
+                if _reflection_mode:
+                    try:
+                        from backend.translation.reflection import (
+                            build_reflection_prompt, parse_reflection_result, apply_reflection
+                        )
+                        from backend.translation.orchestrator import _build_llm_backends
+                        _r_backends = _build_llm_backends(api_keys)
+                        if _r_backends:
+                            _r_llm = _r_backends[0]
+                            _r_prompt = build_reflection_prompt(texts, zh_list, limit=30)
+                            _r_result = _r_llm.translate_raw(_r_prompt, max_tokens=4096)
+                            _r_raw = _r_result.translated[0] if _r_result.translated else ""
+                            if _r_raw:
+                                _r_corrections = parse_reflection_result(_r_raw)
+                                zh_list = apply_reflection(zh_list, _r_corrections)
+                                for s, zh in zip(segments, zh_list):
+                                    s.zh = zh
+                                failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
+                                stderr_progress("translate", 78,
+                                    f"反思修正完成: {len(_r_corrections)} 条优化")
+                                # Re-save corrected translation
+                                with open(translated_path, "w", encoding="utf-8") as f:
+                                    json.dump([{
+                                        "id": s.id, "start": s.start, "end": s.end,
+                                        "text": s.text, "zh": s.zh,
+                                    } for s in segments], f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        _log.warning("反思优化失败", exc_info=True)
         else:
             stderr_progress("translate", 40, "已有翻译记录，跳过")
             raw = json.loads(translated_path.read_text(encoding="utf-8"))
@@ -423,7 +468,7 @@ def main():
                     llm_backend = llm_list[0]
             except Exception:
                 pass
-        subtitle_segments = llm_split_segments(subtitle_segments, llm_backend=llm_backend)
+        subtitle_segments = llm_split_segments(subtitle_segments, llm_backend=llm_backend, pre_splits=sub_splits)
 
         stderr_progress("subtitle", 85, "正在生成字幕文件…")
         build_srt(subtitle_segments, srt_path)
@@ -450,6 +495,12 @@ def main():
             burn_subtitles(video_path, ass_path, video_out)
             stderr_progress("burn", 98, "合成完成")
 
+        if mux_flag:
+            # ── Step 5: Mux (90-100%) ──
+            stderr_progress("burn", 92, "正在封装字幕到视频…")
+            mux_subtitles(video_path, srt_path, video_out_mux)
+            stderr_progress("burn", 98, "封装完成")
+
         ck.save("done", meta=config)
 
         # 保留 input 视频，允许用户切换设置后通过 force=true 重跑。
@@ -470,6 +521,12 @@ def main():
                 _archived = save_path / f"{_video_stem}_{_ctx_suffix}_zh.mp4"
                 _dest_v.rename(_archived)
             shutil.copy2(video_out, _dest_v)
+        if mux_flag and Path(video_out_mux).exists():
+            _dest_v = save_path / Path(video_out_mux).name
+            if _dest_v.exists():
+                _archived = save_path / f"{_video_stem}_{_ctx_suffix}_zh_sub{_video_suffix}"
+                _dest_v.rename(_archived)
+            shutil.copy2(video_out_mux, _dest_v)
         if Path(srt_path).exists() and not burn_flag:
             _dest_s = save_path / Path(srt_path).name
             if _dest_s.exists():
@@ -483,7 +540,7 @@ def main():
         logging.getLogger("worker").info("步骤耗时: %s", _dur_str)
         emit("progress", stage="burn", percent=100, message="完成", detail="")
         emit("done",
-             result_video=video_out if burn_flag else None,
+             result_video=video_out if burn_flag else (video_out_mux if mux_flag else None),
              result_srt=srt_path,
              failed_segments=[{"id": fid, "text": ftxt, "reason": freason}
                               for fid, ftxt, freason in failed] if failed else [],
@@ -492,6 +549,8 @@ def main():
 
     except Exception as e:
         sys.stdout = _real_stdout
+        _dur_str = f"合计={time.time() - _t_start:.0f}s (异常退出)"
+        logging.getLogger("worker").info("步骤耗时: %s", _dur_str)
         emit("error", message=_friendly_error(str(e)), failed_segments=[])
 
 

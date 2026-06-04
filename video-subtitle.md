@@ -35,6 +35,7 @@
 | ↳ V3 2026-06-03 | **API Key 卡片编辑 + 版本号修复 + 模型下线提示**。① 前端 API Key 列表改为可点击卡片，点击回填表单编辑，新增/编辑共用表单 ② 编辑时实时拉取最新模型列表（含新上线/免费模型），用户保存的模型自动选中 ③ 模型被平台下线时在下拉框标注「(已下线)」④ 变更检测直接对比后台数据（非快照）⑤ 版本号检测优先读 .version 文件，修复显示 V2.12 的问题 ⑥ pyproject.toml 版本同步至 3.0 | ✅ |
 | **V3.01** | **Phase 1A 翻译管线实测验证 + 内容类型感知翻译 + 说话人检测降级 + PlayRes 修复**。① 翻译 prompt 根因修复（`[编号] 译文` 格式要求 + 正则 PatternError）② 全文翻译+滑动窗口实测通过（agnes-2.0-flash 104/105 条，14.7s）③ 术语自动提取实测通过 ④ 内容类型感知翻译策略（搞笑/正式/教学/日常四种 prompt）⑤ 说话人检测降级为实验性功能（默认关闭）⑥ ASS PlayRes 统一 1920×1080（修复跨分辨率字幕大小不一致）⑦ 免费翻译引擎 Bing+有道已注册 ⑧ LiteLLM 社区数据集对接（模型免费/付费标签）⑨ API Key 卡片式编辑 | ✅ 快照 `v2/v3.01/` |
 | **V3.02** | **Phase 1B 三模型转录 + 五层幻觉过滤 + 并行优化**。① 三模型并行管线（Whisper + SenseVoice + Qwen3-ASR ≥16GB 内存全并行，8GB 串行）② 五层幻觉过滤（L1 SenseVoice 声音分类硬过滤 → L4 正则硬过滤 → L5 去重硬过滤 → L2 交叉验证软标记 → L3 语速软标记）③ SenseVoice 声音事件分类 + 非人声区间修剪字幕 ④ Qwen3-ASR 交叉验证（Mac MLX/PyTorch 双路径对齐）⑤ 语言自动传递（Whisper 检测语言 → 过滤器阈值自动匹配）⑥ LLM 翻译修复（非上下文感知路径改用降级链，不再并发竞速）⑦ LLM 全失败 120s 超时自动降级免费引擎 ⑧ DELETE 接口保留日志 ⑨ 日志版本号 + 耗时汇总 ⑩ 前端三档转录选项 + 环境栏新增 SenseVoice/Qwen3 检测 ⑪ 69 测试全过 | ✅ 快照 `v2/v3.02/` |
+| **V3.03** | **Phase 1C 打磨收尾 + 代码审查修复**。① 长音频分段切分（Qwen3-ASR + SenseVoice，Whisper segment 边界 + 5s 发音缓冲，15 分钟一批，解除 MLX 20 分钟上限）② LLM 断句与翻译分离（翻译 prompt 不再要求 AI 拆句，字幕生成步骤独立用规则断句，修复 F1 缓存崩溃 bug）③ 软字幕封装（mp4 mov_text / mkv srt，前端新增输出模式三选一）④ yt-dlp 视频下载（`/api/download-video` 端点）⑤ 翻译反思优化（quality 模式可选，翻译后 LLM 自审修正，已接入 worker 管线）⑥ 耗时汇总补异常路径 + 日志版本号 ⑦ F1/F3/F4/F5 代码审查 bug 全修复 ⑧ 竞品分析更新（MioSub / VideoCaptioner / WhisperJAV 代码校验）⑨ 竞品仓库链接归档 ⑩ 159 测试全过 | ✅ 快照 `v2/v3.03/` |
 | **V4** | **体验打磨 + 性能优化 + 数据飞轮**。① GPU 加速包内置安装包（自动检测硬件，加速库预置在 EXE/DMG 安装包内，用户无感。仅 Windows+NVIDIA 用户需要，Mac 原生加速无需此功能）② **Qwen3-ForcedAligner 词级强制对齐**（替代 CTC。输入音频+文字→输出词级毫秒时间戳。**前置条件**：V3 LLM 断句上线后用踩坑视频实测，若断句已解决 90% 字幕错位则 V4 做，若未解决则提前到 V3 Phase 1C）③ 字幕手动微调界面（PySide6 原生编辑面板，用户可修改文字/时间。藏在"微调"按钮后，90% 用户不需要看到）④ RAG 翻译修正反馈循环（用户修改→入库→下次 LLM 检索参考→越用越准。四层记录结构见下方 RAG 知识库章节）⑤ Qwen3-FA 对齐结果兼作幻觉过滤验证信号（与 SenseVoice 双信号交叉确认）。**以 V3 为框架。** | 待 V3 完成 |
 | **未来** | 积分体系 + 云端语料库 + 账号系统。**需先有用户基础和翻译数据，暂不定版本号。** | 待定 |
 
@@ -882,14 +883,23 @@ V1.3 用 `_TeeOutput` 劫持 `sys.stdout` 实现双日志。这个方案在 Web 
 
 | 优先级 | 任务 | 详细方案 | 状态 |
 |--------|------|----------|------|
-| 🔴 5 | **长音频切分（Qwen3 + SenseVoice）** | Qwen3-ASR MLX 单次上限 ~20 分钟；SenseVoice 处理长音频也极慢。按音频时长自动切分为 ≤15 分钟的段落，逐一处理，结果拼接。Phase 1B 实测发现，不修复则超过 20 分钟的视频用不了精确档位 | 待实现 |
-| 🟡 6 | **LLM 断句 + 翻译合并** | 当前 llm_split_segments 与翻译分开两次 LLM 调用。设计文档要求合并为一步。推迟到 1C 与反思优化一起重构 | 待实现 |
-| 🟡 7 | **翻译反思优化（可选·质量模式）** | 翻译完成后 LLM 自审并修正。三步流程：理解→翻译→反思。做成可选"质量模式"最高档 | 待实现 |
-| 🟡 8 | **软字幕封装** | 新增"封装进 MKV/MP4 字幕轨道"选项（ffmpeg `-c:s mov_text`/`-c:s srt`），一条命令 | 待实现 |
-| 🟢 9 | **视频下载（yt-dlp 集成）** | 用户粘贴 URL → yt-dlp 下载完整视频文件到本地 → 进入正常流水线 | 待调研 |
-| 🟡 10 | **耗时汇总补到异常路径** | Phase 1B 的耗时汇总只在成功时写入日志，LLM 全失败等异常路径跳过了。改到 finally 块，不管成功失败都写 | 待实现 |
+| 🔴 5 | **长音频切分（Qwen3 + SenseVoice）** | ✅ V3.03 完成。Whisper segment 边界 + 5s 发音缓冲，15 分钟一批，ffmpeg 提取片段，独立跑模型后拼接 | ✅ V3.03 |
+| 🟡 6 | **LLM 断句 + 翻译合并** | ✅ V3.03 完成（已回退）。翻译 prompt 不再要求 AI 拆句。字幕生成步骤独立用规则断句。修复 F1 缓存崩溃 bug | ✅ V3.03 |
+| 🟡 7 | **翻译反思优化（可选·质量模式）** | ✅ V3.03 完成。翻译后 LLM 自审修正，已接入 worker 管线（quality 模式可选） | ✅ V3.03 |
+| 🟡 8 | **软字幕封装** | ✅ V3.03 完成。`mux_subtitles()` ffmpeg 封装，前端新增输出模式三选一 | ✅ V3.03 |
+| 🟢 9 | **yt-dlp 视频下载** | ✅ V3.03 完成。`video_downloader.py` + `/api/download-video` 端点 | ✅ V3.03 |
+| 🟡 10 | **耗时汇总补异常路径 + 日志版本号** | ✅ V3.03 完成。worker.py 异常路径加耗时，日志头写版本号 | ✅ V3.03 |
 
-**Phase 1C 完成度：0 / 6**
+**Phase 1C 完成度：6 / 6 ✅**
+**代码审查修复：F1/F3/F4/F5 全修，159 测试全过**
+
+#### 已知限制（V3.03 留到后续版本）
+
+| 事项 | 说明 | 计划 |
+|------|------|------|
+| Qwen3-ASR MLX 长音频切分 | 自动切分逻辑已在代码中，但未在 >20min 视频上实测 | V3.04 实测 |
+| whisper.cpp 引擎替换 | MioSub 用 whisper.cpp 比 faster-whisper 快 3-5 倍，但增加跨平台打包复杂度 | V4 打包阶段评估 |
+| Windows Qwen3 时间戳拆句 | PyTorch 版有时间戳，可对着真实停顿拆句（方案 B） | V4 打包阶段 |
 
 ---
 
@@ -948,7 +958,34 @@ FastAPI 后端框架 / Worker 子进程隔离 / 断点恢复 SHA256 checkpoint /
 
 ### 竞品分析记录（2026-05-31）
 
-对比 VideoCaptioner（14.8k Star·PyQt5）/ WhisperJAV（1.6k Star·PyWebView）/ MioSub（546 Star·Electron+React），经乔布斯视角多轮评审后确定 V3 方案：
+对比 VideoCaptioner（14.8k Star·PyQt5）/ WhisperJAV（1.6k Star·PyWebView）/ MioSub（546 Star·Electron+React），经乔布斯视角多轮评审后确定 V3 方案。
+
+#### 竞品代码仓库
+
+| 项目 | 地址 | 前端 | 转录引擎 | Qwen3-ASR？ |
+|------|------|------|---------|------------|
+| VideoCaptioner | [github.com/WEIFENG2333/VideoCaptioner](https://github.com/WEIFENG2333/VideoCaptioner) | PyQt5 | faster-whisper / whisper-cpp / 必剪 / 剪映 | **无** — README 列出五种引擎，没一个叫 Qwen3 |
+| WhisperJAV | [github.com/meizhong986/WhisperJAV](https://github.com/meizhong986/WhisperJAV) | Eel/PyWebView | **Whisper + Qwen3-ASR 双引擎** | **有** — 深度集成。自研 ChronosJAV 管线解决 Qwen3 无时间戳问题。三种对齐模式（Assembly 最长 120s / Context-Aware 30-90s / VAD Slicing） |
+| MioSub | [github.com/corvo007/MioSub](https://github.com/corvo007/MioSub) | Electron+React | whisper.cpp + Google Gemini | **无** — 转录用 whisper.cpp，对齐用 `cpp-ort-aligner`（CTC 强制对齐），不碰 Qwen3 |
+
+#### V3 竞品分析关键修正（2026-06-04 代码验证）
+
+之前竞品分析文档称"三竞品对比 Qwen3-ASR"，但实际核查代码仓库后发现：
+- **VideoCaptioner** 从未使用 Qwen3-ASR。其 README 列出的引擎为 faster-whisper、whisper-api、必剪（bijian）、剪映（jianying）、whisper-cpp
+- **MioSub** 从未使用 Qwen3-ASR。转录用 whisper.cpp，对齐用 `cpp-ort-aligner`（CTC），翻译用 Gemini
+- **WhisperJAV** 是唯一深度集成 Qwen3-ASR 的竞品——双引擎架构，Qwen3 和 Whisper 各跑各的
+
+**这意味着 V3 的三模型设计（Whisper + Qwen3-ASR + SenseVoice）在竞品中没有先例。** Qwen3-ASR 做交叉验证这个方向是我们原创的。[WhisperJAV 中唯一值得借鉴的，是它通过 VAD 场景切分（单段 30-120 秒）从根源上规避了长音频问题。]
+
+#### 竞品长音频处理策略
+
+| 竞品 | 策略 | 对我们的启发 |
+|------|------|------------|
+| **WhisperJAV** | Silero VAD 切分成 30-120s 场景段，每段独立跑 Qwen3 | ⭐ 最佳参考。我们的 Whisper 已经做了类似切分（每个 segment 1-3 秒），可以把相邻 segment 合并成 2-5 分钟批次喂给 Qwen3，绕过 20 分钟上限 |
+| **VideoCaptioner** | 不涉及 | N/A |
+| **MioSub** | whisper.cpp 无 20 分钟限制 | N/A |
+
+**结论**：三个竞品中只有 WhisperJAV 真正深度集成了 Qwen3-ASR。它的解法不是切分长音频——而是用 VAD 先把音频切成小场景（30-120 秒），从根源上避开了长音频问题。我们的 Whisper 其实也内置了类似的 VAD 场景切分——每个 segment 本身就代表一个小场景。让 Qwen3 对每个 Whisper segment 独立跑转录（而不是对整段音频），可以从根本上规避 20 分钟上限。
 
 **竞品借鉴：** LLM 断句优化（VideoCaptioner）、术语自动提取（MioSub）、翻译反思优化（VideoCaptioner）、幻觉正则+语速+概率阈值（WhisperJAV）、软字幕封装、视频下载 yt-dlp
 

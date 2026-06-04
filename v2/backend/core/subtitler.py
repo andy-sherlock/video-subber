@@ -156,6 +156,34 @@ def _find_ffmpeg() -> str:
     return shutil.which("ffmpeg") or "ffmpeg"
 
 
+def mux_subtitles(video_path: str, srt_path: str, output_path: str) -> None:
+    """Embed SRT as a soft subtitle track into video container.
+
+    Video and audio streams are copied without re-encoding.
+    MP4/M4V/MOV uses mov_text codec, other containers use srt codec.
+    """
+    ffmpeg = _find_ffmpeg()
+    if not (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
+        raise RuntimeError("FFmpeg 未安装，无法封装字幕。请安装 ffmpeg 后重试。")
+
+    ext = os.path.splitext(output_path)[1].lower()
+    codec = "mov_text" if ext in (".mp4", ".m4v", ".mov") else "srt"
+
+    cmd = [
+        ffmpeg, "-y",
+        "-i", video_path,
+        "-i", srt_path,
+        "-c", "copy",
+        "-c:s", codec,
+        "-map", "0:v", "-map", "0:a?", "-map", "1:s",
+        output_path,
+    ]
+    r = subprocess.run(cmd, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    if r.returncode != 0 or not Path(output_path).exists():
+        raise RuntimeError(f"字幕封装失败: {r.stderr[-800:]}")
+
+
 def burn_subtitles(video_path: str, ass_path: str, output_path: str) -> None:
     """Burn ASS subtitles into video via ffmpeg (requires libass)."""
     import tempfile, shutil as _shutil

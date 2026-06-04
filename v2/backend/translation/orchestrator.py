@@ -240,7 +240,6 @@ _SUBTITLE_PROMPT = (
     "  新闻/正式 → 保持准确性，语气正式但不僵硬\n"
     "  日常对话 → 使用生活化口语，像朋友聊天\n"
     "- 严格按 [编号] 译文 格式逐行输出，保持编号与原文一一对应\n"
-    "- 每行对应一条字幕，独立翻译，不合并不拆分行\n"
     "- 专有名词、人名保留原文或使用通用译法\n"
     "- 不加任何解释、注释或 markdown 标记\n\n"
 )
@@ -369,11 +368,17 @@ def _translate_whole_with_markers(
     terminology: dict[str, str] | None = None,
     context_summary: str = "",
     progress_callback=None,
-) -> tuple[list[str], dict | None]:
+) -> tuple[list[str], dict | None, dict[int, list[str]]]:
     """V3 sliding window translation with overlap + context + terminology.
 
     Chunks texts with 20% overlap. Each chunk receives terminology table +
     context summary. After all chunks, seam review resolves overlap zones.
+
+    Returns:
+        (translated, token_usage, sub_splits)
+        sub_splits: {original_idx: [split_part_1, split_part_2, ...]}
+        for segments the LLM split using [0.1] [0.2] notation. Empty dict if
+        no splitting was done.
     """
     if progress_callback:
         progress_callback(0, "LLM 整篇上下文翻译中…")
@@ -392,7 +397,7 @@ def _translate_whole_with_markers(
             non_empty.append((i, t.strip()))
 
     if not non_empty:
-        return translated, None
+        return translated, None, {}
 
     # Build chunks with overlap
     step = _CHUNK_SIZE - _OVERLAP_SIZE
@@ -407,6 +412,7 @@ def _translate_whole_with_markers(
     total_chunks = len(chunks)
     token_usage_total = None
     pattern = re.compile(r"\[(\d+)\]\s*(.+)")
+    sub_splits: dict[int, list[str]] = {}
 
     # Track overlap versions for seam review
     chunk_results: list[dict[int, str]] = []
@@ -456,6 +462,7 @@ def _translate_whole_with_markers(
             line = line.strip()
             if not line:
                 continue
+
             m = pattern.search(line)
             if m:
                 idx = int(m.group(1))
@@ -516,6 +523,21 @@ def _translate_whole_with_markers(
         if progress_callback:
             progress_callback(90, "接缝审查完成")
 
+    # Phase 1C: finalize sub_splits — join parts into translated list,
+    # keep only multi-part splits for downstream use
+    final_sub_splits: dict[int, list[str]] = {}
+    for idx, parts in sorted(sub_splits.items()):
+        if len(parts) >= 2:
+            translated[idx] = " ".join(parts)
+            final_sub_splits[idx] = parts
+        elif len(parts) == 1:
+            # Single sub-part — treat as regular translation (override if needed)
+            if translated[idx] == "[翻译失败]":
+                translated[idx] = parts[0]
+    if final_sub_splits:
+        _log.info("LLM 已预拆分段: %d 条 (%d 个子句)",
+                  len(final_sub_splits), sum(len(p) for p in final_sub_splits.values()))
+
     ok_count = sum(1 for i, t in enumerate(translated) if t != "[翻译失败]" or not texts[i].strip())
     if ok_count == 0:
         raise RuntimeError("LLM 整篇翻译失败：完全无法解析返回格式")
@@ -524,7 +546,7 @@ def _translate_whole_with_markers(
         progress_callback(95, f"LLM 翻译完成 ({ok_count}/{len(texts)} 条)")
     _log.warning("翻译步骤结束 (LLM: %s): %d/%d 条成功",
                  getattr(llm, 'name', 'unknown'), ok_count, len(texts))
-    return translated, token_usage_total
+    return translated, token_usage_total, final_sub_splits
 
 
 # ── Main entry point (T1: tier removed) ──
@@ -536,7 +558,7 @@ def translate_with_orchestrator(
     api_keys: list[dict] | None = None,
     context_aware: bool = False,
     progress_callback=None,
-) -> tuple[list[str], list[int], dict | None]:
+) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
     """Main entry point.
 
     Args:
@@ -549,7 +571,9 @@ def translate_with_orchestrator(
         progress_callback: fn(pct: int, message: str).
 
     Returns:
-        (translated_texts, failed_indices, token_usage_dict_or_none)
+        (translated_texts, failed_indices, token_usage_or_none, sub_splits)
+        sub_splits: {original_idx: [split_part_1, ...]} from LLM auto-splitting,
+        or empty dict if no LLM or no splitting was done.
     """
     if priority is None:
         priority = ["google", "bing", "youdao"]
@@ -566,6 +590,7 @@ def translate_with_orchestrator(
         if context_aware:
             translated = None
             token_usage = None
+            sub_splits = {}
             last_llm = None
             _llm_order = [getattr(b, 'name', '?') for b in llm_backends]
             _log.warning("LLM 降级链启动: %d 个后端 (%s)", len(llm_backends), ", ".join(_llm_order))
@@ -587,7 +612,7 @@ def translate_with_orchestrator(
                     context_summary = _generate_context_summary(texts, llm, terminology)
 
                     # T3: sliding window translation
-                    translated, token_usage = _translate_whole_with_markers(
+                    translated, token_usage, sub_splits = _translate_whole_with_markers(
                         texts, llm,
                         terminology=terminology,
                         context_summary=context_summary,
@@ -613,6 +638,7 @@ def translate_with_orchestrator(
             if not llm_produced:
                 translated = ["[翻译失败]"] * len(texts)
                 failed_indices = list(range(len(texts)))
+                sub_splits = {}
                 _log.warning("LLM 降级链结束: 全部失败, 总耗时 %dms, 切换免费引擎", _chain_dur)
             else:
                 failed_indices = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
@@ -645,7 +671,7 @@ def translate_with_orchestrator(
             else:
                 _log.info("所有 LLM 均失败, 免费引擎(%s)完成翻译: %d/%d 条",
                           ", ".join(free_names), len(texts) - len(final_failed), len(texts))
-            return translated, final_failed, token_usage
+            return translated, final_failed, token_usage, sub_splits
         else:
             # Per-batch LLM translation (no full context)
             batches = _split_into_batches(texts)
@@ -668,7 +694,7 @@ def translate_with_orchestrator(
             final_failed = [i for i, r in enumerate(all_results) if r == "[翻译失败]"]
             llm_names = [b.name for b in llm_backends]
             _log.info("LLM 逐段翻译完成: %d/%d 条 (%s)", len(texts) - len(final_failed), len(texts), ", ".join(llm_names))
-            return all_results, final_failed, token_usage_total
+            return all_results, final_failed, token_usage_total, {}
 
     # ── Free backends only ──
     all_backends = ordered_backends
@@ -706,4 +732,4 @@ def translate_with_orchestrator(
     actual_names = list(used_backends) if used_backends else [b.name for b in all_backends]
     _log.info("免费引擎翻译完成: %d/%d 条 (实际使用: %s)", len(texts) - len(final_failed), len(texts), ", ".join(actual_names))
 
-    return all_results, final_failed, token_usage_total
+    return all_results, final_failed, token_usage_total, {}

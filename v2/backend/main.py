@@ -37,6 +37,10 @@ JOB_ID_TO_HASH = {}      # job_id → task_key  (reverse lookup for O(1) status 
 
 
 def _config_hash(cfg: dict) -> str:
+    # Normalize outputMode: derive from burn flag for backward compat
+    _output_mode = cfg.get("outputMode")
+    if _output_mode is None:
+        _output_mode = "burn" if cfg.get("burn", True) else "srt"
     relevant = {
         "model": cfg.get("model", ""),
         "translationMode": cfg.get("translationMode", ""),
@@ -44,6 +48,7 @@ def _config_hash(cfg: dict) -> str:
         "contextAware": cfg.get("contextAware", False),
         "subtitles": cfg.get("subtitles", ""),
         "burn": cfg.get("burn", False),
+        "outputMode": _output_mode,
         "style": cfg.get("style", {}),
         "savePath": cfg.get("savePath", ""),
         "speakerDetect": cfg.get("speakerDetect", False),
@@ -760,8 +765,9 @@ def download_video(job_id: str):
             return FileResponse(path, filename=Path(path).name)
     job_dir = JOBS_DIR / job_id
     if job_dir.exists():
-        for f in job_dir.glob("*_zh.mp4"):
-            return FileResponse(str(f), filename=f.name)
+        for pattern in ["*_zh.mp4", "*_zh_sub.*"]:
+            for f in job_dir.glob(pattern):
+                return FileResponse(str(f), filename=f.name)
     return JSONResponse({"error": "未找到下载文件"}, status_code=404)
 
 
@@ -812,6 +818,24 @@ def llm_fallback_decision(job_id: str, payload: dict):
     decision_file.write_text(json.dumps({"decision": decision}, ensure_ascii=False))
     return {"ok": True}
 
+
+# ── Video download ──
+
+@app.post("/api/download-video")
+def download_video_endpoint(payload: dict):
+    """Download a video from URL, return local file path."""
+    url = payload.get("url", "").strip()
+    if not url:
+        return JSONResponse({"error": "请提供视频链接"}, status_code=400)
+    from .core.video_downloader import download_video, is_ytdlp_available
+    if not is_ytdlp_available():
+        return JSONResponse({"error": "yt-dlp 未安装，无法下载视频"}, status_code=500)
+    dl_dir = str(Path.home() / "Downloads" / "Video-Subber")
+    Path(dl_dir).mkdir(parents=True, exist_ok=True)
+    path = download_video(url, dl_dir)
+    if not path:
+        return JSONResponse({"error": "下载失败，请检查链接是否有效"}, status_code=500)
+    return {"ok": True, "path": path, "filename": Path(path).name}
 
 # ── WebSocket ──
 

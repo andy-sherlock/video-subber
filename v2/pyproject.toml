@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "video-subber-web"
-version = "3.02"
+version = "3.03"
 description = "视频中文字幕生成 — Web 版"
 requires-python = ">=3.10"
 dependencies = [
