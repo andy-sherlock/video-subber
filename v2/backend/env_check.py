@@ -86,9 +86,29 @@ def preload_resemblyzer():
         pass
 
 
+def check_sensevoice() -> dict:
+    """Check if SenseVoice (funasr) is installed."""
+    try:
+        import funasr  # noqa: F401
+        return {"ready": True}
+    except ImportError:
+        return {"ready": False}
+
+
+def check_qwen_asr() -> dict:
+    """Check if Qwen3-ASR MLX is installed (Apple Silicon only)."""
+    try:
+        from qwen3_asr_mlx import Qwen3ASR  # noqa: F401
+        return {"ready": True}
+    except ImportError:
+        return {"ready": False}
+
+
 def check_all() -> dict:
     return {
         "ffmpeg": check_ffmpeg(),
         "whisper": check_whisper(),
         "resemblyzer": check_resemblyzer(),
+        "sensevoice": check_sensevoice(),
+        "qwen_asr": check_qwen_asr(),
     }

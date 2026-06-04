@@ -1,13 +1,15 @@
 """Transcription via faster-whisper + resemblyzer speaker change detection.
 
 Simplified pipeline:
-  Whisper (context enabled) → keyword hallucination filter →
-  hallucination chain dedup → speaker detection.
+  Whisper → [SenseVoice sound classification] → [Qwen3-ASR cross-validation]
+  → five-layer hallucination filter → speaker detection.
 """
+import gc
 import logging
 import numpy as np
 from faster_whisper import WhisperModel
 from backend.core.vad_filter import compute_speech_ratio_via_vad
+from backend.core.hallucination_filter import filter_hallucinations
 
 _log = logging.getLogger("transcriber")
 
@@ -23,47 +25,10 @@ class Segment:
         self.uncertain = False
         self.zh = ""
         self.words = []
-
-
-HALLUCINATION_KEYWORDS = (
-    "音乐", "music", "♪", "♫", "[music]", "[applause]", "[laughter]",
-    "掌声", "笑声", "鼓掌", "谢谢观看", "请订阅", "字幕组", "字幕由",
-    "музыка", "МУЗЫКА", "аплодисменты", "смех",
-    "音楽", "拍手", "笑い声",
-)
-
-
-def _is_hallucination(text: str) -> bool:
-    t = text.strip().lower()
-    if not t:
-        return True
-    for kw in HALLUCINATION_KEYWORDS:
-        if kw.lower() in t:
-            return True
-    if all(not c.isalnum() and c not in "你我他她它的了是有不在" for c in t):
-        return True
-    if 4 < len(t) <= 30 and len(set(t)) / len(t) < 0.3:
-        return True
-    return False
-
-
-def _dedup_hallucination_chains(segments: list) -> list:
-    """Remove consecutive segments with identical text (hallucination chains).
-
-    With condition_on_previous_text=True, Whisper may repeat the same text
-    across multiple segments. Keep only the first occurrence in each chain.
-    """
-    if len(segments) < 2:
-        return segments
-    result = [segments[0]]
-    for seg in segments[1:]:
-        if seg.text.strip() == result[-1].text.strip():
-            _log.info("幻觉链: 丢弃重复段 start=%.2f text=%r", seg.start, seg.text[:50])
-            continue
-        result.append(seg)
-    for i, s in enumerate(result):
-        s.id = i
-    return result
+        self.sensevoice_tag = None
+        self.qwen_text = None
+        self.filtered = False
+        self.filter_reason = None
 
 
 def _detect_speaker_changes(audio_path: str, segments: list) -> list:
@@ -182,6 +147,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
                vad_threshold: float = 0.0,
                filter_keywords: bool = True,
                speaker_detect: bool = True,
+               transcription_tier: str = "standard",
                progress_callback=None) -> list:
     """Transcribe audio, return list of Segment."""
     _log.info("transcribe() 开始: audio=%s model=%s lang=%s",
@@ -225,23 +191,14 @@ def transcribe(audio_path: str, model_size: str = "medium",
         **vad_kwargs
     )
     _log.info("检测语言: %s (概率 %.2f)", info.language, info.language_probability)
+    detected_lang = info.language if info.language else source_lang
 
     results = []
     n_total = 0
-    dropped = 0
 
     for seg in segments_iter:
         text = seg.text.strip()
         n_total += 1
-
-        if filter_keywords and _is_hallucination(text):
-            dropped += 1
-            _log.debug("DROP hallucination: start=%.2f text=%r", seg.start, text[:80])
-            continue
-
-        if len(text) < 2:
-            _log.debug("DROP too short: start=%.2f text=%r", seg.start, text)
-            continue
 
         s = Segment(
             id=len(results),
@@ -266,17 +223,110 @@ def transcribe(audio_path: str, model_size: str = "medium",
         if progress_callback and n_total % 10 == 0:
             progress_callback(n_total)
 
-    _log.info("过滤: 总=%d 保留=%d 幻觉关键词=%d", n_total, len(results), dropped)
+    _log.info("Whisper 转录: %d 段, 语言=%s (概率 %.2f)", n_total, info.language, info.language_probability)
 
-    before = len(results)
-    results = _dedup_hallucination_chains(results)
-    if len(results) < before:
-        _log.info("幻觉链去重: %d → %d 段", before, len(results))
+    # ── Release Whisper model memory ──
+    del model
+    gc.collect()
+    _log.info("Whisper 模型已释放")
+
+    import threading
+    from backend.core.hardware_detector import detect_hardware
+
+    hw = detect_hardware()
+    ram_gb = hw.get("ram_gb", 0) or 0
+    use_parallel = (transcription_tier == "precise" and ram_gb >= 16)
+
+    qwen_raw = None
+    sv_events = None
+    qwen_thread = None
+    sv_thread = None
+
+    if use_parallel and filter_keywords:
+        _log.info("并行模式：SenseVoice + Qwen3 同时启动")
+
+        from backend.core.qwen_asr_runner import transcribe_raw, is_qwen_asr_available
+        _qwen_holder = {}  # 只在 join() 后读取
+        if is_qwen_asr_available():
+            def _run_qwen():
+                _qwen_holder["data"] = transcribe_raw(audio_path)
+            qwen_thread = threading.Thread(target=_run_qwen, daemon=True)
+            qwen_thread.start()
+
+        from backend.core.sensevoice_runner import run_sensevoice, is_sensevoice_available
+        _sv_holder = {}  # 只在 join() 后读取
+        if is_sensevoice_available():
+            def _run_sv():
+                _sv_holder["data"] = run_sensevoice(audio_path, device="cpu")
+            sv_thread = threading.Thread(target=_run_sv, daemon=True)
+            sv_thread.start()
+
+    # ── Step 2: SenseVoice（串行路径）──
+    if not use_parallel and transcription_tier in ("standard", "precise") and filter_keywords:
+        _log.info("SenseVoice 声音分类开始 (tier=%s)", transcription_tier)
+        from backend.core.sensevoice_runner import (
+            run_sensevoice, is_sensevoice_available, trim_segments_by_sensevoice
+        )
+        if is_sensevoice_available():
+            sv_events = run_sensevoice(audio_path, device="cpu")
+        else:
+            _log.warning("SenseVoice 不可用，跳过声音分类")
+
+    # ── 等待并行线程 ──
+    if sv_thread:
+        sv_thread.join()
+        sv_events = _sv_holder.get("data")
+    if qwen_thread:
+        qwen_thread.join()
+        qwen_raw = _qwen_holder.get("data")
+
+    # ── 应用 SenseVoice 结果（串行 + 并行共用）──
+    if sv_events:
+        from backend.core.sensevoice_runner import trim_segments_by_sensevoice
+        for seg in results:
+            seg.sensevoice_tag = None
+            for ev in sv_events:
+                if ev["start_s"] <= seg.start and seg.end <= ev["end_s"]:
+                    seg.sensevoice_tag = ev["event"]
+                    break
+        results = trim_segments_by_sensevoice(results, sv_events)
+
+    # ── Step 3: Qwen3 对齐（串行路径）──
+    if not use_parallel and transcription_tier == "precise" and filter_keywords:
+        _log.info("Qwen3-ASR 交叉验证开始 (tier=%s)", transcription_tier)
+        from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
+        if is_qwen_asr_available():
+            results = run_qwen_asr(audio_path, results)
+        else:
+            _log.warning("Qwen3-ASR 不可用，跳过交叉验证")
+
+    # ── Step 3b: Qwen3 对齐（并行路径）──
+    if use_parallel and qwen_raw and qwen_raw.get("text"):
+        from backend.core.qwen_asr_runner import align_by_similarity, align_by_timestamps
+        for seg in results:
+            seg.qwen_text = None
+        if qwen_raw.get("timestamps"):
+            ts_all = []
+            for ts in qwen_raw["timestamps"]:
+                if hasattr(ts, 'items'):
+                    ts_all.extend(ts.items)
+                elif isinstance(ts, list):
+                    ts_all.extend(ts)
+            align_by_timestamps(ts_all, results)
+        else:
+            align_by_similarity(qwen_raw["text"], results)
+        total = sum(1 for s in results if s.qwen_text is not None)
+        _log.info("Qwen3-ASR 交叉验证完成（并行）: %d/%d", total, len(results))
+
+    # ── Step 4: Five-layer hallucination filter ──
+    if filter_keywords:
+        results = filter_hallucinations(results, detected_lang)
 
     if not results:
         _log.error("未检测到任何语音内容")
         raise RuntimeError("未检测到任何语音内容。视频可能为纯音乐或无声")
 
+    # ── Step 5: Speaker detection ──
     if speaker_detect:
         _log.info("说话人检测开始（自适阈值）")
         results = _detect_speaker_changes(audio_path, results)

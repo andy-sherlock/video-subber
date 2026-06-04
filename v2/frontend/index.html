@@ -315,6 +315,19 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   </div>
 </div>
 
+<!-- ═══════════════ Region 3b: Transcription Tier ═══════════════ -->
+<div class="card">
+  <div class="card-label">转录模式</div>
+  <div class="row" style="margin-bottom:4px">
+    <div class="toggle" id="tierToggle">
+      <button data-v="fast">快速</button>
+      <button class="active" data-v="standard">标准（推荐）</button>
+      <button data-v="precise">精确</button>
+    </div>
+  </div>
+  <div class="info-note" id="tierNote">快速：仅语音识别 · 标准：语音识别 + 声音分类过滤 · 精确：三模型交叉验证，内存占用最大</div>
+</div>
+
 <!-- ═══════════════ Region 4: Translation Mode ═══════════════ -->
 <div class="card" id="transSection">
   <div class="card-label" id="transModeTitle">翻译模式</div>
@@ -426,6 +439,7 @@ const State={
     translationMode:"speed",translationPriority:["google","bing","youdao"],
     contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
     speakerDetect:false,
+    transcriptionTier:"standard",
     style:{font:"PingFang SC",size:20,color:"white",outlineColor:"black",bgColor:"transparent"}
   }
 };
@@ -449,6 +463,12 @@ function renderEnv(d){
   else if(!ff.has_libass){laDot='warn';laTxt='烧录模块（libass）未安装';laGuide='<br><span class="env-guide-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')" style="margin-top:2px">如何修复 ▸</span><div class="env-guide">当前 FFmpeg 为基础版。<b>可生成字幕，无法烧录到视频画面</b>。<br><br>终端运行：<br><code>brew install ffmpeg-full</code></div>'}
   let whDot='ok',whTxt='语音识别已就绪',whGuide='';
   if(!wh.installed){whDot='err';whTxt='语音识别模型未下载';whGuide='<br><span class="env-guide-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')" style="margin-top:2px">如何下载 ▸</span><div class="env-guide">选择模型后点击开始，系统会自动下载（约 150MB~3GB，仅首次）。</div>'}
+  const sv=d.sensevoice||{};
+  let svDot='ok',svTxt='声音分类已就绪';
+  if(!sv.ready){svDot='err';svTxt='声音分类模块未安装'}
+  const qa=d.qwen_asr||{};
+  let qaDot='ok',qaTxt='交叉验证已就绪';
+  if(!qa.ready){qaDot='err';qaTxt='交叉验证模块未安装'}
   const rz=d.resemblyzer||{};
   let rzDot='ok',rzTxt='说话人检测已就绪';
   if(!rz.ready){rzDot='warn';rzTxt='说话人检测模块未安装（可选·首次启动自动下载）'}
@@ -456,6 +476,8 @@ function renderEnv(d){
     `<div class="env-item"><span class="env-dot ${ffDot}"></span><div><span>${ffTxt}</span>${ffGuide}</div></div>`+
     `<div class="env-item"><span class="env-dot ${laDot}"></span><div><span>${laTxt}</span>${laGuide}</div></div>`+
     `<div class="env-item"><span class="env-dot ${whDot}"></span><div><span>${whTxt}</span>${whGuide}</div></div>`+
+    `<div class="env-item"><span class="env-dot ${svDot}"></span><div><span>${svTxt}</span></div></div>`+
+    `<div class="env-item"><span class="env-dot ${qaDot}"></span><div><span>${qaTxt}</span></div></div>`+
     `<div class="env-item"><span class="env-dot ${rzDot}"></span><div><span>${rzTxt}</span></div></div>`;
   // Fix #9: disable burn when libass missing
   window._hasLibass=ff.installed&&ff.has_libass;
@@ -679,6 +701,7 @@ function buildPriorityList(){
 $('advToggle').addEventListener('click',()=>{$('advToggle').classList.toggle('open');$('advBody').classList.toggle('open')});
 $('ctxToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.contextAware=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
 $('speakerToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.speakerDetect=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
+$('tierToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.transcriptionTier=e.target.dataset.v;saveConfig();refreshStartBtn()});
 
 // ============ Platform / Model select ============
 const MODEL_ID_FORMAT={
@@ -969,7 +992,7 @@ $('styleConfirmBtn').addEventListener('click',()=>{
 
 // ============ Config Persistence ============
 async function saveConfig(){
-  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,burn:State.settings.burn,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect};
+  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,burn:State.settings.burn,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect,transcriptionTier:State.settings.transcriptionTier};
   // localStorage: strip key values, save metadata only
   const safeCfg={...cfg,apiKeys:(cfg.apiKeys||[]).map(k=>({platform:k.platform,name:k.name,model:k.model,api_endpoint:k.api_endpoint}))};
   localStorage.setItem('video-subber-config',JSON.stringify(safeCfg));
@@ -1101,6 +1124,7 @@ function renderSettingsToDOM(){
   const pl=document.getElementById('priorityList');pl.classList.toggle('show',State.settings.translationMode==='quality');
   document.querySelectorAll('#ctxToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.contextAware))});
   document.querySelectorAll('#speakerToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.speakerDetect))});
+  document.querySelectorAll('#tierToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.transcriptionTier||'standard'))});
   document.getElementById('styleConfirmed').style.display='none';
   if(State.settings.style){
     const s=State.settings.style;

@@ -47,6 +47,7 @@ def _config_hash(cfg: dict) -> str:
         "style": cfg.get("style", {}),
         "savePath": cfg.get("savePath", ""),
         "speakerDetect": cfg.get("speakerDetect", False),
+        "transcriptionTier": cfg.get("transcriptionTier", "standard"),
     }
     raw = json.dumps(relevant, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()[:12]
@@ -265,6 +266,14 @@ def _cleanup_old_cache():
 @app.get("/api/health")
 def health():
     return {"ok": True, "version": _detect_version()}
+
+
+@app.get("/api/hardware")
+def hardware():
+    from .core.hardware_detector import detect_hardware, TIERS
+    hw = detect_hardware()
+    hw["tiers"] = TIERS
+    return hw
 
 
 def _detect_version() -> str:
@@ -558,9 +567,12 @@ async def create_job(request: Request):
     # ── 模式 1：本地路径（JSON body）──
     if content_type and "json" in content_type:
         body = await request.json()
-        cfg = json.loads(body.get("config", "{}"))
+        cfg = body.get("config", {})
+        if isinstance(cfg, str):
+            cfg = json.loads(cfg)
         cfg.pop("tier", None)
-        local_path = cfg.pop("local_path", "")
+        cfg.pop("local_path", None)
+        local_path = body.get("local_path", "")
 
         if not local_path or not _os_module.path.isfile(local_path):
             return JSONResponse(
@@ -774,9 +786,6 @@ def cancel_job(job_id: str):
     worker_manager.cancel(job_id)
 
     time.sleep(0.1)
-    log_dir = LOG_DIR / job_id
-    if log_dir.exists():
-        shutil.rmtree(log_dir, ignore_errors=True)
 
     j = JOBS.pop(job_id, None)
     if j:

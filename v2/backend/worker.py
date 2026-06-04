@@ -119,6 +119,8 @@ def main():
         print("Usage: python -m backend.worker <config.json>", file=sys.stderr)
         sys.exit(1)
 
+    _t_start = time.time()
+
     config_path = Path(sys.argv[1])
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -128,6 +130,14 @@ def main():
     user_log_path, debug_log_path = _setup_file_log(job_id)
     logging.getLogger("worker").info("Worker started — 用户日志: %s  调试日志: %s",
                                      user_log_path, debug_log_path)
+    # ── 版本号写入日志 ──
+    try:
+        import tomllib
+        _ppt = Path(__file__).parent.parent / "pyproject.toml"
+        _ver = tomllib.loads(_ppt.read_text()).get("project", {}).get("version", "dev")
+    except Exception:
+        _ver = "dev"
+    logging.getLogger("worker").info("版本: %s", _ver)
     video_path = config["video_path"]
     burn_flag = config.get("burn", True)
     subtitles = config.get("subtitles", "no")
@@ -138,6 +148,7 @@ def main():
     context_aware = config.get("contextAware", False)
     style = config.get("style", None)
     speaker_detect = config.get("speakerDetect", False)  # 实验性功能，默认关闭
+    transcription_tier = config.get("transcriptionTier", "standard")  # fast/standard/precise
 
     # ── v2.05: Config schema 校验，防止静默降级 ──
     def _validate_config(cfg: dict):
@@ -151,6 +162,8 @@ def main():
             raise ValueError(f"config.subtitles 无效: {cfg['subtitles']}")
         if "speakerDetect" in cfg and not isinstance(cfg.get("speakerDetect"), (bool, type(None))):
             raise ValueError(f"config.speakerDetect 应为 bool，实际为 {type(cfg['speakerDetect']).__name__}")
+        if "transcriptionTier" in cfg and cfg["transcriptionTier"] not in ("fast", "standard", "precise", None):
+            raise ValueError(f"config.transcriptionTier 无效: {cfg['transcriptionTier']}")
     _validate_config(config)
 
     # Redirect V1.3 print() to stderr so stdout stays clean JSON.
@@ -179,6 +192,7 @@ def main():
     SETTING_STAGE = {
         "subtitles": "extract_audio",
         "model": "transcribe",
+        "transcriptionTier": "transcribe",
         "speakerDetect": "transcribe",
         "translationMode": "translate",
         "translationPriority": "translate",
@@ -266,6 +280,7 @@ def main():
                 audio_path, model_size=model, source_lang="auto",
                 skip_vad=True, vad_threshold=0.0,
                 filter_keywords=True, speaker_detect=speaker_detect,
+                transcription_tier=transcription_tier,
                 progress_callback=_trans_progress,
             )
             with open(transcript_path, "w", encoding="utf-8") as f:
@@ -273,6 +288,8 @@ def main():
                     "id": s.id, "start": s.start, "end": s.end,
                     "text": s.text, "speaker_change": s.speaker_change,
                     "uncertain": s.uncertain,
+                    "sensevoice_tag": getattr(s, "sensevoice_tag", None),
+                    "qwen_text": getattr(s, "qwen_text", None),
                     "words": getattr(s, "words", []),
                 } for s in segments], f, ensure_ascii=False, indent=2)
             ck.save("transcribe", meta=config)
@@ -283,6 +300,8 @@ def main():
             for s, r in zip(segments, raw):
                 s.speaker_change = r.get("speaker_change", False)
                 s.uncertain = r.get("uncertain", False)
+                s.sensevoice_tag = r.get("sensevoice_tag", None)
+                s.qwen_text = r.get("qwen_text", None)
                 s.words = r.get("words", [])
 
         total = len(segments)
@@ -315,7 +334,7 @@ def main():
                 s.zh = zh
             failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
 
-            # ── LLM 失败降级弹窗 ──
+            # ── LLM 失败降级 ──
             _has_llm_keys = bool(api_keys)
             _all_failed = len(failed) == total and total > 0
             if _has_llm_keys and _all_failed:
@@ -330,19 +349,30 @@ def main():
 
                 decision_file = job_dir / "llm_fallback.json"
                 _deadline = time.time() + 120
-                _decision = "keep_failed"
+                _decision = "use_free"  # 超时自动降级，不阻塞流程
+                _auto_fallback = True
                 while time.time() < _deadline:
                     if decision_file.exists():
                         try:
                             _dec = json.loads(decision_file.read_text(encoding="utf-8"))
-                            _decision = _dec.get("decision", "keep_failed")
+                            _decision = _dec.get("decision", "use_free")
+                            _auto_fallback = False
                             break
                         except Exception:
                             pass
                     time.sleep(1)
 
                 if _decision == "use_free":
-                    stderr_progress("translate", 40, "已切换为免费引擎，正在重新翻译…")
+                    if _auto_fallback:
+                        stderr_progress("translate", 40, "超时无回应，已自动切换免费引擎继续翻译…")
+                        _note = json.dumps({
+                            "type": "notice",
+                            "message": "LLM 翻译未能完成，已自动切换免费引擎（Google/Bing/有道）。",
+                        }, ensure_ascii=False)
+                        _real_stdout.write(_note + "\n")
+                        _real_stdout.flush()
+                    else:
+                        stderr_progress("translate", 40, "已切换为免费引擎，正在重新翻译…")
                     zh_list, failed_indices, token_usage = translate_with_orchestrator(
                         texts=texts, mode=translation_mode, priority=translation_priority,
                         api_keys=[], context_aware=False,
@@ -448,6 +478,9 @@ def main():
             shutil.copy2(srt_path, _dest_s)
 
         sys.stdout = _real_stdout
+        _t_end = time.time()
+        _dur_str = f"合计={_t_end - _t_start:.0f}s"
+        logging.getLogger("worker").info("步骤耗时: %s", _dur_str)
         emit("progress", stage="burn", percent=100, message="完成", detail="")
         emit("done",
              result_video=video_out if burn_flag else None,

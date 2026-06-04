@@ -657,10 +657,7 @@ def translate_with_orchestrator(
                     pct = int((bi + 1) / len(batches) * 95)
                     progress_callback(pct, f"LLM 逐段翻译… (批 {bi+1}/{len(batches)})")
 
-                if mode == "speed":
-                    batch_results, _, batch_tokens = _run_speed_mode_batch(batch, llm_backends)
-                else:
-                    batch_results, _, _, batch_tokens = _run_quality_mode_batch(batch, llm_backends)
+                batch_results, _, _, batch_tokens = _run_quality_mode_batch(batch, llm_backends)
 
                 all_results.extend(batch_results)
                 token_usage_total = _merge_tokens(token_usage_total, batch_tokens)
