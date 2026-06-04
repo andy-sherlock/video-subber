@@ -5,6 +5,7 @@ T3: Sliding window with overlap + context summary + seam review.
 T5: Terminology auto-extraction before translation.
 """
 import threading, time, re, logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .base import TranslationBackend, TranslationResult
 from .google import GoogleBackend
 from .bing import BingBackend
@@ -248,6 +249,7 @@ _CHUNK_SIZE = 1200
 _OVERLAP_RATIO = 0.2
 _OVERLAP_SIZE = int(_CHUNK_SIZE * _OVERLAP_RATIO)
 _SEAM_CONTEXT = 50
+_INDEXED_LINE_RE = re.compile(r"\[(\d+)\]\s*(.+)")
 
 
 def _generate_context_summary(
@@ -349,10 +351,9 @@ def _review_seam(
     except Exception:
         return None
 
-    pattern = re.compile(r"\[(\d+)\]\s*(.+)")
     reviewed = {}
     for line in raw.split("\n"):
-        m = pattern.match(line.strip())
+        m = _INDEXED_LINE_RE.match(line.strip())
         if m:
             idx = int(m.group(1))
             zh = m.group(2).strip()
@@ -360,6 +361,44 @@ def _review_seam(
                 reviewed[idx] = zh
 
     return reviewed if reviewed else None
+
+
+def _translate_one_chunk(
+    chunk: list[tuple[int, str]],
+    prompt_prefix: str,
+    llm: TranslationBackend,
+    ci: int,
+    total: int,
+) -> tuple[int, dict[int, str], dict | None]:
+    """Translate a single chunk. Returns (chunk_idx, {idx: translated}, tokens_used)."""
+    lines = "\n".join(f"[{i}] {t}" for i, t in chunk)
+    prompt = prompt_prefix + "【待翻译字幕】\n" + lines
+
+    if not hasattr(llm, "translate_raw"):
+        raise RuntimeError(f"LLM 后端 {getattr(llm, 'name', 'unknown')} 不支持 translate_raw")
+
+    result = llm.translate_raw(prompt, max_tokens=16384)
+    raw = result.translated[0] if result.translated else ""
+
+    if raw:
+        _log.debug("chunk %d/%d: 原始返回 %d 字，内容前 500 字: %s",
+                   ci + 1, total, len(raw), raw[:500])
+    else:
+        _log.warning("LLM 返回为空 (chunk %d/%d)", ci + 1, total)
+
+    chunk_result: dict[int, str] = {}
+    for line in raw.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        m = _INDEXED_LINE_RE.search(line)
+        if m:
+            idx = int(m.group(1))
+            zh = m.group(2).strip()
+            if zh:
+                chunk_result[idx] = zh
+
+    return ci, chunk_result, result.tokens_used
 
 
 def _translate_whole_with_markers(
@@ -411,11 +450,7 @@ def _translate_whole_with_markers(
 
     total_chunks = len(chunks)
     token_usage_total = None
-    pattern = re.compile(r"\[(\d+)\]\s*(.+)")
     sub_splits: dict[int, list[str]] = {}
-
-    # Track overlap versions for seam review
-    chunk_results: list[dict[int, str]] = []
 
     # Build prompt sections
     term_section = ""
@@ -428,64 +463,31 @@ def _translate_whole_with_markers(
         summary_section = f"【内容摘要】\n{context_summary}\n\n"
         _log.info("翻译策略已启用（内容摘要 %d 字）", len(context_summary))
 
-    prev_tail = ""
+    prompt_prefix = _SUBTITLE_PROMPT + term_section + summary_section
+    chunk_results = [{} for _ in range(total_chunks)]
+    translated_lock = threading.Lock()
 
-    for chunk_idx, chunk in enumerate(chunks):
-        context_section = ""
-        if prev_tail:
-            context_section = f"【前文参考，勿翻译】\n{prev_tail}\n\n"
+    completed = 0
+    with ThreadPoolExecutor(max_workers=min(total_chunks, 5)) as executor:
+        futures = {
+            executor.submit(_translate_one_chunk, chunks[ci], prompt_prefix, llm, ci, total_chunks): ci
+            for ci in range(total_chunks)
+        }
+        for future in as_completed(futures):
+            ci, chunk_result, chunk_tokens = future.result()
+            chunk_results[ci] = chunk_result
+            with translated_lock:
+                for idx, zh in chunk_result.items():
+                    if 0 <= idx < len(texts) and zh:
+                        translated[idx] = zh
+            token_usage_total = _merge_tokens(token_usage_total, chunk_tokens)
+            completed += 1
+            if progress_callback and total_chunks > 1:
+                pct = int(completed / total_chunks * 80)
+                progress_callback(pct, f"LLM 翻译第 {completed}/{total_chunks} 段…")
 
-        lines = "\n".join(f"[{i}] {t}" for i, t in chunk)
-        prompt = (
-            _SUBTITLE_PROMPT + term_section + summary_section
-            + context_section + "【待翻译字幕】\n" + lines
-        )
-
-        try:
-            if hasattr(llm, "translate_raw"):
-                result = llm.translate_raw(prompt, max_tokens=16384)
-            else:
-                result = llm.translate_batch([lines], context="")
-            raw = result.translated[0] if result.translated else ""
-            token_usage_total = _merge_tokens(token_usage_total, result.tokens_used)
-        except Exception:
-            raw = ""
-
-        if raw:
-            _log.debug("LLM 原始返回 (chunk %d/%d, %d字): %s",
-                       chunk_idx + 1, total_chunks, len(raw), raw[:500])
-        else:
-            _log.warning("LLM 返回为空 (chunk %d/%d)", chunk_idx + 1, total_chunks)
-
-        chunk_result = {}
-        for line in raw.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-
-            m = pattern.search(line)
-            if m:
-                idx = int(m.group(1))
-                zh = m.group(2).strip()
-                if 0 <= idx < len(texts) and zh:
-                    translated[idx] = zh
-                    chunk_result[idx] = zh
-
-        chunk_results.append(chunk_result)
-
-        # Build context tail for next chunk
-        tail_lines = []
-        for orig_idx, _ in chunk[-5:]:
-            zh = translated[orig_idx]
-            if zh and zh != "[翻译失败]":
-                tail_lines.append(f"[{orig_idx}] {zh}")
-        prev_tail = "\n".join(tail_lines)
-
-        if progress_callback:
-            pct = int((chunk_idx + 1) / total_chunks * 80)
-            label = (f"LLM 翻译第 {chunk_idx + 1}/{total_chunks} 段…"
-                     if total_chunks > 1 else "LLM 整篇翻译中…")
-            progress_callback(pct, label)
+    if progress_callback:
+        progress_callback(80, f"LLM 翻译完成 ({total_chunks}/{total_chunks} 段)")
 
     # Seam review for overlap zones (only when multiple chunks exist)
     if total_chunks > 1 and terminology is not None:

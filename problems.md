@@ -2488,3 +2488,282 @@ if len(parts) != len(non_empty):
 **原因**：V2→V3 升级时没有新建 `v3/` 目录，直接在 `v2/` 里继续开发并改版本号。`v2/` 从"V2 版本代码"变成了"活跃代码目录"，但文件夹名仍叫 v2，造成语义混乱
 **解决方案**：**推迟到 V3 Phase 2（PySide6 桌面应用重写前端）时一并整理**。届时需要：① 将 `v2/` 重命名或迁移为 `v3/` ② 将 v2.XX 快照移到与 v3/ 同级 ③ 更新 CLAUDE.md 和所有路径引用。当前阶段（Phase 1B 多模型转录）不动目录结构，避免引入不必要的变更风险
 **已修** ❌（计划推迟到 Phase 2）
+
+---
+
+## P133 | 2026-06-04 | 模型下载 | HuggingFace 国内被墙，无镜像配置
+
+**问题**：Whisper 五个型号和 Qwen3-ASR、Qwen3-ForcedAligner 都从 HuggingFace（huggingface.co）下载。HuggingFace 在国内被墙，用户直接下载会失败或极慢。
+
+**原因**：代码里 `snapshot_download("Systran/faster-whisper-*")` 和 `Qwen3ASR.from_pretrained(...)` 全部直连 HuggingFace，没有镜像配置。
+
+**解决方案**：设置 HuggingFace 镜像环境变量：
+```
+HF_ENDPOINT=https://hf-mirror.com
+```
+hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自动走镜像，无需代理。做模型下载按钮时一并处理。
+
+**已修** ❌
+
+---
+
+## P134 | 2026-06-04 | 模型下载 | 千问两个模型 + SenseVoice 无下载按钮
+
+**问题**：目前只有 Whisper 五个型号有下载按钮（`/api/models/download/{model_id}` + 前端圆点 UI）。Qwen3-ASR（转录交叉验证 3.5GB）、Qwen3-ForcedAligner（词级时间戳对齐 979MB）、SenseVoice（声音分类）都是第一次使用时自动静默下载。用户界面卡住不动，不知道在下载、看不到进度、不知道要等多久。
+
+**原因**：三模型接入时没有同步做下载按钮和进度 UI。`from_pretrained` 和 `funasr.AutoModel` 自带自动下载，但交互体验差。
+
+**解决方案**：
+- Qwen3-ASR：模型名 `Qwen/Qwen3-ASR-1.7B`（PyTorch）/ `mlx-community/Qwen3-ASR-1.7B-bf16`（MLX），走 HuggingFace，下载方式与 Whisper 一致
+- Qwen3-ForcedAligner：模型名待定（V3.04 实现时确定），同样走 HuggingFace
+- SenseVoice：走 ModelScope（modelscope.cn）国内可直连，下载方式与 HuggingFace 不同（`funasr.AutoModel` 自动管理）
+- 三种模型都加到 `/api/models/status` 返回列表 + 前端圆点下载 UI
+- Whisper 的进度条是模拟的，新模型下载建议也沿用模拟进度——能告诉用户"在动"就行
+
+**已修** ❌（待做模型下载功能时统一处理）
+
+---
+
+## P135 | 2026-06-04 | 打包 | Resemblyzer 说话人识别模型需内置
+
+**问题**：Resemblyzer 模型很小（几十 MB），但每次 `VoiceEncoder()` 首次调用时也会走网络自动下载。应该直接打入安装包。
+
+**原因**：Resemblyzer 不是用户可选的功能——系统自动用它检测说话人切换。它不需要用户手动下载。
+
+**解决方案**：打包 EXE/DMG 时把 resemblyzer 的模型文件预置到安装包内。用户安装即用，不触发网络下载。
+
+**已修** ❌（V4 打包阶段处理）
+
+---
+
+## P136 | 2026-06-04 | Phase 1D | Qwen3-FA 对齐结果全丢 — 读了不存在的字段
+
+**问题**：`apply_aligner_timestamps()` 第 249 行读 `seg.zh`（中文翻译），但该函数在翻译**之前**被调用，此时 segment 只有 `seg.text`（原文）。每个 segment 的 `zh` 都是空字符串，全部被 `if txt_len == 0: continue` 跳过。精确时间戳全丢了——Qwen3-FA 模型白跑了。
+
+**原因**：设计文档最初把 Qwen3-FA 放在翻译之后，Steve Jobs 审查后改为转录之后。但 `apply_aligner_timestamps` 代码没有跟着改——它仍然假设翻译已跑完、`seg.zh` 已填好。
+
+**解决方案**：`seg.zh` → `seg.text`（三处：变量名、长度计算、分词）。对齐器对原文文本做对齐，所以分配器也应该读原文文本。
+
+**已修** ✅ V3.04
+
+---
+
+## P137 | 2026-06-04 | Phase 1D | [?] 标记全灭（第1刀）— worker 无条件重置 uncertain
+
+**问题**：`worker.py:456-457` 有一行 `for s in segments: s.uncertain = False`，在字幕生成前把所有 segment 的不确定标记全部重置。幻觉过滤辛苦标记的 `seg.uncertain = True` 被全部消灭。`qm_count` 永远是 0，`[?]` 永远不会出现在字幕里，前端阈值警告永远不会触发。
+
+**原因**：这行代码是 V3 早期的遗留物——当时还没有双信号过滤和 `[?]` 标记功能。它本来是保证"翻译后的 segment 状态干净"，但在 Phase 1D 引入 `uncertain` 标记后变成了杀手。
+
+**解决方案**：删除这行循环。`uncertain` 标记从幻觉过滤产出、到字幕生成、到 `qm_count` 统计，全程保留。
+
+**已修** ✅ V3.04
+
+---
+
+## P138 | 2026-06-04 | Phase 1D | [?] 标记全灭（第2刀）— sentence_splitter 硬编码 False
+
+**问题**：`sentence_splitter.py` 三处创建新 Segment 时硬编码 `sub.uncertain = False`（第 83、185、274 行）。拆句后所有子 segment 的标记全丢。
+
+**原因**：`Segment.__init__` 没有 `uncertain` 字段——它是 `hallucination_filter` 动态加上去的。创建新 Segment 时自然没有这个属性，代码随手补了 `False`。
+
+**解决方案**：三处改为 `sub.uncertain = getattr(seg, 'uncertain', False)`——从父 segment 继承标记。
+
+**已修** ✅ V3.04
+
+---
+
+## P139 | 2026-06-04 | Phase 1D | 空对齐列表触发假阳性洪水
+
+**问题**：`_layer1_dual_signal` 的门控条件是 `if aligner_result is not None:`。空列表 `[]` 不是 `None`，所以进入了双信号路径。空列表里没有任何词，`has_alignment` 对所有 segment 返回 False。所有"人声"segment 都被标记 `uncertain = True`。好视频被标红"音频质量差"。
+
+**原因**：Python 中 `[] is not None` 为 True。空列表是有值的——只是里面没东西。门控逻辑只区分了"有没有传参数"，没区分"传了参数但数据为空"。
+
+**解决方案**：门控改为 `if aligner_result is not None and len(aligner_result) > 0`。空列表走单信号降级路径。
+
+**已修** ✅ V3.04
+
+---
+
+## P140 | 2026-06-04 | Phase 1D | GPU 泄漏 — aligner.close() 不在 finally
+
+**问题**：`transcriber_v2.py` 中 `aligner.close()` 放在 `try` 块内部的 `if` 分支里。如果 `apply_aligner_timestamps()` 抛异常，`close()` 永远不会执行。Qwen3-FA 模型（~1GB）一直蹲在内存/显存里直到 worker 进程结束。连续处理多个视频 → 内存累积 → OOM。
+
+**原因**：`close()` 写在正常流程的末尾，没有放在 `finally` 块里。异常路径绕过了它。
+
+**解决方案**：`aligner` 变量提前声明为 `None`，`close()` 移到 `finally` 块。不管成功、失败、还是跳过，模型一定释放。
+
+**已修** ✅ V3.04
+
+---
+
+## P141 | 2026-06-04 | Phase 1D | self._processor 未初始化导致降级路径崩溃
+
+**问题**：`QwenAligner.__init__` 的 `except ImportError` 只设了 `self._model = None`，没设 `self._processor`。后续代码如果访问 `self._processor`（即使是 `hasattr` 检查），在没有 PyTorch 的电脑上会触发 `AttributeError`——降级路径本身崩了。
+
+**原因**：漏写了一行。`except` 块应该把所有属性都设为安全默认值。
+
+**解决方案**：加一行 `self._processor = None`。
+
+**已修** ✅ V3.04
+
+---
+
+## P142 | 2026-06-04 | Phase 1D | L2 交叉验证未拦截空字符串 qwen_text
+
+**问题**：`_layer2_cross_validate()` 只检查 `qwen_text is None`，不检查 `qwen_text == ""`。空字符串被喂给 `SequenceMatcher`，与正常文本比较返回相似度 0.0，误标 `[?]`。
+
+**原因**：Python 中 `"" is not None`。保护条件 `is None` 不能同时拦截空字符串。
+
+**解决方案**：`if not qwen_text: return`——同时拦截 None 和空字符串。
+
+**已修** ✅ V3.04
+
+---
+
+## P143 | 2026-06-04 | Phase 1D | QwenAligner.close() 未释放 self._processor
+
+**问题**：`close()` 释放了模型但没释放 processor（tokenizer/feature extractor）。多次对齐后累积内存。
+
+**原因**：`except ImportError` 设了 `self._processor = None`，但 `close()` 没做同样清理。
+
+**解决方案**：`close()` 中 `del self._processor`，用 `hasattr` 保护。
+
+**已修** ✅ V3.04
+
+---
+
+## P144 | 2026-06-04 | Phase 1D | SenseVoice 标签在旧时间戳上判断，对齐后可能偏移
+
+**问题**：SenseVoice 用 Whisper 原始时间戳做声音分类。之后 Qwen3-FA 修改了时间戳。L1 双信号在新时间戳上检查旧标签——边界偏移几十毫秒。
+
+**原因**：Phase 1D 在 SenseVoice 之后插入了 Qwen3-FA，改变了时间戳。
+
+**解决方案**：调换 SenseVoice 和 Qwen3-FA 的执行顺序。架构调整，实际影响极小。
+
+**已修** ❌（推迟到架构重构时处理）
+
+---
+
+## P145 | 2026-06-04 | Phase 1D | apply_aligner_timestamps docstring 错误
+
+**问题**：docstring 写"Matches aligned words against each segment's Chinese text (seg.zh)"，但代码读的是 `seg.text`（Bug 1 修复后遗留）。
+
+**原因**：Bug 1 改了代码但忘了改注释。
+
+**解决方案**："Chinese text (seg.zh)" → "transcription text (seg.text)"。
+
+**已修** ✅ V3.04
+
+---
+
+## P146 | 2026-06-04 | 🔴 服务器重启后任务恢复全链路缺陷（6 个子问题）
+
+**发现场景**：处理俄语长视频时服务器意外重启。重新拖入视频恢复——前端进度条卡住，API 返回 progress=0。排查发现恢复链路存在 6 个独立但互相放大的缺陷。
+
+### P146a：恢复时误删刚上传的视频
+**问题**：`create_job` 检测到旧任务中断 → 删除刚创建的新临时目录（含刚上传的视频）→ 切换到旧目录 → 旧视频在取消时已被删除 → Worker 拿着不存在路径启动 → 立即崩溃。
+**原因**：恢复逻辑假设旧目录一定有 `input.*`。取消时的清理与恢复逻辑互相矛盾。
+**解决方案**：删临时目录前先检查旧目录有无视频。没有则把新视频搬过去。
+
+### P146b：`is_alive()` 只查花名册不查操作系统
+**问题**：`worker_manager.is_alive()` 只查 `self._processes` 字典。服务器重启后字典为空——旧 Worker 明明在跑，但返回 False。
+**原因**：P104（V2.10）修了前端但后端实现只查自己启动过的进程。
+**解决方案**：用 `psutil.pid_exists()` 问操作系统，不用自己的字典。
+
+### P146c：恢复后 Worker 没在 JOBS 正确登记
+**问题**：WebSocket 推前端正常（进度条动），但 API 轮询永远 progress=0。JOBS 更新路径偏差。
+**解决方案**：确保 Worker 启动时 JOBS 登记完成，`_forward_to_ws` 加容错。
+
+### P146d：进度消息不写日志
+**问题**：进度回调走 stdout（随服务器丢失），日志只记关键节点。事后无法查看中间进度。
+**解决方案**：`stderr_progress()` 同时写一份到日志文件。
+
+### P146e：转录中途不存 checkpoint
+**问题**：checkpoint 只在转录全部完成后保存。中途崩溃全丢，第二轮从头开始。
+**解决方案**：每 50 段保存一次中间 checkpoint。
+
+### P146f：长音频 chunk 5 分钟过保守
+**问题**：`_CHUNK_MAX_DURATION_S = 300`。模型支持 20 分钟，应改为 15 分钟。2 小时视频从 24 chunk 降到 8 chunk。
+**解决方案**：`300 → 900`。
+
+**已修** ❌（V3.05 一次性修复全部 6 项）
+
+## P147 | 2026-06-05 | Phase 1D 转录 | 千问 ASR 重复坍缩/生成失控（13.5 分钟卡死）
+**测试**：job 97c57255ec，24 分钟俄语成人视频，V3.05，tier=precise。
+**问题**：千问 ASR 在视频前 2 分钟后陷入重复坍缩，从 120s 一路到结尾每段都吐同一串幻觉 `1056234897 НЕТ ТЫ МЕНЯ ПРОСТИ`。chunk5 单块卡 13.5 分钟。最终 198 段里 116 段（58%）qwen_text 是这串垃圾；整体仅 4% 千问输出可用（9/198 ok，41 lowsim，116 garbage，32 empty）。
+**原因**：`qwen_asr_runner.py` 里 `model.transcribe(chunk_path)` **零参数调用**，全吃默认值：
+  - `max_tokens` 不传 → 自动 = 时长×50 ≈ 15000/块，无熔断 → 卡死后狂吐到 15000 才停（13.5 分钟来源）
+  - `repetition_penalty` = 1.2 默认，太弱，掰不开强重复环
+  - `repetition_context_size` = 100，重复周期超窗口后惩罚"失忆"
+  - `temperature` = 0.0 贪心，最易掉进确定性重复环
+  - `language` 不传 → 每块独立重判语言（本次判对了 ru，但仍是稳定性隐患）
+**解决方案**：TDD `_qwen_gen_kwargs(duration_s, language, use_mlx)` —— `max_tokens=时长×10` 熔断（floor 256）+ `repetition_penalty 1.4` + `repetition_context_size 256` + `language` 透传。MLX/PyTorch 参数名适配。`transcribe_raw`/`run_qwen_asr` + 内部两个 chunk 函数全部接线；`transcriber_v2.py` 两处调用点传入 `detected_lang`。
+**已修** ✅（2026-06-05，V3.05）
+
+## P148 | 2026-06-05 | Phase 1D 过滤 | L2 交叉验证无脑信任千问 → 77% 字幕误盖 [?]
+**问题**：最终 SRT 225 块里 175 块（77%）盖 `[?]`，但字幕文字内容（Whisper 的）完全正确，翻译 198/198 成功。问号全是误标。
+**原因**：`hallucination_filter.py:168 _layer2_cross_validate` 拿 Whisper 文本和千问文本逐字符比相似度，<0.3 就标 uncertain → 加 [?]。三个缺陷：
+  ① 用千问前没有任何"体检"，只判 `if not qwen_text`（是否为空），不判千问本身是否是坍缩垃圾；
+  ② 分歧时单向甩锅——永远标"这段（Whisper）可疑"，从无"也许千问疯了别信它"的分支；
+  ③ L4 已有重复坍缩检测（`_RE_REPEATED_PATTERN`）却只查 `seg.text`，从不查 `qwen_text`。
+  根因：交叉验证假设"两个裁判都清醒"，没有"裁判坏了"的后路。千问崩 → L2 从幻觉过滤器变成问号喷射器。
+**解决方案**：`hallucination_filter.py` 新增 `_qwen_is_reliable()`——非空 qwen_text 里同一串占比 >30% 即判千问坍缩，L2 整体跳过（`_layer2_cross_validate` 加 `qwen_reliable` 参数）。TDD：`test_phase1d_qwen_health.py`（RED→GREEN）。
+**验证**：① 全套 233 测试通过；② 拿本任务真实 transcript.json 重放，`[?]` 从 159/198(80%) 降到 17/198(8%)，剩余 17 为合理的 L3 语速标记。整片端到端重跑留待 P147 一起做。
+**已修** ✅（2026-06-05，V3.05）
+
+## P149 | 2026-06-05 | Phase 1D 过滤 | L2 逐字符相似度对两 ASR 输出天然爱误判
+**问题**：即便千问没崩，L2 也会过度盖问号。本次 41 段（20%）qwen_text 是真内容、没崩，只因和 Whisper 断句/用词/标点不同，相似度仍 <0.3 → 照样盖 [?]。
+**原因**：两个 ASR 模型对同一句的切分天然不同，逐字符 `SequenceMatcher` 相似度本就偏低，正确句子也常 <0.3。0.3 阈值 + 逐字符比对的设计本身偏激进。
+**解决方案**：三个候选——A 降低阈值 0.3→0.2（一行数字，英语风险低，俄语可接受）；B 改词级比对（俄语词形变换不友好）；C 先不动等端到端数据。brainstorming 审议结论：**降级到 V3.07**（P148 止血后，这是扫尾灰。先端到端验证 P147/P148，用真实 SRT 数 [?] 决定要不要修+怎么修）。语义比对是更优雅的长期方向（用户提出：比句义、不比字面），也留到 V3.07 一并评估。
+**已修** ❌（降级到 V3.07，数据驱动再决定）
+
+## P150 | 2026-06-05 | 转录 | condition_on_previous_text 从 v1.1 的 False 回归成 v2/ 的 True
+**问题**：`transcriber_v2.py:188` 现为 `condition_on_previous_text=True`。而 v1.1（P013）当年"外部建议采纳"明确改成 False，防止 Whisper 片头幻觉传播到后续段。v2/v3 重写时翻回了 True。
+**原因**：True 是用户为换准确率主动改的（False 每段独立、丢上下文、准确率低）——属权衡，非纯 bug。但本片大量重复非语音段，正是 True 最易翻车的内容类型，而唯一兜底的 L2 又坏了。本次没咬到（Whisper 输出干净），属埋雷。
+**解决方案**：用户确认——**保持 True，不动。** 主动改为 True 是为了换准确率（False 每段独立、丢上下文），这是清醒的权衡。P148 修好后 L2 现有健康检查兜底，安全网在线。（Steve Jobs 审查：它没坏，别动它。）
+**已修** ✅（确认保持 True，无需改动）
+
+## P151 | 2026-06-05 | 千问 | 招牌 context（上下文偏置）本地 MLX 包没实现
+**问题**：想用千问 context（喂背景/人名/术语纠偏）提准确率，但本地 `qwen3_asr_mlx` 0.1.1 的 `transcribe()` 没这个参数，`build_prompt` 只能塞语言。
+**原因**：context 是千问模型本身的能力，官方开源版（transformers/vllm）和云端 Flash 都支持，但你装的这个社区 MLX 小包没实现。
+**解决方案**：用户决策——**延期到 V3 后期，Windows 系统实测。** Mac MLX 版缺 context 是平台限制，非 bug。Windows 用户用的官方 transformers 版理论上支持 context，届时实测验证。不需在 Mac 上换包。
+**已修** ❌（延期到 V3 Windows 实测）
+
+## P152 | 2026-06-05 | 转录调度 | Whisper 和千问没真正并行，修复方案：错开流水线
+
+**问题**：tier=precise 的"并行模式"实际只让 SenseVoice(~2min) 和千问重叠。最贵的 Whisper（本次 37 分钟）单独串行先跑，跑完才启动后两者——省时没省到刀刃上（本次 53min 总耗时里，真正重叠的只有 ~2min）。
+
+**原因**：千问被设计成用 Whisper 的段落边界切块（`segments_hint=results`），必须等 Whisper 跑完才能启动。SenseVoice∥千问 只是"都在 Whisper 之后又互相独立"的顺手并行，不是有意识的设计。
+
+**修复方案（用户提出）**：Whisper 先启动 → 先判语言（~8 秒）拿到 ru → Whisper 边转边产段落，约 2 分钟后已有 ~10 段 → 千问拿这 10 段当一块、带着 language 开始转录 → 之后千问跟在 Whisper 后约 2 分钟流水线推进。两个最耗时的转录模型由此并发，省下 ~16 分钟（本次 53min→约 37min），且 language 传得过去。
+
+**工程改动点**：① 让千问按时间/段落流式切块、不再整体依赖 Whisper 跑完；② Whisper 消费改为流式 yield 段落给千问；③ 先单独判语言再启动两路全量转录。
+
+**前置条件（关键）**：**必须先端到端验证 P147/P148，确认千问不再坍缩。** 否则只是让一个 4% 有用、还拖垮 Whisper 的功能跑得更快——优化负价值功能的速度仍是负价值（Steve Jobs 审查结论：先跑测试，数字说话）。
+
+**已修** ❌（计划锁定，端到端验证 P147/P148 通过后解锁）
+
+## P154 | 2026-06-05 | 配置 | API Key 加密导致 key 反复丢失
+
+**问题**：用户每次重新打开前端，DeepSeek API key 都是空的。`config.json` 里 `apiKeys=[]`。
+
+**原因**：`config_manager.save_config` 用 Fernet 加密 key 后存盘，`load_config` 解密。加密密钥从 `platform.node()-getpass.getuser()-uuid.getnode()` 派生——主机名/Wi-Fi MAC/Docker 网络接口任一变化 → 派生密钥变化 → 已存的 key 解不开 → `decrypt_api_key` 失败被 `except Exception: pass` 静默吞掉 → 前端看到空 key。
+
+**根因**：产品是纯本地桌面应用，所有数据都在本地——不存在"config.json 被他人拷走"的威胁模型。加密防的是不存在的攻击者，却给真实用户造成了反复丢 key 的摩擦。
+
+**解决方案（Steve Jobs + 用户决策）**：砍掉加密。明文存 key。用户自己负责自己电脑的安全。TDD：`test_plaintext_keys.py`（RED→GREEN，3 测试）。
+
+**改动**：`config_manager.py` 删除 `encrypt_api_key`/`decrypt_api_key` 调用；文件内 `from .key_manager import` 两个 import 随加密逻辑一并移除。`key_manager.py` 保留（log scrub 功能仍在使用）。
+
+**已修** ✅（2026-06-05，V3.05）
+
+## P155 | 2026-06-05 | 版本管理 | Git 提交落后两个版本
+
+**问题**：`v2/` 的 git log 最新提交是 V3.03。V3.04 和 V3.05 的版本快照文件夹（`v2/v3.04/`、`v2/v3.05/`）已手动复制创建，14 个活跃文件已修改，但从未 `git add` / `git commit`。git 不知道这两个版本存在。
+
+**原因**：版本迭代靠"手动复制上一版本文件夹→在新文件夹改"完成，复制之后缺了 git commit 环节。当别人问我"最新版本是什么"时，我读到的是 git log 里的 V3.03，而不是磁盘上的 V3.05，这个差距就是缺少 git commit。
+
+**解决方案**：① 每次版本迭代后执行 git commit，把当前所有改动（活跃代码 + 快照文件夹 + 问题库/主档案/progress/task_plan）一起提交；② 主档案 `video-subtitle.md` 记录规则：当用户说"版本迭代"时，等同于触发 git commit；③ commit message 格式固定为 `VX.XX: <一句话版本内容简述>`。
+
+**已修** ✅（2026-06-05，当前改动已 commit）
+

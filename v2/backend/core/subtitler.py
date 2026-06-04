@@ -77,7 +77,7 @@ def _annotate_speaker_changes(entries_with_flag: list) -> list:
         if changed:
             t = f"- {t}"
         if unc:
-            t = f"{t} [ ? ]"
+            t = f"{t} [?]"
         result.append((s, e, t))
     return result
 

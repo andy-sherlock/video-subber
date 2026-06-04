@@ -84,15 +84,33 @@ class LLMBackend(TranslationBackend):
             "messages": [{"role": "user", "content": prompt}],
         }).encode()
 
-    def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
-        """发送 prompt 到 LLM API，返回原始文本。子类通常不需要重写。"""
+    def _call_api_raw(self, prompt: str, max_tokens: int = 8192) -> tuple:
+        """Like _call_api but returns (parsed_text, raw_response_json_dict)."""
         import json as _json, urllib.request as _urllib
         body = self._build_body(prompt, max_tokens)
         req = _urllib.Request(
             self._api_url, data=body, headers=self._build_headers()
         )
         with _urllib.urlopen(req, timeout=120) as resp:
-            return self._call_api_parse(_json.loads(resp.read().decode()))
+            data = _json.loads(resp.read().decode())
+            return self._call_api_parse(data), data
+
+    def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
+        """发送 prompt 到 LLM API，返回原始文本。子类通常不需要重写。"""
+        text, _ = self._call_api_raw(prompt, max_tokens)
+        return text
+
+    def _extract_tokens(self, response_data: dict) -> dict | None:
+        """Extract token usage from API response. Override for non-OpenAI formats."""
+        if response_data is None:
+            return None
+        usage = response_data.get("usage")
+        if usage:
+            return {
+                "input_tokens": usage.get("prompt_tokens", 0),
+                "output_tokens": usage.get("completion_tokens", 0),
+            }
+        return None
 
     # ── 基类统一提供（子类不需要动）──────────────────────
 
@@ -102,7 +120,7 @@ class LLMBackend(TranslationBackend):
         _tlog = logging.getLogger("backend.translation")
         t0 = _time.monotonic()
         try:
-            content = self._call_api(prompt, max_tokens)
+            content, raw_data = self._call_api_raw(prompt, max_tokens)
             dur_ms = int((_time.monotonic() - t0) * 1000)
             content_len = len(content) if content else 0
             _tlog.debug(
@@ -113,6 +131,7 @@ class LLMBackend(TranslationBackend):
             return TranslationResult(
                 translated=[content],
                 backend_name=self.name,
+                tokens_used=self._extract_tokens(raw_data),
                 duration_ms=dur_ms,
             )
         except Exception as e:
@@ -152,17 +171,18 @@ class LLMBackend(TranslationBackend):
         )
 
         try:
-            raw = self._call_api(prompt, max_tokens=4096)
+            raw, raw_data = self._call_api_raw(prompt, max_tokens=4096)
             parts = [p.strip() for p in raw.split(SEP)]
             for target_idx, part in enumerate(parts):
                 if target_idx < len(non_empty):
                     original_idx = non_empty[target_idx][0]
                     results[original_idx] = part if part else "[翻译失败]"
         except Exception:
-            pass
+            raw_data = None
 
         return TranslationResult(
             translated=results,
             backend_name=self.name,
+            tokens_used=self._extract_tokens(raw_data) if raw_data else None,
             duration_ms=int((_time.monotonic() - t0) * 1000),
         )

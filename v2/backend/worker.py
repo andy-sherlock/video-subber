@@ -19,6 +19,7 @@ _real_stdout = sys.stdout
 # ── 0) Setup logging BEFORE anything else ──
 LOG_DIR = Path.home() / ".video-subber" / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+_log = logging.getLogger("worker")
 
 # 根 Logger：开启 DEBUG，由下游 Handler 各自筛选级别
 root_log = logging.getLogger()
@@ -453,9 +454,8 @@ def main():
             )
 
         # ── Step 4: Subtitle (80-90%) ──
-        for s in segments:
-            s.uncertain = False
-
+        # Phase 1D: uncertain flags from hallucination filter are preserved
+        # for [?] marking and question_mark_count statistics.
         subtitle_segments = word_align_segments(segments)
 
         # T4: LLM sentence splitting for long Chinese subtitles
@@ -539,13 +539,15 @@ def main():
         _dur_str = f"合计={_t_end - _t_start:.0f}s"
         logging.getLogger("worker").info("步骤耗时: %s", _dur_str)
         emit("progress", stage="burn", percent=100, message="完成", detail="")
+        qm_count = sum(1 for s in segments if getattr(s, "uncertain", False))
         emit("done",
              result_video=video_out if burn_flag else (video_out_mux if mux_flag else None),
              result_srt=srt_path,
              failed_segments=[{"id": fid, "text": ftxt, "reason": freason}
                               for fid, ftxt, freason in failed] if failed else [],
              segment_count=total,
-             success_count=ok_count)
+             success_count=ok_count,
+             question_mark_count=qm_count)
 
     except Exception as e:
         sys.stdout = _real_stdout

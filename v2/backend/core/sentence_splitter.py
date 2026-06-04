@@ -80,7 +80,7 @@ def word_align_segments(segments: list) -> list:
             sub = Segment(id=seg.id * 1000 + i, start=t, end=t_end, text=en_text)
             sub.zh = zh_part
             sub.speaker_change = seg.speaker_change if i == 0 else False
-            sub.uncertain = False
+            sub.uncertain = getattr(seg, 'uncertain', False)
             sub.words = []
             result.append(sub)
             t = t_end
@@ -182,7 +182,7 @@ def _build_split_segments(seg, parts: list[str]) -> list:
         )
         sub.zh = part
         sub.speaker_change = seg.speaker_change if j == 0 else False
-        sub.uncertain = False
+        sub.uncertain = getattr(seg, 'uncertain', False)
         sub.words = []
         subs.append(sub)
         t = t_end
@@ -271,7 +271,7 @@ def _rule_based_split(seg) -> list:
         sub = Segment(id=seg.id * 100 + j, start=t_start, end=t_end, text=seg.text)
         sub.zh = part
         sub.speaker_change = seg.speaker_change if j == 0 else False
-        sub.uncertain = False
+        sub.uncertain = getattr(seg, 'uncertain', False)
         sub.words = []
         subs.append(sub)
 

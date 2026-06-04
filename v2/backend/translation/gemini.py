@@ -26,7 +26,7 @@ class GeminiBackend(LLMBackend):
             "generationConfig": {"maxOutputTokens": max_tokens},
         }).encode()
 
-    def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
+    def _call_api_raw(self, prompt: str, max_tokens: int = 8192) -> tuple:
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
             f"models/{self._model}:generateContent"
@@ -34,7 +34,23 @@ class GeminiBackend(LLMBackend):
         body = self._build_body(prompt, max_tokens)
         req = urllib.request.Request(url, data=body, headers=self._build_headers())
         with urllib.request.urlopen(req, timeout=120) as resp:
-            return self._call_api_parse(json.loads(resp.read().decode()))
+            data = json.loads(resp.read().decode())
+            return self._call_api_parse(data), data
+
+    def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
+        text, _ = self._call_api_raw(prompt, max_tokens)
+        return text
+
+    def _extract_tokens(self, response_data: dict) -> dict | None:
+        if response_data is None:
+            return None
+        usage = response_data.get("usageMetadata")
+        if usage:
+            return {
+                "input_tokens": usage.get("promptTokenCount", 0),
+                "output_tokens": usage.get("candidatesTokenCount", 0),
+            }
+        return None
 
     def _call_api_parse(self, data: dict) -> str:
         return data["candidates"][0]["content"]["parts"][0]["text"]

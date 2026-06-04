@@ -45,6 +45,38 @@ def is_qwen_asr_available() -> bool:
     return _USE_MLX or _USE_PYTORCH
 
 
+# ── P147: anti-collapse generation parameters ──
+_QWEN_REPETITION_PENALTY = 1.4   # default 1.2 too weak to break repetition loops
+_QWEN_REPETITION_WINDOW = 256    # default 100 too short for long repeats
+_QWEN_TOKENS_PER_SEC = 10        # real speech ~3-5 words/s; default ~50 let a
+                                 # collapse run to 15000 tok/chunk (13.5 min hang)
+_QWEN_MIN_TOKENS = 256
+
+
+def _qwen_gen_kwargs(duration_s, language=None, use_mlx=True) -> dict:
+    """Anti-collapse kwargs for model.transcribe() (P147).
+
+    Caps generated tokens to ~10/sec so a repetition collapse force-stops in
+    minutes instead of running to the default ~50/sec ceiling, tightens the
+    repetition penalty/window, and forwards the language Whisper already
+    detected so Qwen doesn't re-guess (and mis-guess) per chunk.
+
+    Param names differ by backend: the MLX `transcribe()` takes `max_tokens` +
+    `repetition_penalty`/`repetition_context_size`; the PyTorch wrapper takes
+    `max_new_tokens` (its repetition params are unverified here, so omitted).
+    """
+    kwargs = {}
+    if language and language not in ("auto", ""):
+        kwargs["language"] = language
+    if duration_s and duration_s > 0:
+        cap = max(_QWEN_MIN_TOKENS, int(duration_s * _QWEN_TOKENS_PER_SEC))
+        kwargs["max_tokens" if use_mlx else "max_new_tokens"] = cap
+    if use_mlx:
+        kwargs["repetition_penalty"] = _QWEN_REPETITION_PENALTY
+        kwargs["repetition_context_size"] = _QWEN_REPETITION_WINDOW
+    return kwargs
+
+
 def _split_sentences(text: str) -> list[str]:
     parts = _SENTENCE_SPLIT_RE.split(text)
     return [p.strip() for p in parts if p.strip()]
@@ -208,7 +240,7 @@ def _extract_audio_chunk(audio_path: str, start_s: float, end_s: float,
 # Chunked transcription (internal helpers)
 # ═══════════════════════════════════════════════════════════════════
 
-def _transcribe_raw_chunked(audio_path: str, segments) -> dict | None:
+def _transcribe_raw_chunked(audio_path: str, segments, language=None) -> dict | None:
     """Chunked Qwen3-ASR for long audio — used by transcribe_raw().
 
     Extracts each chunk, transcribes independently, merges text and
@@ -238,7 +270,9 @@ def _transcribe_raw_chunked(audio_path: str, segments) -> dict | None:
             os.close(fd)
             try:
                 _extract_audio_chunk(audio_path, t_start, t_end, chunk_path)
-                result = model.transcribe(chunk_path)
+                result = model.transcribe(
+                    chunk_path,
+                    **_qwen_gen_kwargs(t_end - t_start, language, _USE_MLX))
 
                 if _USE_MLX:
                     text = result.text if result.text else ""
@@ -291,7 +325,7 @@ def _transcribe_raw_chunked(audio_path: str, segments) -> dict | None:
     return {"text": merged_text, "language": merged_lang, "timestamps": merged_ts}
 
 
-def _run_qwen_asr_chunked(audio_path: str, segments: list) -> list:
+def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> list:
     """Chunked cross-validation for long audio.
 
     Batches Whisper segments into ~5-minute chunks at natural boundaries,
@@ -324,7 +358,9 @@ def _run_qwen_asr_chunked(audio_path: str, segments: list) -> list:
         try:
             _extract_audio_chunk(audio_path, t_start, t_end, chunk_path)
 
-            result = model.transcribe(chunk_path)
+            result = model.transcribe(
+                chunk_path,
+                **_qwen_gen_kwargs(t_end - t_start, language, _USE_MLX))
             if _USE_MLX:
                 full_text = result.text if result.text else ""
             else:
@@ -389,7 +425,7 @@ def _run_qwen_asr_chunked(audio_path: str, segments: list) -> list:
 # Public API
 # ═══════════════════════════════════════════════════════════════════
 
-def transcribe_raw(audio_path: str, segments_hint=None) -> dict | None:
+def transcribe_raw(audio_path: str, segments_hint=None, language=None) -> dict | None:
     """Transcribe audio without Whisper-segment dependency.
 
     Args:
@@ -419,23 +455,28 @@ def transcribe_raw(audio_path: str, segments_hint=None) -> dict | None:
                 pass
         if need_chunk:
             _log.info("Qwen3-ASR 音频 %.0fs > 20min，启用分段转录", dur)
-            return _transcribe_raw_chunked(audio_path, segments_hint)
+            return _transcribe_raw_chunked(audio_path, segments_hint,
+                                           language=language)
 
     # ── Direct path (original behaviour) ──
     t0 = time.time()
+    _dur = _get_audio_duration(audio_path)
     model = None
     try:
         if _USE_MLX:
             from qwen3_asr_mlx import Qwen3ASR
             model = Qwen3ASR.from_pretrained("mlx-community/Qwen3-ASR-1.7B-bf16")
-            result = model.transcribe(audio_path)
+            result = model.transcribe(
+                audio_path, **_qwen_gen_kwargs(_dur, language, True))
             lang = getattr(result, 'language', None)
             text = result.text if result.text else ""
             ts = None
         else:
             from qwen_asr import Qwen3ASRModel
             model = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
-            result = model.transcribe(audio_path, return_time_stamps=True)
+            result = model.transcribe(
+                audio_path, return_time_stamps=True,
+                **_qwen_gen_kwargs(_dur, language, False))
             lang = getattr(result, 'language', None)
             text = result.text if hasattr(result, 'text') else ""
             ts = getattr(result, 'time_stamps', None)
@@ -450,7 +491,7 @@ def transcribe_raw(audio_path: str, segments_hint=None) -> dict | None:
     return {"text": text, "language": lang, "timestamps": ts}
 
 
-def run_qwen_asr(audio_path: str, segments: list) -> list:
+def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
     for seg in segments:
         seg.qwen_text = None
 
@@ -462,7 +503,7 @@ def run_qwen_asr(audio_path: str, segments: list) -> list:
     total_duration = segments[-1].end
     if total_duration > _LONG_AUDIO_THRESHOLD_S:
         _log.info("音频 %.0fs > 20min，启用 Qwen 分段对齐", total_duration)
-        return _run_qwen_asr_chunked(audio_path, segments)
+        return _run_qwen_asr_chunked(audio_path, segments, language=language)
 
     # ── Direct path (original behaviour) ──
     t0 = time.time()
@@ -480,7 +521,9 @@ def run_qwen_asr(audio_path: str, segments: list) -> list:
 
     t1 = time.time()
     try:
-        result = model.transcribe(audio_path)
+        result = model.transcribe(
+            audio_path,
+            **_qwen_gen_kwargs(total_duration, language, _USE_MLX))
         if _USE_MLX:
             detected_lang = getattr(result, 'language', None)
             full_text = result.text if result.text else ""

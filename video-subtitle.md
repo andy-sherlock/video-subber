@@ -36,7 +36,9 @@
 | **V3.01** | **Phase 1A 翻译管线实测验证 + 内容类型感知翻译 + 说话人检测降级 + PlayRes 修复**。① 翻译 prompt 根因修复（`[编号] 译文` 格式要求 + 正则 PatternError）② 全文翻译+滑动窗口实测通过（agnes-2.0-flash 104/105 条，14.7s）③ 术语自动提取实测通过 ④ 内容类型感知翻译策略（搞笑/正式/教学/日常四种 prompt）⑤ 说话人检测降级为实验性功能（默认关闭）⑥ ASS PlayRes 统一 1920×1080（修复跨分辨率字幕大小不一致）⑦ 免费翻译引擎 Bing+有道已注册 ⑧ LiteLLM 社区数据集对接（模型免费/付费标签）⑨ API Key 卡片式编辑 | ✅ 快照 `v2/v3.01/` |
 | **V3.02** | **Phase 1B 三模型转录 + 五层幻觉过滤 + 并行优化**。① 三模型并行管线（Whisper + SenseVoice + Qwen3-ASR ≥16GB 内存全并行，8GB 串行）② 五层幻觉过滤（L1 SenseVoice 声音分类硬过滤 → L4 正则硬过滤 → L5 去重硬过滤 → L2 交叉验证软标记 → L3 语速软标记）③ SenseVoice 声音事件分类 + 非人声区间修剪字幕 ④ Qwen3-ASR 交叉验证（Mac MLX/PyTorch 双路径对齐）⑤ 语言自动传递（Whisper 检测语言 → 过滤器阈值自动匹配）⑥ LLM 翻译修复（非上下文感知路径改用降级链，不再并发竞速）⑦ LLM 全失败 120s 超时自动降级免费引擎 ⑧ DELETE 接口保留日志 ⑨ 日志版本号 + 耗时汇总 ⑩ 前端三档转录选项 + 环境栏新增 SenseVoice/Qwen3 检测 ⑪ 69 测试全过 | ✅ 快照 `v2/v3.02/` |
 | **V3.03** | **Phase 1C 打磨收尾 + 代码审查修复**。① 长音频分段切分（Qwen3-ASR + SenseVoice，Whisper segment 边界 + 5s 发音缓冲，15 分钟一批，解除 MLX 20 分钟上限）② LLM 断句与翻译分离（翻译 prompt 不再要求 AI 拆句，字幕生成步骤独立用规则断句，修复 F1 缓存崩溃 bug）③ 软字幕封装（mp4 mov_text / mkv srt，前端新增输出模式三选一）④ yt-dlp 视频下载（`/api/download-video` 端点）⑤ 翻译反思优化（quality 模式可选，翻译后 LLM 自审修正，已接入 worker 管线）⑥ 耗时汇总补异常路径 + 日志版本号 ⑦ F1/F3/F4/F5 代码审查 bug 全修复 ⑧ 竞品分析更新（MioSub / VideoCaptioner / WhisperJAV 代码校验）⑨ 竞品仓库链接归档 ⑩ 159 测试全过 | ✅ 快照 `v2/v3.03/` |
-| **V4** | **体验打磨 + 性能优化 + 数据飞轮**。① GPU 加速包内置安装包（自动检测硬件，加速库预置在 EXE/DMG 安装包内，用户无感。仅 Windows+NVIDIA 用户需要，Mac 原生加速无需此功能）② **Qwen3-ForcedAligner 词级强制对齐**（替代 CTC。输入音频+文字→输出词级毫秒时间戳。**前置条件**：V3 LLM 断句上线后用踩坑视频实测，若断句已解决 90% 字幕错位则 V4 做，若未解决则提前到 V3 Phase 1C）③ 字幕手动微调界面（PySide6 原生编辑面板，用户可修改文字/时间。藏在"微调"按钮后，90% 用户不需要看到）④ RAG 翻译修正反馈循环（用户修改→入库→下次 LLM 检索参考→越用越准。四层记录结构见下方 RAG 知识库章节）⑤ Qwen3-FA 对齐结果兼作幻觉过滤验证信号（与 SenseVoice 双信号交叉确认）。**以 V3 为框架。** | 待 V3 完成 |
+| **V3.04** | **Phase 1D 对齐精度 + 幻觉验证升级**（2026-06-04 Steve Jobs 审查决策：V4 四项提前，2026-06-04 完成）。① Qwen3-ForcedAligner 词级强制对齐 ② 双信号幻觉过滤升级 ③ [?] 不确定标记恢复 ④ [?] 阈值提示系统 ⑤ 模型分时加载。**以 V3.03 为框架。** | ✅ 快照 `v2/v3.04/` |
+| **V3.05 🔴** | **Phase 1D bug 修复 + 审查收尾**（2026-06-04）。修复 10 个 bug（P136-P145：对齐全丢、[?]标记全灭×2、假阳性洪水、GPU泄漏、属性未定义、空qwen_text、processor未释放、docstring错误）+ 4 个审查发现（_log未定义、JS旧警告残留、轮询缺qm_count、死代码）+ 前端renderEnv缺括号修复。新增 35 个测试（端到端集成+checkpoint+降级+UI覆盖率）。**以 V3.04 为框架。** | ✅ 快照 `v2/v3.05/`，231 测试全过 |
+| **V4** | **体验打磨 + 数据飞轮**。① GPU 加速包内置安装包（自动检测硬件，加速库预置在 EXE/DMG 安装包内，用户无感。仅 Windows+NVIDIA 用户需要，Mac 原生加速无需此功能）② 字幕手动微调界面（PySide6 原生编辑面板，用户可修改文字/时间。藏在"微调"按钮后，90% 用户不需要看到。**前置条件**：Phase 1D 自动对齐做到极致后，若仍有用户需求再做）③ RAG 翻译修正反馈循环（用户修改→入库→下次 LLM 检索参考→越用越准。四层记录结构。**前置条件**：需先有用户基础和翻译数据）④ ~~Qwen3-ForcedAligner~~（已提前到 V3.04）⑤ ~~双信号幻觉过滤~~（已提前到 V3.04）。**以 V3 为框架。** | 待 V3 完成 |
 | **未来** | 积分体系 + 云端语料库 + 账号系统。**需先有用户基础和翻译数据，暂不定版本号。** | 待定 |
 
 <details>
@@ -80,6 +82,20 @@
 | 多语言 | 99 种 | 52 种 | 50+ 种 |
 | 特殊能力 | no_speech_prob + 词级时间戳 | 原生时间戳 + 语言自动识别 | 声音类型分类（人声/掌声/笑声/音乐）+ 情绪识别 |
 | 需要 GPU | 是（推荐） | 是 | 轻量 |
+
+**V3 模型下载方案（2026-06-04 ）：**
+
+| 模型 | 下载方式 | 仓库 | 国内可直连 | 下载按钮 | 备注 |
+|------|---------|------|-----------|---------|------|
+| Whisper（5 个型号） | `snapshot_download` | HuggingFace `Systran/faster-whisper-*` | ❌ 需镜像 | ✅ 已有 | 75MB–2.9GB |
+| Qwen3-ASR（转录交叉验证） | `from_pretrained` | HuggingFace `Qwen/Qwen3-ASR-1.7B` | ❌ 需镜像 | ❌ 待做 | 3.5GB |
+| Qwen3-ForcedAligner（词级时间戳） | `from_pretrained` | HuggingFace（待定） | ❌ 需镜像 | ❌ 待做 | ~979MB（4-bit），V3.04 实现 |
+| SenseVoice（声音分类） | `funasr.AutoModel` | ModelScope（魔搭） | ✅ 国内直连 | ❌ 待做 | 阿里服务器 |
+| Resemblyzer（说话人识别） | `VoiceEncoder()` | resemblyzer 默认仓库 | — | **无需按钮** | 几十 MB，**打包进安装包** |
+
+**国内下载方案**：设置 `HF_ENDPOINT=https://hf-mirror.com` 环境变量，所有 HuggingFace 下载走国内镜像。详见 `problems.md` → P133。
+
+
 | 安装 | pip | pip | pip |
 
 ~~**V3 云端转录 API（已砍掉）**：剪映（字节跳动）/ 必剪（B站）的逆向 ASR 接口。砍掉原因：①国内平台内容审核可能静默修改转录结果 ②污染 RAG 知识库数据质量 ③逆向接口随时失效，平台依赖不可控。转录统一使用本地模型（Whisper / Qwen3-ASR / SenseVoice）。~~
@@ -508,19 +524,19 @@ else:
 
 ---
 
-### V4 完整功能清单
+### V4 完整功能清单（2026-06-04 更新：②⑤⑥⑦⑧ 已提前到 V3.04 Phase 1D）
 
-| # | 功能 | 说明 |
-|---|------|------|
-| ① | GPU 加速包内置 | 安装包预置，用户无感。仅 Windows+NVIDIA 用户需要，Mac 原生加速 |
-| ② | Qwen3-ForcedAligner 词级对齐 | 替代 CTC，注意力机制直接预测词级时间戳。噪声下不糊，不被背景音干扰 |
-| ③ | 字幕手动微调界面 | PySide6 原生面板，藏在"微调"按钮后，90% 用户不需要看到 |
-| ④ | RAG 翻译修正反馈循环 | 四层记录结构（文本/人物/场景/来源），用户修正入库 → LLM 检索参考 → 越用越准 |
-| ⑤ | 双信号幻觉过滤 | Qwen3-FA 对齐结果兼作 SenseVoice 的第二验证信号，四路判断矩阵 |
-| ⑥ | 恢复 [?] 不确定标记 | SenseVoice 与 Qwen3-FA 意见不一致时标记，保护信号信誉 |
-| ⑦ | [?] 阈值提示系统 | 比例 + 绝对数，三级梯度（无提示/黄色/红色） |
-| ⑧ | 模型分时加载 | `del model` 用完即释，峰值内存降到单个模型水平（~3.5GB） |
-| ⑨ | 智能硬件调度 | 复用 V3 三档（快速/标准/精确），Qwen3-FA 绑精确档 |
+| # | 功能 | 说明 | 状态 |
+|---|------|------|------|
+| ① | GPU 加速包内置 | 安装包预置，用户无感。仅 Windows+NVIDIA 用户需要，Mac 原生加速 | 推迟到 V4 |
+| ② | ~~Qwen3-ForcedAligner 词级对齐~~ | → 已提前到 V3.04 Phase 1D | ✅ 提前 |
+| ③ | 字幕手动微调界面 | PySide6 原生面板，藏在"微调"按钮后。**前置**：Phase 1D 对齐做到极致后评估是否需要 | 推迟到 V4 |
+| ④ | RAG 翻译修正反馈循环 | 四层记录结构（文本/人物/场景/来源），用户修正入库 → LLM 检索参考。**前置**：需先有用户基础和数据 | 推迟到 V4 |
+| ⑤ | ~~双信号幻觉过滤~~ | → 已提前到 V3.04 Phase 1D | ✅ 提前 |
+| ⑥ | ~~恢复 [?] 不确定标记~~ | → 已提前到 V3.04 Phase 1D | ✅ 提前 |
+| ⑦ | ~~[?] 阈值提示系统~~ | → 已提前到 V3.04 Phase 1D | ✅ 提前 |
+| ⑧ | ~~模型分时加载~~ | → 已提前到 V3.04 Phase 1D | ✅ 提前 |
+| ⑨ | 智能硬件调度 | 复用 V3 三档（快速/标准/精确），Qwen3-FA 绑精确档。Phase 1D 实现 Qwen3-FA 后自然集成 | Phase 1D 同步做 |
 
 ---
 
@@ -813,14 +829,21 @@ V1.3 用 `_TeeOutput` 劫持 `sys.stdout` 实现双日志。这个方案在 Web 
 - [x] V2：27 项功能清单全部完成（V2.01-V2.10 共 10 个迭代），2 免费 + 7 LLM 后端，前后端一致性已审查 ✅
 - [x] 自动化测试：32 个纯函数测试（test/test_pure_functions.py），覆盖 6 个核心函数 ✅
 - [x] ~~付费转化路径~~（V3 砍掉付费墙后废弃）
-- [ ] V3 Phase 1A：翻译管线升级（tier清理 + LLM断句 + 滑动窗口翻译+接缝审查 + 术语提取）— 不需要新模型
-- [ ] V3 Phase 1B：多模型转录 + 幻觉过滤（三模型集成 + 五层过滤 + 云端ASR）
-- [ ] V3 Phase 1C：打磨（翻译反思 + 软字幕封装 + yt-dlp）
-- [ ] V3 Phase 2：PySide6 原生桌面应用（替代 PyQt5，LGPL 协议）
-- [ ] V4：GPU 加速包内置安装包（加速库预置在 EXE/DMG 内，安装时自动配置，用户无感。参考 SmartSub 硬件检测逻辑，不做界面内二次下载）
-- [ ] V4：CTC 强制对齐（MMS/ONNX 词级时间戳，参考 MioSub。前置条件：V3 LLM 断句实测后决定是否提前）
+- [x] V3 Phase 1A：翻译管线升级 — 全文翻译+滑动窗口+术语提取+内容类型感知 ✅ V3.01
+- [x] V3 Phase 1B：多模型转录 + 五层幻觉过滤 — 三模型并行+智能调度+SenseVoice+Qwen3-ASR ✅ V3.02
+- [x] V3 Phase 1C：打磨收尾 — 长音频切分+软字幕封装+yt-dlp+翻译反思+代码修复 ✅ V3.03（159 测试全过）
+- [x] **V3 Phase 1D：对齐精度 + 幻觉验证升级** ✅ V3.04+V3.05（231 测试全过，P136-P145 已修）
+  - [x] ① Qwen3-ForcedAligner 词级强制对齐
+  - [x] ② 双信号幻觉过滤升级
+  - [x] ③ [?] 不确定标记恢复
+  - [x] ④ [?] 阈值提示系统
+  - [x] ⑤ 模型分时加载
+- [ ] V3 Phase 2：PySide6 原生桌面应用（替代 HTML 前端，LGPL 协议）
+- [ ] V4：GPU 加速包内置安装包（仅 Windows+NVIDIA，Mac 原生加速）
+- [ ] V4：字幕手动微调界面（PySide6 面板，90% 用户不需要。前置：Phase 1D 自动对齐做到极致后评估）
+- [ ] V4：RAG 翻译修正反馈循环（四层记录结构。前置：需先有用户基础）
 - [x] V3：免费翻译引擎扩展 — Bing（逆向 Edge）+ 有道（逆向 aidemo），已实现并注册到 orchestrator
-- [ ] 未来：RAG 知识库 + 积分体系 + 准确性校准循环（暂不定版本号）
+- [ ] 未来：积分体系 + 云端语料库 + 账号系统（暂不定版本号）
 
 ---
 
@@ -830,27 +853,147 @@ V1.3 用 `_TeeOutput` 劫持 `sys.stdout` 实现双日志。这个方案在 Web 
 
 ---
 
+## V3.03 代码功能完整索引（2026-06-04 代码审查同步）
+
+> 以下为代码中已实现但此前文档未记录的功能/模块/端点。2026-06-04 对照 `v2/` 全部活跃代码逐一核实后补录。
+
+### 一、新增模块/文件（9 个）
+
+| 文件 | 功能 | 行数（约） |
+|------|------|-----------|
+| `v2/desktop.py` | **PyWebView 桌面启动器**。单实例锁（TCP 端口 18766）+ 自动启动 FastAPI 后端 + 打开原生窗口。FROZEN 模式检测（打包后 `sys.frozen`）。开发时 `python desktop.py`，打包后双击 EXE。V3 Phase 2 计划换 PySide6，当前版已是可用的独立桌面入口 | ~280 |
+| `v2/backend/model_manager.py` | **Whisper 模型下载管理器**。管理 5 个 Whisper 模型（tiny～large-v3），后台线程下载 + 进度轮询 + 用户取消。下载状态存内存 (`_downloads` 字典)，`get_model_status()` 返回全部模型状态。`_detect_model_dir()` 检查 HuggingFace 缓存目录下的模型文件 | ~150 |
+| `v2/backend/core/hardware_detector.py` | **硬件检测与转录档位推荐**。7 个函数：`is_apple_silicon()` / `_detect_platform()` / `_detect_gpu()` / `_detect_ram_gb()` / `recommend_tier()` / `downgrade_tier()` / `detect_hardware()`。三档配置 `TIERS` 字典（fast/standard/precise）。规则：<8GB → fast，8-15GB → standard，≥16GB → precise | ~130 |
+| `v2/backend/core/hallucination_filter.py` | **五层幻觉过滤独立模块**。L1 SenseVoice 声音分类硬过滤 → L4 正则模式硬过滤 → L5 幻觉链去重硬过滤 → L2 交叉验证软标记 → L3 语速异常软标记。处理顺序：先走三道硬过滤丢弃不可回收的 → 去重 → 对幸存段做软标记。`filter_hallucinations(segments, source_lang)` 主入口 | ~180 |
+| `v2/backend/core/sensevoice_runner.py` | **SenseVoice 运行器**。调用 FunASR SenseVoice 模型做声音事件分类（人声/掌声/笑声/音乐）。`run_sensevoice()` 返回事件列表，`trim_segments_by_sensevoice()` 根据事件裁剪字幕段，`is_sensevoice_available()` 检测模型是否可用。支持并行模式（与 Whisper 同时跑）和串行模式 | ~ |
+| `v2/backend/core/qwen_asr_runner.py` | **Qwen3-ASR 运行器**。Mac MLX 路径（`qwen3_asr_mlx`）和 PyTorch 路径（`qwen_asr`）双后端。`transcribe_raw()` 无时间戳转录，`run_qwen_asr()` 带交叉验证，`align_by_similarity()` 文本相似度对齐，`align_by_timestamps()` 时间戳对齐。`is_qwen_asr_available()` 综合检测 MLX/PyTorch 可用性 | ~ |
+| `v2/backend/core/sentence_splitter.py` | **断句模块**。T2：`split_zh_simple()` 按中文标点断句 + `word_align_segments()` 英文词级时间戳对齐。T4：LLM 四信号语义断句（停顿位置+停顿时长+语义完整性+中文长度，<0.3s 不切/0.3-1s 看语义/>1s 必切）。`_MAX_ZH_CHARS = 20` 每行最多 20 个中文字 | ~120 |
+| `v2/backend/core/video_downloader.py` | **yt-dlp 视频下载模块**。`is_ytdlp_available()` 检测 yt-dlp 是否安装。`download_video()` 带进度回调 + 自动命名（`%(title)s.%(ext)s`）。`_make_progress_hook()` 生成进度钩子。下载到 `~/Downloads/Video-Subber/` | ~50 |
+| `v2/backend/translation/reflection.py` | **翻译反思模块**（#7）。`build_reflection_prompt()` 构建 LLM 自审 prompt，`parse_reflection_result()` 解析修正输出 → `{index: corrected_text}` 字典，`apply_reflection()` 应用修正到翻译列表。quality 模式下可选启用 | ~55 |
+
+### 二、API 端点完整列表（20 个端点 + 1 个 WebSocket）
+
+| 方法 | 路径 | 功能 | 首次记录 |
+|------|------|------|---------|
+| GET | `/api/health` | 健康检查 + 版本号 | V2.01 |
+| GET | `/api/hardware` | 硬件检测（platform/gpu/ram/tier）+ TIERS 配置 | **🆕** |
+| GET | `/api/env` | 环境检测（FFmpeg/Whisper/resemblyzer）+ `?simulate=` 模拟 | V2.01 |
+| GET | `/api/models/status` | 5 个 Whisper 模型的下载状态（downloaded/downloading/progress） | **🆕** |
+| POST | `/api/models/download/{model_id}` | 触发模型下载（tiny/base/small/medium/large-v3） | **🆕** |
+| DELETE | `/api/models/download/{model_id}` | 取消模型下载 | **🆕** |
+| GET | `/api/backends` | 返回启用的免费后端 + LLM 平台列表（含免费标签） | V2.01 |
+| POST | `/api/llm-models` | **实时拉取 LLM 模型列表**。用用户 Key 调对应平台 `/models` API，返回真实可用模型（含免费标签+已下线标注）。Claude/Gemini 走专用 API，GPT/DeepSeek/豆包/GLM/自定义走 OpenAI 兼容 `/models` | V2.12 |
+| GET | `/api/config` | 读取 `~/.video-subber/config.json`（含 translationPriority 自动合并） | V2.01 |
+| PUT | `/api/config` | 保存用户配置 | V2.01 |
+| POST | `/api/jobs` | **核心：创建任务**。支持两种模式——`multipart/form-data` 文件上传 或 `application/json` 本地路径直读。SHA256 流式计算 + 配置感知去重（`task_key = file_hash + config_hash`）+ 中断任务自动恢复 | V2.01 |
+| GET | `/api/active-jobs` | **活跃任务恢复**。前端 localStorage 为空时调用，从 `GLOBAL_HASH_INDEX` 返回所有 incomplete 任务 | **🆕** |
+| GET | `/api/jobs/{job_id}` | 任务状态查询。内存 JOBS 未命中时回退磁盘 `meta.json`，优先使用 GLOBAL_HASH_INDEX 状态（启动时已修正 interrupted） | V2.01 |
+| GET | `/api/jobs/{job_id}/download/video` | 下载字幕视频（`*_zh.mp4` / `*_zh_sub.*`） | V2.01 |
+| GET | `/api/jobs/{job_id}/download/srt` | 下载 SRT 字幕文件 | V2.01 |
+| DELETE | `/api/jobs/{job_id}` | **取消任务**（保留缓存）。仅删除 `input.*` 视频文件，`cache/` 下中间产物全部保留。用户重新提交可复用 | V2.01 |
+| POST | `/api/jobs/{job_id}/llm-fallback` | **LLM 失败降级决策**。Worker 发 `llm_failed` 消息后轮询此端点。`decision: "use_free"` → 降级免费引擎；`"keep_failed"` → 保留失败结果 | **🆕** |
+| POST | `/api/download-video` | **yt-dlp 视频下载**。输入 URL → 下载到 `~/Downloads/Video-Subber/` → 返回本地路径和文件名 | V3.03 |
+| WS | `/ws/{job_id}` | WebSocket 实时进度推送（进度/步骤/token_usage/llm_failed/错误消息） | V2.01 |
+
+### 三、前端功能索引（补充 V2 7 区域之外的新增 UI）
+
+| 区域 | 功能 | 说明 |
+|------|------|------|
+| **顶部** | 环境检测栏 | 4 项状态圆点（FFmpeg/libass/Whisper/resemblyzer），绿/黄/红三色。每项旁边有「如何安装 ▸」可展开按钮。缺 libass 时自动切 SRT 并禁用烧录/封装选项 |
+| **区域 1** | 拖拽上传 | 拖拽/点击上传 + 下方「本地路径输入框」（粘贴绝对路径，支持 macOS/Windows）双模式。展开后显示格式指南。建议不超过 5GB（软建议，非硬限制） |
+| **区域 2** | 字幕与输出 | 字幕状态（无/有）+ **输出模式三选一**：烧录/封装(可开关)/仅 SRT。烧录警告红色提示。封装提示「💡 可在播放器中开关字幕」。缺 libass → 自动禁用烧录；缺 ffmpeg → 强制 SRT |
+| **区域 2b** | 字幕样式 | 字体/字号/颜色/描边颜色/描边粗细 5 个选择器 + 黑底实时预览框（中日混合示例）。「确认样式」按钮 + 「✓ 样式已确认」指示器。样式未确认时底部按钮禁用 |
+| **区域 3a** | Whisper 模型 | 5 圆点拖拽选择（tiny/base/small/medium/large-v3）+ 双向箭头标注快慢/准确度 + 当前选中模型名称居中加粗显示。**模型下载状态三态**：未下载（灰）/下载中（脉冲动画+进度）/已下载（绿）。点击未下载模型→开始下载 |
+| **区域 3b** 🆕 | **转录模式** | **三档切换**：快速（仅 Whisper）/ 标准（Whisper+声音分类过滤）/ 精确（三模型交叉验证）。下方提示文字说明每档含义。存入 `transcriptionTier` 配置 |
+| **区域 4** | 翻译模式 | 极速模式（并行竞速）/质量优先（串行降级）切换。质量模式展开拖拽排序列表。下方 ℹ 说明：`-` 前缀=说话人切换，`[?]`=翻译准确性存疑 |
+| **区域 5** | LLM 智能翻译 | **两行 UI**：第 1 行 API Key 输入（带眼睛图标切换可见性）+ 第 2 行平台选择/模型下拉/自定义模型名/自定义端点/命名/添加按钮/取消按钮。填 Key 后自动拉取该平台可用模型列表（含「（免费）」标签）。**卡片式编辑**：已保存 Key 显示为可点击卡片，点卡片→回填表单编辑，保存按钮检测变更后亮起。模型被平台下线→「(已下线)」标注 |
+| **区域 6** | 高级设置 | 折叠面板（默认收合）。翻译方式：逐段/上下文感知切换（无 LLM Key 时自动禁用）。**说话人检测开关** 🆕：关闭（默认）/ 开启 🧪（实验性），存入 `speakerDetect` |
+| **底部** | 自定义保存路径 | 显示 `~/Downloads/Video-Subber`，旁边「更改」按钮 |
+| **弹窗** | **LLM 失败降级弹窗** 🆕 | 遮罩弹窗："翻译全部失败，是否改用 Google/Bing/有道免费翻译继续？"+ 两个按钮（降级为免费翻译 / 保留失败结果）。Worker 等待 120s 无响应→自动降级 |
+| **弹窗** | 错误提示 | `showToast()` 替代 `alert()`，4s 自动消失 |
+| **弹窗** | 付费方案（已废弃） | 免费用户任务完成后的付费引导弹窗（V3 砍掉付费墙后此弹窗不再触发，代码保留） |
+| **多任务** | Job Cards | 每个任务独立卡片（文件名+状态），支持多任务并行。完成卡片显示下载按钮（视频/SRT）。卡内进度条+步骤文字 |
+| **右下角** | 版本号 | `id="versionTag"` 显示当前版本（V3.0） |
+| **全局** | 动画尊重系统偏好 | `prefers-reduced-motion` 媒体查询，开启后关闭动画 |
+| **全局** | 按钮/输入框最小高度 | 统一 36px，触控友好 |
+
+### 四、流水线功能索引（Worker + Orchestrator + Core）
+
+| 功能 | 实现文件 | 详细说明 |
+|------|---------|---------|
+| **配置感知去重 (V2.09)** | `main.py` | `_config_hash(cfg)` 对 9 项配置（不含 tier/local_path）算 SHA256 → `_task_key(file_hash, cfg)` = `file_hash + config_hash`。输入设置变了 → 新 task_key → 新任务；没变 → 复用 |
+| **GLOBAL_HASH_INDEX 内存索引** | `main.py` | 启动时扫描 `jobs/` 全部 `meta.json` → `{task_key: {job_id, status, config, file_hash}}`。查重 O(1)。JOB_ID_TO_HASH 反向 lookup。写入硬盘+内存双同步 |
+| **🔴 本地路径不复制视频** | `main.py:create_job` | 本地路径模式：8MB 分块流式读文件算 SHA256 → `video_path = local_path` 直接引用原文件（不复制到 jobs 目录）。50GB 视频零磁盘开销 |
+| **DELETE 保留缓存** | `main.py:cancel_job` | 取消任务只删 `input.*` 视频文件，保留 `cache/` 目录（audio.wav / transcript.json / translated.json 等）。重新提交可秒级复用 |
+| **interrupted 自动恢复** | `main.py:startup` | 启动时扫描 GLOBAL_HASH_INDEX → 找到 `status=interrupted` 的条目 → 自动重启 Worker。前端 `GET /api/jobs/{id}` 优先使用修正后的状态 |
+| **Worker 双进程护卫 (P045)** | `worker_manager.py` | `_kill_if_alive(job_id)` 在 spawn 前检查旧进程 → `psutil` 查找 + SIGKILL → 等 2s → 确认退出后才启动新进程 |
+| **LLM 降级链 + 120s 超时** | `worker.py` | LLM 全部翻译失败 → 发 `llm_failed` WebSocket 消息 → 等待 `llm_fallback.json` 决策文件（轮询 interval=2s，超时=120s）。超时或 `use_free` → 自动切 Google/Bing/有道降级链。`keep_failed` → 保留 `[翻译失败]` 标记 |
+| **内容类型感知翻译策略** | `orchestrator.py:_SUBTITLE_PROMPT` | prompt 内嵌 4 类策略指令：脱口秀/搞笑 → 保留双关+意译；新闻/正式 → 准确正式；日常对话 → 生活化口语。LLM 根据上下文摘要中识别的内容类型自动匹配翻译口吻 |
+| **全文翻译+滑动窗口+接缝审查** | `orchestrator.py` | 12 个函数完整管线：`extract_terminology()` 术语提取 → `_generate_context_summary()` 上下文摘要 → `_translate_whole_with_markers()` 滑动窗口分批（20% overlap）+ 术语表+摘要传递 → `_review_seam()` 接缝审查（前后各 50 段上下文，LLM 对比重叠区两版本选优）→ `_translate_one_chunk()` 单批翻译 |
+| **LLM 降级链（多后端容错）** | `orchestrator.py:translate_with_orchestrator` | 用户配置了 N 个 LLM → 串行尝试。任一后端翻译出 ≥1 条有效结果就停止降级。全部失败 → 发 `llm_failed` 回前端 |
+| **翻译反思 (T7)** | `reflection.py` + `worker.py` | quality 模式下可选。翻译完成后 LLM 自审修正：`build_reflection_prompt()` → LLM → `parse_reflection_result()` → `apply_reflection()` 覆盖修正 |
+| **三模型转录并行调度** | `transcriber_v2.py` | ≥16GB：Whisper/Qwen3-ASR/SenseVoice 全并行（threading）。<16GB：串行（先 Whisper → 再 SenseVoice → 需要时 Qwen3-ASR）。配置 `transcriptionTier:` fast=仅 Whisper / standard=Whisper+SenseVoice / precise=全部 |
+| **五层幻觉过滤** | `hallucination_filter.py` | L1 SenseVoice 硬过滤 → L4 正则硬过滤（关键词+结构+括号描述+重复模式+片段）→ L5 幻觉链去重 → L2 交叉验证软标记 → L3 语速异常软标记（0.0s 时长、0.3s 70 字等物理不可能的情况直接丢弃） |
+| **长音频切分（Qwen3+SenseVoice）** | `transcriber_v2.py` | Whisper segment 边界 + 5s 发音缓冲 → ffmpeg 提取片段 → 15 分钟一批 → 独立跑模型后拼接。解除 MLX 20 分钟上限 |
+| **LLM 断句与翻译分离** | `worker.py` + `sentence_splitter.py` | 翻译 prompt 不再要求 AI 拆句。翻译完成后走 `word_align_segments()` 词级对齐 + `split_zh_simple()` 规则断句。每行最多 20 中文字，超过时走 LLM 辅助拆句 |
+| **软字幕封装 (Mux)** | `worker.py` + `subtitler.py` | `mux_subtitles()` ffmpeg 封装。mp4→mov_text codec，mkv→srt codec。前端输出模式三选一 |
+| **ASS PlayRes 统一 1920×1080** | `subtitle_style.py:build_ass_styled` | PlayResX/PlayResY 固定 1920×1080，字幕大小跨分辨率一致。`video_width/video_height` 仅用于竖屏检测 |
+| **Token 用量 WebSocket 推送** | `worker.py` → `main.py:_tracking_send` | 翻译完成后 Worker 发 `{"type":"token_usage","usage":{...}}` → 主进程 WebSocket 转发前端。**前端当前不展示**，数据通路已打通 |
+| **LiteLLM 社区定价集成** | `main.py` | 启动时后台线程拉取 `model_prices_and_context_window.json`（2500+ 模型），缓存 24h。`_is_free_model()` 查社区数据 + hardcoded 兜底（GLM Flash / Gemini Flash 免费模型）。`_curate_model_ids()` 模型名后追加「（免费）」标签 |
+
+### 五、配置项完整列表（`State.settings` / `config.json`）
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `subtitles` | `"no"\|"yes"` | `"no"` | 原视频是否有字幕 |
+| `outputMode` | `"burn"\|"mux"\|"srt"` | `"burn"` | 输出方式三选一（V3.03 从 `burn: bool` 升级） |
+| `model` | `str` | `"medium"` | Whisper 模型（tiny/base/small/medium/large-v3） |
+| `translationMode` | `"speed"\|"quality"` | `"speed"` | 翻译模式 |
+| `translationPriority` | `list[str]` | `["google","bing","youdao"]` | 免费引擎优先级排序 |
+| `apiKeys` | `list[dict]` | `[]` | LLM API Key 列表 |
+| `contextAware` | `bool` | `false` | 上下文感知翻译开关 |
+| `style` | `dict` | `{font,size,color,outlineColor,outlineWidth}` | 字幕样式（5 字段） |
+| `speakerDetect` 🆕 | `bool` | `false` | 说话人检测开关（实验性，默认关闭） |
+| `transcriptionTier` 🆕 | `"fast"\|"standard"\|"precise"` | `"standard"` | 转录模式三档 |
+| `savePath` 🆕 | `str` | `"~/Downloads/Video-Subber"` | 自定义输出目录 |
+
+**向后兼容**：`outputMode` 读取时兼容旧 `burn: bool` —— `burn===true` → `outputMode="burn"`。
+
+### 六、前端 State 与后端配置哈希联动
+
+配置感知去重（`_config_hash`）比较以下 9 个字段（排除 `tier` 和 `local_path`）：`subtitles, outputMode, model, translationMode, translationPriority, apiKeys, contextAware, style, speakerDetect, transcriptionTier`。`savePath` 不参与哈希（不影响翻译结果）。
+
+**STAGE_CACHE 缓存失效**：`SETTING_STAGE` 字典映射每个设置→影响的最早阶段。配置变更时，从最早受影响阶段开始删除后续全部缓存。
+
+---
+
 ## 当前第一优先级
 
-**V3 已启动**。基于 V2.12 框架，版本号 `"3.0"`。V3 起跑线清理已完成：删除 post-commit hook、删除凭据加密系统（credential_manager）、删除百度翻译。免费引擎扩展为 Google/Bing/有道（全部逆向，无需 Key）。
+**V3.04 Phase 1D 进行中**。基于 V3.03 框架，版本号 `"3.0"`。
 
-### V3 工程审查决策（2026-06-01 plan-eng-review 锁定）
+**2026-06-04 Steve Jobs 审查决策**：V4 四项提前到 V3 Phase 1D，GPU 加速包/微调界面/RAG 保留在 V4 推迟。
+
+### V3 工程审查决策（2026-06-01 plan-eng-review 锁定，2026-06-04 更新）
 
 | 决策 | 结论 |
 |------|------|
-| Phase 1 拆分 | 拆为 1A/1B/1C 三个可独立验证的子阶段 |
+| Phase 1 拆分 | 拆为 1A/1B/1C/1D 四个可独立验证的子阶段（原 3 个，1D 新增） |
 | 通信架构 | 双进程（保留 FastAPI），未来支持原生+Web 双入口 |
-| 三模型调度 | 三档自动检测（快速/标准/精确）+ 用户可覆盖（~~云端补充已砍~~） |
+| 三模型调度 | 三档自动检测（快速/标准/精确）+ 用户可覆盖 |
 | 滑动窗口 | 方案A(前情摘要) + 方案B(接缝审查) 都做，始终启用 |
 | Tier 清理 | 彻底删除 tier/激活码/开发者模式，改为"有Key就用LLM" |
 | 断句模块 | 从 worker.py 拆出到 core/sentence_splitter.py |
 | 测试策略 | TDD（测试驱动开发） |
-| 前端框架 | PyQt5 → PySide6（LGPL，避免 GPL 协议限制） |
-| 时间预算 | Phase 1A 完成后用 3-5 个真实视频实测端到端处理时间 |
+| 前端框架 | HTML 临时壳 → PySide6（LGPL，避免 GPL 协议限制） |
+| **对齐方案（新）** | **Qwen3-ForcedAligner 替代按字数比例分时（42.9ms vs 133ms）** |
+| **幻觉过滤（新）** | **双信号交叉验证（SenseVoice + Qwen3-FA）替代单信号** |
+| **内存策略（新）** | **模型分时加载，峰值从 8.7GB → 3.5GB** |
 
-### V3 执行计划（2026-05-31 竞品分析会议确定）
+### V3 执行计划（2026-05-31 竞品分析会议确定，2026-06-04 更新）
 
-**执行原则：后端先行，前端最后换壳。** Phase 1A 集中做翻译管线（不需要新模型），Phase 1B 做多模型转录+幻觉过滤（需要新模型），Phase 1C 打磨收尾。阶段 2 用 PyQt5 重做前端，阶段 3 打包发布。
+**执行原则：后端先行，前端最后换壳。** Phase 1A 翻译管线（不需要新模型）→ Phase 1B 多模型转录+幻觉过滤（需要新模型）→ Phase 1C 打磨收尾 → **Phase 1D 对齐精度+幻觉验证升级（新模型 Qwen3-FA）** → 阶段 2 PySide6 重做前端 → 阶段 3 打包发布。
+
+Phase 1A/1B/1C **全部完成**（V3.01/V3.02/V3.03 只读快照已保存）。**当前在 Phase 1D。**
 
 ---
 
@@ -893,11 +1036,33 @@ V1.3 用 `_TeeOutput` 劫持 `sys.stdout` 实现双日志。这个方案在 Web 
 **Phase 1C 完成度：6 / 6 ✅**
 **代码审查修复：F1/F3/F4/F5 全修，159 测试全过**
 
+---
+<br>
+
+#### Phase 1D：对齐精度 + 幻觉验证升级（2026-06-04 Steve Jobs 审查决策·从 V4 提前）
+
+> **决策背景**：字幕工具最大的用户投诉是「时间戳对不齐」。Qwen3-ForcedAligner（42.9ms 平均对齐误差，竞品 WhisperX 133ms）已开源可用。双信号交叉验证（SenseVoice + Qwen3-FA）在 V3 架构设计中已规划，实现成本低。
+>
+> **Steve Jobs 决策**：「你把最重要的两个字幕质量保证功能推到 V4。This is like building a Ferrari engine and putting bicycle tires on it.」「If you ship this now, you'll be the first subtitle tool on the market with Qwen3-ForcedAligner word-level alignment. That's not a feature. That's a moat.」
+
+| 优先级 | 任务 | 详细方案 | 预计改动 |
+|--------|------|----------|----------|
+| 🔴 1 | **Qwen3-ForcedAligner 词级对齐集成** | 新增 `backend/core/qwen_aligner.py`。加载 `Qwen/Qwen3-ForcedAligner-0.6B`（979MB 4-bit），非自回归单次前向推理（RTF ~0.001）。输入音频+Whisper 转录文字→输出每个词起止时间戳。替代当前 `word_align_segments()` 的「按字数比例分时间」旧方案。11 语言支持（EN/ZH/Cantonese/DE/ES/FR/IT/PT/RU/KO/JA）。worker.py 翻译完成后调用，对齐结果传入 `build_ass_styled()` | ~150 行新文件 + worker.py ~20 行集成 |
+| 🔴 2 | **双信号幻觉过滤升级** | 修改 `hallucination_filter.py` L1：从 SenseVoice 单信号→SenseVoice + Qwen3-FA 双信号交叉确认。四路判断矩阵：非人声+无对齐→丢弃 ✓ / 非人声+有对齐→保留/SenseVoice误判 / 人声+无对齐→保留并标记 [?] / 人声+有对齐→正常通过 ✓。`filter_hallucinations()` 新增 `aligner_result` 参数 | ~60 行修改 |
+| 🟡 3 | **[?] 标记 + 阈值提示系统** | 修改 `subtitler.py`/`subtitle_style.py`：双信号不一致的段 → 句尾追加 `[?]`。前端新增阈值检测：总段数<20 不触发；[?]<5%且<50条→无提示；5-15%或≥50条→黄色提示；>15%→红色提示。worker.py 统计 [?] 比例→WS 推送前端 | ~50 行修改 + 前端 ~40 行 |
+| 🟡 4 | **模型分时加载** | 修改 `transcriber_v2.py` 和 `worker.py`：Whisper 转录完→`del model` 释放；Qwen3-ASR 交叉验证完→`del model` 释放；SenseVoice 分类完→`del model` 释放；Qwen3-FA 对齐完→`del model` 释放。峰值内存从 ~8.7GB 降到 ~3.5GB（最大单个模型）。模型文件始终在硬盘，下次处理重新加载（1-2秒） | ~30 行修改 |
+
+**Phase 1D 完成度：0 / 4** 🚧
+
+**不动的模块**：五层幻觉过滤 L2-L5 逻辑不变 / 三模型转录调度框架不变 / `transcriptionTier` 三档不变（精确档新增 Qwen3-FA 对齐）/ `_SUBTITLE_PROMPT` 不变 / FastAPI 路由不变 / 前端 7 区域布局不变
+
+**测试计划**：4 个新测试文件（`test_phase1d_aligner.py` / `test_phase1d_dual_signal.py` / `test_phase1d_question_mark.py` / `test_phase1d_memory.py`），目标 30+ 测试
+
 #### 已知限制（V3.03 留到后续版本）
 
 | 事项 | 说明 | 计划 |
 |------|------|------|
-| Qwen3-ASR MLX 长音频切分 | 自动切分逻辑已在代码中，但未在 >20min 视频上实测 | V3.04 实测 |
+| Qwen3-ASR MLX 长音频切分 | 自动切分逻辑已在代码中，但未在 >20min 视频上实测 | Phase 1D 开发中实测 |
 | whisper.cpp 引擎替换 | MioSub 用 whisper.cpp 比 faster-whisper 快 3-5 倍，但增加跨平台打包复杂度 | V4 打包阶段评估 |
 | Windows Qwen3 时间戳拆句 | PyTorch 版有时间戳，可对着真实停顿拆句（方案 B） | V4 打包阶段 |
 

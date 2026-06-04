@@ -249,7 +249,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
         _qwen_holder = {}  # 只在 join() 后读取
         if is_qwen_asr_available():
             def _run_qwen():
-                _qwen_holder["data"] = transcribe_raw(audio_path, segments_hint=results)
+                _qwen_holder["data"] = transcribe_raw(audio_path, segments_hint=results, language=detected_lang)
             qwen_thread = threading.Thread(target=_run_qwen, daemon=True)
             qwen_thread.start()
 
@@ -296,7 +296,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
         _log.info("Qwen3-ASR 交叉验证开始 (tier=%s)", transcription_tier)
         from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
         if is_qwen_asr_available():
-            results = run_qwen_asr(audio_path, results)
+            results = run_qwen_asr(audio_path, results, language=detected_lang)
         else:
             _log.warning("Qwen3-ASR 不可用，跳过交叉验证")
 
@@ -318,9 +318,37 @@ def transcribe(audio_path: str, model_size: str = "medium",
         total = sum(1 for s in results if s.qwen_text is not None)
         _log.info("Qwen3-ASR 交叉验证完成（并行）: %d/%d", total, len(results))
 
+    # ── Step 3.5: Qwen3-FA precise alignment (Phase 1D) ──
+    aligner_result = None
+    if filter_keywords and transcription_tier == "precise":
+        from backend.core.qwen_aligner import (
+            QwenAligner, is_qwen_aligner_available, apply_aligner_timestamps,
+        )
+        if is_qwen_aligner_available():
+            aligner = None
+            try:
+                _log.info("Qwen3-ForcedAligner 词级对齐开始")
+                aligner = QwenAligner()
+                if aligner._model is not None:
+                    full_text = " ".join([(seg.text or "") for seg in results])
+                    aligner_result = aligner.align(
+                        audio_path, full_text, language=detected_lang,
+                    )
+                    if aligner_result:
+                        results = apply_aligner_timestamps(results, aligner_result)
+                        _log.info("Qwen3-FA 对齐完成: %d 词", len(aligner_result))
+                else:
+                    _log.warning("Qwen3-FA 模型未加载，跳过对齐")
+            except Exception as e:
+                _log.warning("Qwen3-FA 对齐失败，保留原始时间戳: %s", e)
+            finally:
+                if aligner is not None and aligner._model is not None:
+                    aligner.close()
+
     # ── Step 4: Five-layer hallucination filter ──
     if filter_keywords:
-        results = filter_hallucinations(results, detected_lang)
+        results = filter_hallucinations(results, detected_lang,
+                                        aligner_result=aligner_result)
 
     if not results:
         _log.error("未检测到任何语音内容")

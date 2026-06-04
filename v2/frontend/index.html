@@ -183,6 +183,11 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .failed-detail summary{cursor:pointer;color:var(--red)}
 
 /* ── Error ── */
+.qm-warn{display:none;padding:8px 14px;border-radius:8px;font-size:13px;margin-top:10px}
+.qm-warn.active{display:block}
+.qm-warn.yellow{background:rgba(255,204,0,.12);color:#b38600;border:1px solid rgba(255,204,0,.3)}
+.qm-warn.red{background:rgba(255,59,48,.10);color:#c00;border:1px solid rgba(255,59,48,.3)}
+
 .error-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;justify-content:center;align-items:center}
 .error-overlay.active{display:flex}
 .error-box{background:var(--card);border-radius:12px;padding:24px;max-width:400px;text-align:center}
@@ -398,6 +403,8 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 <div id="jobCards"></div>
 <button class="btn-primary" id="startBtn" disabled>选择视频文件开始</button>
 
+<div class="qm-warn" id="qmWarn"></div>
+
 <div class="progress-section" id="progressSection" style="display:none">
   <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   <div class="progress-step" id="progressStep">准备中…</div>
@@ -501,6 +508,7 @@ function renderEnv(d){
       if(muxOpt)muxOpt.disabled=false;
     }
   }
+}
 reloadEnv();
 
 // ============ Backends ============
@@ -1190,7 +1198,7 @@ function connectCard(jid){
       if(step){step.textContent='处理异常中断，请取消后重试';step.style.color='var(--red)'}
       job.pollTimer=setTimeout(poll,5000)}
     else if(j.status==='running'||j.status==='queued'){if(fill){fill.style.width=j.progress+'%';fill.style.background='';fill.classList.add('working')}if(step){step.textContent=j.message||j.stage||'处理中…';step.style.color=''}if(j.stage==='transcribe'&&j.progress>=10&&j.progress<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}job.pollTimer=setTimeout(poll,2000)}
-    else if(j.status==='done'){handleCardMsg(jid,{type:'done',result_video:j.result_video,result_srt:j.result_srt,failed_segments:j.failed_segments,segment_count:j.segment_count,success_count:j.success_count})}
+    else if(j.status==='done'){handleCardMsg(jid,{type:'done',result_video:j.result_video,result_srt:j.result_srt,failed_segments:j.failed_segments,segment_count:j.segment_count,success_count:j.success_count,question_mark_count:j.question_mark_count})}
     else if(j.status==='error'){handleCardMsg(jid,{type:'error',message:j.error})}
     else if(j.status==='cancelled'){removeCard(jid)}
     else{job.pollTimer=setTimeout(poll,2000)}
@@ -1200,7 +1208,7 @@ function connectCard(jid){
 function handleCardMsg(jid,msg){
   const card=$('card-'+jid);if(!card)return;const fill=$('fill-'+jid);const step=$('step-'+jid);
   if(msg.type==='progress'){if(fill){fill.style.width=msg.percent+'%';fill.style.background=''}if(step){step.textContent=msg.message+(msg.detail?' ('+msg.detail+')':'');step.style.color=''}if(msg.stage==='transcribe'&&msg.percent>=10&&msg.percent<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}}
-  else if(msg.type==='done'){renderCardDone(jid,msg);const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone();refreshStartBtn()}
+  else if(msg.type==='done'){renderCardDone(jid,msg);showQmWarning(msg);const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone();refreshStartBtn()}
   else if(msg.type==='error'){if(step)step.textContent='出错';const err=$('err-'+jid);if(err){err.textContent=msg.message;err.classList.add('show')}card.classList.add('job-card-done');const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone()}
   else if(msg.type==='llm_failed'){
     if(step)step.textContent='等待选择…';step.style.color='var(--yellow)';
@@ -1234,6 +1242,15 @@ function saveActiveJobs(){localStorage.setItem('activeJobs',JSON.stringify(Objec
 function removeActiveJobId(jid){const ids=Object.keys(activeJobs).filter(id=>id!==jid);localStorage.setItem('activeJobs',JSON.stringify(ids))}
 function showError(msg){$('errorText').textContent=msg;$('errorOverlay').classList.add('active');sbtn.disabled=false;sbtn.textContent='重试'}
 function closeError(){$('errorOverlay').classList.remove('active')}
+function showQmWarning(msg){
+  const qm=msg.question_mark_count||0;const total=msg.segment_count||0;
+  const w=$('qmWarn');
+  if(total<20||qm===0){w.classList.remove('active','yellow','red');return}
+  const r=qm/total;
+  if(r>0.15){w.textContent='⚠ 音频质量较差（'+Math.round(r*100)+'% 字幕存疑），建议手动校对后使用';w.className='qm-warn red active'}
+  else if(r>=0.05||qm>=50){w.textContent='⚠ 部分字幕可能不准确（'+Math.round(r*100)+'%），可查看 [?] 标记';w.className='qm-warn yellow active'}
+  else{w.classList.remove('active','yellow','red')}
+}
 
 // ============ Init ============
 document.addEventListener('DOMContentLoaded',async()=>{

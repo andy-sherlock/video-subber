@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Video Subber V2</title>
+<style>
+/* ════════════════════════════════════════════════════
+   Video Subber V2 — Steve Jobs 重设计版
+   ════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--sub:#86868b;
+  --blue:#0071e3;--red:#ff3b30;--green:#34c759;--yellow:#ff9500;
+  --border:#c7c7cc;--surface:#f0f0f0;
+  transition:background-color .3s,color .3s;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1e;--card:#2c2c2e;--text:#f5f5f7;--sub:#98989d;
+    --border:#636366;--surface:#3a3a3c;
+  }
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;
+}
+.app{width:100%;max-width:680px;margin:0 auto;padding:32px 20px 60px}
+*,*::before,*::after{transition:background-color .3s,border-color .3s}
+
+/* ── Header ── */
+.app-header{text-align:center;margin-bottom:28px}
+.app-header h1{font-size:28px;font-weight:700;margin-bottom:4px}
+.app-header p{font-size:15px;color:var(--sub);font-weight:400}
+
+/* ── Env Bar ── */
+.env-bar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;justify-content:center}
+.env-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);background:var(--card);border-radius:20px;padding:6px 14px;position:relative}
+.env-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.env-dot.ok{background:var(--green)}.env-dot.warn{background:var(--yellow)}.env-dot.err{background:var(--red)}
+.env-guide-btn{font-size:11px;background:none;border:none;color:var(--blue);cursor:pointer;padding:0}
+.env-guide{display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px;line-height:1.7;z-index:10;min-width:260px;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.env-guide.open{display:block}
+.env-guide code{background:var(--bg);padding:2px 5px;border-radius:3px}
+
+/* ── Card ── */
+.card{background:var(--card);border-radius:12px;padding:18px 22px;margin-bottom:10px}
+.card-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px}
+
+/* ── Dropzone ── */
+.dropzone{border:2px dashed var(--border);border-radius:16px;padding:44px 20px;text-align:center;cursor:pointer;transition:all .2s}
+.dropzone:hover,.dropzone.active{border-color:var(--blue);background:rgba(0,113,227,.04)}
+.dropzone .dz-icon svg{width:36px;height:36px;margin-bottom:8px;color:var(--sub)}
+.dropzone .dz-title{font-size:16px;font-weight:600}
+.dropzone .dz-hint{font-size:12px;color:var(--sub);margin-top:4px}
+.dropzone .dz-file{font-size:13px;color:var(--blue);font-weight:500;margin-top:6px;display:none}
+.local-path-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--sub)}
+.local-path-row input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;background:var(--card);color:var(--text)}
+.local-path-row input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,.12)}
+.local-path-guide{font-size:11px;color:var(--sub);margin-top:6px;cursor:pointer;user-select:none}
+.local-path-guide .expand{display:none;margin-top:4px;line-height:1.8;padding:8px 12px;background:var(--surface);border-radius:6px}
+.local-path-guide.open .expand{display:block}
+
+/* ── Row / Toggle ── */
+.row{display:flex;align-items:center;gap:10px;padding:3px 0;flex-wrap:wrap}
+.toggle{display:flex}
+.toggle button{border:1px solid var(--border);background:var(--card);padding:5px 14px;font-size:12px;cursor:pointer;color:var(--text);transition:all .15s}
+.toggle button:first-child{border-radius:6px 0 0 6px}
+.toggle button:last-child{border-radius:0 6px 6px 0}
+.toggle button.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+select,input[type=text],input[type=password]{min-height:36px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--card);color:var(--text);transition:border-color .15s}
+.toggle button{min-height:36px;padding:8px 14px}
+select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,.12)}
+.burn-warn{font-size:11px;color:var(--red);margin-top:6px;padding:6px 10px;background:rgba(255,59,48,.06);border-radius:6px}
+
+/* ── Model Slider ── */
+.model-section{position:relative;padding:10px 0}
+.model-dots{display:flex;justify-content:space-between;padding:0 6px;margin-bottom:34px;position:relative}
+.model-dots::before{content:'';position:absolute;top:10px;left:8px;right:8px;height:2px;background:var(--border);border-radius:1px;z-index:0}
+.model-dot-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;z-index:1;cursor:pointer}
+.model-dot-circle{width:20px;height:20px;border-radius:50%;background:var(--card);border:2px solid var(--border);transition:all .2s}
+.model-dot-circle.active{background:var(--blue);border-color:var(--blue);box-shadow:0 2px 12px rgba(0,113,227,.35);transform:scale(1.15)}
+.model-dot-circle.missing{border-color:#ff453a;background:transparent}
+.model-dot-circle.downloading{border-color:var(--blue);animation:dotPulse .8s ease-in-out infinite}
+.model-dot-circle.downloaded{background:#30d158;border-color:#30d158}
+@keyframes dotPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.model-dot-label{font-size:11px;color:var(--sub);text-align:center;white-space:nowrap}
+.model-dot-wrap.active .model-dot-label{color:var(--text);font-weight:600}
+.model-dot-wrap.missing .model-dot-label{color:#ff453a}
+.model-dot-hint{font-size:11px;color:var(--sub);margin-bottom:10px;display:none}
+.model-dot-hint.visible{display:block}
+.model-progress-area{margin-top:12px}
+.model-progress-row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;animation:slideDown .2s ease-out}
+.model-progress-name{min-width:50px;color:var(--sub)}
+.model-progress-bar-wrap{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.model-progress-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .3s}
+.model-progress-pct{min-width:34px;text-align:right;color:var(--sub)}
+.model-progress-cancel{width:16px;height:16px;border:none;background:none;color:var(--sub);font-size:12px;cursor:pointer;padding:0;line-height:1;border-radius:50%}
+.model-progress-cancel:hover{color:#ff453a}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.model-arrow-bar{display:flex;align-items:center;margin:0 6px}
+.model-arrow-line{flex:1;height:2px;background:var(--border)}
+.model-arrow-left,.model-arrow-right{width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent}
+.model-arrow-left{border-right:7px solid var(--sub)}
+.model-arrow-right{border-left:7px solid var(--sub)}
+.model-arrow-labels{display:flex;justify-content:space-between;margin:3px 4px 0;font-size:11px;color:var(--sub)}
+.model-current{text-align:center;font-size:13px;font-weight:600;margin-top:10px}
+
+/* ── Priority ── */
+.priority-list{margin-top:8px;display:none}
+.priority-list.show{display:block}
+.priority-item{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--surface);border-radius:8px;margin-bottom:4px;cursor:grab;font-size:13px}
+.priority-item:active{cursor:grabbing}
+.priority-rank{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;text-align:center;line-height:20px;flex-shrink:0;font-weight:600}
+.drag-handle{color:var(--sub);font-size:16px;flex-shrink:0;cursor:grab;line-height:1}
+
+/* ── [?] info ── */
+.info-note{font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6}
+
+/* ── API Keys ── */
+.api-tip{font-size:12px;color:var(--sub);margin-bottom:10px}
+.api-row{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.api-line{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.api-row select,.api-row input{font-size:12px;padding:6px 10px}
+.api-row input{flex:1;min-width:80px}
+.api-row .api-name-input{max-width:100px}
+.api-key-list{list-style:none;font-size:12px}
+.api-key-list li{display:flex;align-items:center;gap:8px;padding:4px 0}
+.api-key-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;opacity:.6;transition:opacity .15s}
+.api-key-del:hover{opacity:1}
+.api-key-card{display:flex;align-items:center;gap:8px;padding:8px 12px;margin:4px 0;background:var(--surface);border-radius:8px;cursor:pointer;transition:all .15s;list-style:none}
+.api-key-card:hover{background:color-mix(in srgb,var(--blue) 15%,var(--surface))}
+.api-key-card.editing{border:1px solid var(--blue);background:color-mix(in srgb,var(--blue) 10%,var(--surface));cursor:default}
+.api-key-card .card-name{flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.api-cancel-btn{display:none;width:auto;margin:0;padding:6px 16px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;transition:all .15s}
+.api-cancel-btn:hover{background:var(--border)}
+.api-key-wrap{position:relative;flex:1;display:flex}
+.api-key-wrap input{padding-right:36px!important;width:100%}
+.key-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--sub);line-height:1;display:flex;align-items:center}
+.key-eye:hover{color:var(--text)}
+.api-custom-model{display:none;font-size:12px;padding:6px 10px;border:1px solid var(--blue);border-radius:6px;background:var(--card);color:var(--text);flex:1;min-width:120px}
+.api-custom-model.visible{display:inline-block}
+.model-hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.5}
+
+/* ── Collapsible ── */
+.collapse-toggle{font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text);width:100%;padding:0}
+.collapse-toggle .chevron{transition:transform .2s;display:inline-block;font-size:10px}
+.collapse-toggle.open .chevron{transform:rotate(90deg)}
+.collapse-body{display:none;margin-top:12px}
+.collapse-body.open{display:block}
+
+/* ── Style Preview ── */
+.style-preview-box{background:#1a1a1a;color:#fff;padding:16px 20px;border-radius:8px;text-align:center;line-height:1.8;margin-top:10px;font-size:18px}
+.style-actions{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
+.style-confirm-btn{min-height:36px;padding:8px 18px;border:1px solid var(--blue);border-radius:6px;background:var(--card);color:var(--blue);font-size:12px;cursor:pointer;transition:all .15s}
+.style-confirm-btn:hover{background:var(--blue);color:#fff}
+.style-confirmed-indicator{font-size:11px;color:var(--green);text-align:center;margin-top:4px;display:none}
+
+/* ── Buttons ── */
+.btn-primary{margin-top:16px;width:100%;padding:13px;border:none;border-radius:10px;background:var(--blue);color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed}
+.btn-primary:not(:disabled):active{transform:scale(.98)}
+
+/* ── Progress ── */
+.progress-section{display:none;background:var(--card);border-radius:12px;padding:16px 20px;margin-top:12px}
+.progress-section.active{display:block}
+.progress-bar{height:5px;background:var(--surface);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;width:0;background:var(--blue);border-radius:3px;transition:width .3s}
+.progress-fill.working{animation:pulse 2s ease-in-out infinite}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes flash{0%,100%{background:var(--card)}50%{background:var(--blue);box-shadow:0 0 12px rgba(0,113,227,.4)}}
+.job-card.flash-highlight{animation:flash .6s ease-in-out 2}
+.progress-step{font-size:13px;color:var(--sub);margin-top:6px}
+
+/* ── Results ── */
+.result-section{display:none;gap:10px;margin-top:12px}
+.result-section.active{display:flex}
+.result-section a{flex:1;text-align:center;padding:12px;border-radius:8px;background:var(--card);border:1px solid var(--border);text-decoration:none;font-size:13px;font-weight:500;color:var(--text)}
+.result-section a:hover{border-color:var(--blue)}
+.failed-detail{margin-top:8px;font-size:12px;color:var(--sub)}
+.failed-detail summary{cursor:pointer;color:var(--red)}
+
+/* ── Error ── */
+.error-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;justify-content:center;align-items:center}
+.error-overlay.active{display:flex}
+.error-box{background:var(--card);border-radius:12px;padding:24px;max-width:400px;text-align:center}
+.error-box p{margin-bottom:12px;font-size:14px;color:var(--red)}
+.error-box button{padding:8px 24px;border:none;border-radius:6px;background:var(--blue);color:#fff;cursor:pointer}
+
+.dev-login-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center}
+.dev-login-overlay.active{display:flex}
+.dev-login-box{background:var(--card);border-radius:12px;padding:24px;max-width:360px;width:90%}
+.hidden{display:none!important}
+
+/* ── Locked controls ── */
+.disabled-ctl{pointer-events:none;opacity:.45}
+.disabled-ctl input,.disabled-ctl select,.disabled-ctl button{cursor:not-allowed}
+.locked-dz{pointer-events:none;opacity:.45}
+
+/* ── Job Cards ── */
+#jobCards{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.job-card{background:var(--card);border-radius:12px;padding:14px 18px}
+.job-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.job-card-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85%}
+.job-card-close{background:none;border:none;color:var(--sub);cursor:pointer;font-size:18px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.job-card-close:hover{color:var(--red);background:rgba(255,59,48,.08)}
+.job-card .progress-bar{height:4px;background:var(--surface);border-radius:2px;overflow:hidden;margin:6px 0}
+.job-card .progress-fill{height:100%;width:0;background:var(--blue);border-radius:2px;transition:width .3s}
+.job-card .progress-fill.working{animation:pulse 2s ease-in-out infinite}
+.job-card-step{font-size:11px;color:var(--sub)}
+.job-card-result{display:none;gap:8px;margin-top:8px}
+.job-card-result.show{display:flex}
+.job-card-result a{font-size:11px;color:var(--blue);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:5px}
+.job-card-result a:hover{border-color:var(--blue)}
+.job-card-error{display:none;font-size:11px;color:var(--red);margin-top:4px}
+.job-card-error.show{display:block}
+.job-card-done .job-card-close{display:none}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ═══════════════ Header ═══════════════ -->
+<header class="app-header">
+  <h1>Video Subber</h1>
+  <p>拖进去，等一会，就能看懂 <span style="font-size:10px;color:var(--sub);opacity:.5" id="versionTag"></span></p>
+</header>
+
+<!-- Environment Bar -->
+<div class="env-bar" id="envBar"></div>
+
+<!-- ═══════════════ Region 1: Upload ═══════════════ -->
+<div class="card">
+  <div class="dropzone" id="dz">
+    <div class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/></svg></div>
+    <div class="dz-title">拖视频到这里，或点击选择</div>
+    <div class="dz-hint">MP4 · TS · MKV · AVI · MOV · WMV · FLV · WebM · 建议不超过 5GB</div>
+    <div class="dz-file" id="dzFile"></div>
+  </div>
+  <input type="file" id="fileInput" accept="video/*,.ts,.TS,.mkv,.MKV,.avi,.AVI,.mov,.MOV,.wmv,.WMV,.flv,.FLV,.webm,.WEBM" class="hidden">
+
+  <div class="local-path-row">
+    <span style="flex-shrink:0;opacity:.7">或输入本地路径</span>
+    <input type="text" id="localPathInput" placeholder="/Users/andy/Movies/video.mp4 或 D:\Movies\video.mp4">
+  </div>
+  <div class="local-path-guide" id="localPathGuide" onclick="this.classList.toggle('open')">
+    💡 适用于 5GB 以上的大文件 — 无需上传，直接读取本地文件 · 如何获取路径？ ▸
+    <div class="expand">
+      <strong>Mac：</strong>选中文件 → <kbd>Cmd</kbd> + <kbd>Opt</kbd> + <kbd>C</kbd> → 在此处粘贴<br>
+      <strong>Windows：</strong><kbd>Shift</kbd> + 右键文件 →「复制为路径」→ 在此处粘贴
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ Region 2a: Subtitle Settings ═══════════════ -->
+<div class="card">
+  <div class="card-label">字幕与输出</div>
+  <div class="row">
+    <span style="font-size:13px;min-width:80px">原视频字幕</span>
+    <div class="toggle" id="subToggle">
+      <button class="active" data-v="no">无字幕</button>
+      <button data-v="yes">有字幕</button>
+    </div>
+    <span style="font-size:11px;color:var(--sub);margin-left:4px">有字幕时新字幕显示在顶部，避免遮挡</span>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <span style="font-size:13px;min-width:80px">输出方式</span>
+    <select id="burnSelect">
+      <option value="true">烧录字幕到视频</option>
+      <option value="false">仅生成 SRT 文件</option>
+    </select>
+  </div>
+  <div class="burn-warn" id="burnWarn">⚠ 烧录后字幕将永久固定在视频画面上，无法更改或去除。</div>
+  <div class="row" style="font-size:12px;color:var(--sub);margin-top:4px">
+    <span style="min-width:80px">保存位置</span>
+    <span id="savePathDisplay">~/Downloads/Video-Subber</span>
+    <button id="savePathBtn" style="font-size:11px;background:none;border:none;color:var(--blue);cursor:pointer;padding:0">更改</button>
+  </div>
+</div>
+
+<!-- ═══════════════ Region 2b: Subtitle Style ═══════════════ -->
+<div class="card" id="styleSubSection">
+  <div class="card-label">字幕样式</div>
+  <div class="row">
+    <select id="styleFont"><option>PingFang SC</option><option>Noto Sans CJK SC</option><option>Heiti SC</option><option>Songti SC</option><option>Kaiti SC</option></select>
+    <select id="styleSize"><option value="16">16px</option><option value="20" selected>20px</option><option value="24">24px</option><option value="28">28px</option></select>
+    <select id="styleColor"><option value="white" selected>白色</option><option value="yellow">黄色</option><option value="green">绿色</option><option value="cyan">青色</option></select>
+    <select id="styleOutline"><option value="black" selected>黑色描边</option><option value="white">白色描边</option><option value="none">无描边</option></select>
+    <select id="styleOutlineWidth"><option value="1">描边 1px</option><option value="2" selected>描边 2px</option><option value="3">描边 3px</option><option value="4">描边 4px</option></select>
+  </div>
+  <div class="style-preview-box" id="stylePreview">这是一段示例字幕<br>変身！必殺技全開！</div>
+  <div class="style-actions">
+    <button class="style-confirm-btn" id="styleConfirmBtn">确认样式</button>
+  </div>
+  <div class="style-confirmed-indicator" id="styleConfirmed" style="display:none">✓ 样式已确认</div>
+</div>
+
+<!-- ═══════════════ Region 3: Model Selection ═══════════════ -->
+<div class="card">
+  <div class="card-label">Whisper 模型</div>
+  <div class="model-section" id="modelSection">
+    <div class="model-dot-hint" id="modelHintText">点击圆点即可下载对应模型。medium 约 1.5GB，推荐大多数人使用。</div>
+    <div class="model-dots" id="modelDots"></div>
+    <div class="model-progress-area" id="modelProgressArea"></div>
+    <div class="model-arrow-labels" style="margin-bottom:2px"><span>← 快</span><span>慢 →</span></div>
+    <div class="model-arrow-bar">
+      <div class="model-arrow-left"></div><div class="model-arrow-line"></div><div class="model-arrow-right"></div>
+    </div>
+    <div class="model-arrow-labels" style="margin-top:2px"><span>← 低准确度</span><span>高准确度 →</span></div>
+    <div class="model-current" id="modelCurrent"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ Region 3b: Transcription Tier ═══════════════ -->
+<div class="card">
+  <div class="card-label">转录模式</div>
+  <div class="row" style="margin-bottom:4px">
+    <div class="toggle" id="tierToggle">
+      <button data-v="fast">快速</button>
+      <button class="active" data-v="standard">标准（推荐）</button>
+      <button data-v="precise">精确</button>
+    </div>
+  </div>
+  <div class="info-note" id="tierNote">快速：仅语音识别 · 标准：语音识别 + 声音分类过滤 · 精确：三模型交叉验证，内存占用最大</div>
+</div>
+
+<!-- ═══════════════ Region 4: Translation Mode ═══════════════ -->
+<div class="card" id="transSection">
+  <div class="card-label" id="transModeTitle">翻译模式</div>
+  <div class="row" id="modeRow">
+    <div class="toggle" id="modeToggle">
+      <button class="active" data-v="speed">极速模式</button>
+      <button data-v="quality">质量优先</button>
+    </div>
+  </div>
+  <div class="priority-list" id="priorityList"></div>
+  <div class="info-note">ℹ 字幕中 <b>- </b> 前缀表示系统检测到说话人切换。句尾 <b>[?]</b> 标记表示翻译准确性存疑：画面中确实有人说话 → 字幕大概率正确；若无人说话 → 可能误判。</div>
+</div>
+
+<!-- ═══════════════ Region 5: API Key Management ═══════════════ -->
+<div class="card">
+  <div class="card-label">LLM 智能翻译</div>
+  <div class="api-tip" id="apiTip">暂未配置 LLM API Key</div>
+  <div class="api-row" id="apiRow">
+    <div class="api-line">
+      <div class="api-key-wrap">
+        <input type="password" id="apiKeyInput" placeholder="① 先粘贴 API Key（填好自动识别可用模型）">
+        <button type="button" id="apiKeyEye" class="key-eye" onclick="toggleKeyVisibility()" title="显示/隐藏">
+          <svg id="eyeOffIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          <svg id="eyeOnIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="api-line">
+      <select id="apiPlatform"></select>
+      <select id="apiModel" style="display:none"></select>
+      <input type="text" id="apiCustomModel" class="api-custom-model" placeholder="输入模型名…">
+      <input type="text" id="apiModelName" placeholder="模型名（如 moonshot-v1-8k）" style="display:none;flex:1">
+      <input type="text" id="apiEndpoint" placeholder="平台地址（如 https://apihub.agnes-ai.com/v1）" style="display:none;flex:1.5">
+      <input type="text" class="api-name-input" id="apiName" placeholder="命名">
+      <button class="btn-primary" id="apiAddBtn" style="width:auto;margin:0;padding:6px 16px;font-size:12px">添加</button>
+      <button class="api-cancel-btn" id="apiCancelBtn">取消</button>
+    </div>
+  </div>
+  <div class="model-hint" id="modelHint" style="display:none"></div>
+  <ul class="api-key-list" id="apiKeyList"></ul>
+</div>
+
+<!-- ═══════════════ Region 6: Advanced Settings ═══════════════ -->
+<div class="card" id="advCard">
+  <button class="collapse-toggle" id="advToggle"><span class="chevron">▶</span> 高级设置</button>
+  <div class="collapse-body" id="advBody">
+    <div class="row">
+      <span style="font-size:13px;min-width:70px">翻译方式</span>
+      <div class="toggle" id="ctxToggle">
+        <button class="active" data-v="false">逐段翻译</button>
+        <button data-v="true">上下文感知</button>
+      </div>
+    </div>
+    <div class="info-note">上下文感知：LLM 先阅读完整字幕理解语境（主题、人物、术语），再逐段翻译。更准确，但耗时更长。</div>
+    <div class="row" style="margin-top:12px">
+      <span style="font-size:13px;min-width:70px">说话人检测</span>
+      <div class="toggle" id="speakerToggle">
+        <button class="active" data-v="false">关闭</button>
+        <button data-v="true">开启 🧪</button>
+      </div>
+    </div>
+    <div class="info-note">🧪 实验性功能。检测到可能的说话人切换时字幕加 <b>- </b> 横杠前缀。单人演讲、脱口秀等内容建议关闭。</div>
+  </div>
+</div>
+
+<div id="jobCards"></div>
+<button class="btn-primary" id="startBtn" disabled>选择视频文件开始</button>
+
+<div class="progress-section" id="progressSection" style="display:none">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-step" id="progressStep">准备中…</div>
+</div>
+<div class="result-section" id="resultSection" style="display:none">
+  <a href="#" id="dlVideo">下载字幕视频</a>
+  <a href="#" id="dlSrt">下载 SRT 字幕</a>
+</div>
+<div class="failed-detail" id="failedDetail" style="display:none"></div>
+
+<div class="error-overlay" id="errorOverlay">
+  <div class="error-box"><p id="errorText"></p><button onclick="closeError()">知道了</button></div>
+</div>
+
+<!-- LLM Fallback Modal -->
+<div class="dev-login-overlay" id="llmFallbackOverlay">
+  <div class="dev-login-box">
+    <h3 style="margin:0 0 8px">LLM 翻译失败</h3>
+    <p style="font-size:13px;color:var(--sub);margin:0 0 16px" id="llmFallbackMsg">翻译全部失败，是否改用 Google/Bing/有道免费翻译继续？</p>
+    <div style="display:flex;gap:8px">
+      <button onclick="llmFallbackDecide('use_free')" style="flex:1;padding:8px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">降级为免费翻译</button>
+      <button onclick="llmFallbackDecide('keep_failed')" style="flex:1;padding:8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:14px;cursor:pointer">保留失败结果</button>
+    </div>
+  </div>
+</div>
+
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+
+// ============ State ============
+const State={
+  videoFile:null,
+  localPath:null,
+  doneJobConfig:null,
+  availableBackends:{free:[],llm:[]},
+  settings:{
+    subtitles:"no",burn:true,model:"medium",
+    translationMode:"speed",translationPriority:["google","bing","youdao"],
+    contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
+    speakerDetect:false,
+    transcriptionTier:"standard",
+    style:{font:"PingFang SC",size:20,color:"white",outlineColor:"black",bgColor:"transparent"}
+  }
+};
+const MODELS=["tiny","base","small","medium","large-v3"];
+const MODEL_INFO={"tiny":"tiny（最快，~150MB）","base":"base（快，~300MB）","small":"small（均衡，~900MB）","medium":"medium（推荐，~1.5GB）","large-v3":"large-v3（最准，~3GB）"};
+const DEFAULT_LABELS={google:"Google",bing:"Bing",youdao:"有道"};
+
+function getSimulateParam(){ return ''; }
+
+// ============ Env Bar ============
+function reloadEnv(){
+  const url='/api/env'+getSimulateParam();
+  fetch(url,{cache:'no-store'}).then(r=>r.json()).then(renderEnv).catch(()=>{});
+}
+function renderEnv(d){
+  const ff=d.ffmpeg;const wh=d.whisper;
+  let ffDot='ok',ffTxt='视频处理已就绪',ffGuide='';
+  if(!ff.installed){ffDot='err';ffTxt='视频处理（FFmpeg）未安装';ffGuide='<br><span class="env-guide-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')" style="margin-top:2px">如何安装 ▸</span><div class="env-guide"><strong>macOS</strong><br>终端运行：<br><code>brew install ffmpeg-full</code><br><br><strong>Windows</strong><br>访问 ffmpeg.org 下载 full build</div>'}
+  let laDot='ok',laTxt='烧录模块已就绪',laGuide='';
+  if(!ff.installed){laDot='err';laTxt='烧录模块不可用（需先安装 FFmpeg）'}
+  else if(!ff.has_libass){laDot='warn';laTxt='烧录模块（libass）未安装';laGuide='<br><span class="env-guide-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')" style="margin-top:2px">如何修复 ▸</span><div class="env-guide">当前 FFmpeg 为基础版。<b>可生成字幕，无法烧录到视频画面</b>。<br><br>终端运行：<br><code>brew install ffmpeg-full</code></div>'}
+  let whDot='ok',whTxt='语音识别已就绪',whGuide='';
+  if(!wh.installed){whDot='err';whTxt='语音识别模型未下载';whGuide='<br><span class="env-guide-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')" style="margin-top:2px">如何下载 ▸</span><div class="env-guide">选择模型后点击开始，系统会自动下载（约 150MB~3GB，仅首次）。</div>'}
+  const sv=d.sensevoice||{};
+  let svDot='ok',svTxt='声音分类已就绪';
+  if(!sv.ready){svDot='err';svTxt='声音分类模块未安装'}
+  const qa=d.qwen_asr||{};
+  let qaDot='ok',qaTxt='交叉验证已就绪';
+  if(!qa.ready){qaDot='err';qaTxt='交叉验证模块未安装'}
+  const rz=d.resemblyzer||{};
+  let rzDot='ok',rzTxt='说话人检测已就绪';
+  if(!rz.ready){rzDot='warn';rzTxt='说话人检测模块未安装（可选·首次启动自动下载）'}
+  $('envBar').innerHTML=
+    `<div class="env-item"><span class="env-dot ${ffDot}"></span><div><span>${ffTxt}</span>${ffGuide}</div></div>`+
+    `<div class="env-item"><span class="env-dot ${laDot}"></span><div><span>${laTxt}</span>${laGuide}</div></div>`+
+    `<div class="env-item"><span class="env-dot ${whDot}"></span><div><span>${whTxt}</span>${whGuide}</div></div>`+
+    `<div class="env-item"><span class="env-dot ${svDot}"></span><div><span>${svTxt}</span></div></div>`+
+    `<div class="env-item"><span class="env-dot ${qaDot}"></span><div><span>${qaTxt}</span></div></div>`+
+    `<div class="env-item"><span class="env-dot ${rzDot}"></span><div><span>${rzTxt}</span></div></div>`;
+  // Fix #9: disable burn when libass missing
+  window._hasLibass=ff.installed&&ff.has_libass;
+  if(!window._hasLibass){
+    const bs=document.getElementById('burnSelect');
+    if(bs&&bs.value==='true'){bs.value='false';bs.dispatchEvent(new Event('change'))}
+    if(bs)bs.disabled=true;
+  }else{
+    const bs=document.getElementById('burnSelect');if(bs)bs.disabled=false;
+  }
+}
+reloadEnv();
+
+// ============ Backends ============
+function updateBackendLists(data){
+  State.availableBackends=data;
+  const newPriority=data.free.map(b=>b.id);
+  const existing=new Set(State.settings.translationPriority);
+  const merged=newPriority.filter(b=>existing.has(b));
+  newPriority.forEach(b=>{if(!existing.has(b))merged.push(b)});
+  State.settings.translationPriority=merged.length?merged:newPriority;
+  buildPriorityList();
+  const sel=$('apiPlatform');sel.innerHTML='';
+  State._llmModels={};
+  data.llm.forEach(b=>{
+    const o=document.createElement('option');o.value=b.id;o.textContent=b.name;
+    sel.appendChild(o);
+    if(b.models)State._llmModels[b.id]=b.models;
+  });
+  onPlatformChange();
+  // LLM section always visible — user adds own API keys
+  $('apiTip').textContent=`可用 LLM 平台: ${data.llm.map(b=>b.name).join(' / ')}。添加 API Key 即可启用智能翻译。`;
+  $('apiRow').style.display='flex';$('modeRow').style.display='flex';
+  $('advCard').style.display='block';
+  $('transModeTitle').textContent='翻译模式';
+  syncContextAwareBtn();
+}
+
+function syncContextAwareBtn(){
+  const hasKeys=State.settings.apiKeys&&State.settings.apiKeys.length>0;
+  const ctxBtns=document.querySelectorAll('#ctxToggle button');
+  ctxBtns.forEach(b=>{if(b.dataset.v==='true'){b.disabled=!hasKeys;b.style.opacity=hasKeys?'1':'0.35'}});
+  if(!hasKeys&&State.settings.contextAware){State.settings.contextAware=false;ctxBtns.forEach(b=>b.classList.toggle('active',b.dataset.v==='false'))}
+}
+
+// ============ Upload ============
+const dz=$('dz'),fi=$('fileInput'),df=$('dzFile'),sbtn=$('startBtn'),lpi=$('localPathInput');
+dz.addEventListener('click',()=>{fi.value='';fi.click()});
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('active')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('active'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('active');const f=e.dataTransfer.files[0];if(f)selectFile(f)});
+fi.addEventListener('change',()=>{const f=fi.files[0];if(f)selectFile(f)});
+lpi.addEventListener('input',()=>{
+  const p=lpi.value.trim();
+  if(p){State.localPath=p;State.videoFile=null;State.forceRerun=false;State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
+  else{State.localPath=null;sbtn.disabled=!State.videoFile;sbtn.textContent='选择视频文件开始'}
+});
+function selectFile(f){
+  State.videoFile=f;State.localPath=null;lpi.value='';State.forceRerun=false;State.doneJobConfig=null;
+  df.style.display='block';df.textContent=f.name+' ('+(f.size/1024/1024).toFixed(0)+'MB)';refreshStartBtn()
+}
+function _settingsMatchDone(){
+  const c=State.doneJobConfig;if(!c)return false;const s=State.settings;
+  if(String(s.subtitles)!==String(c.subtitles??'no'))return false;
+  if(String(s.burn)!==String(c.burn??false))return false;
+  if(String(s.model)!==String(c.model??'medium'))return false;
+  if(String(s.translationMode)!==String(c.translationMode??'speed'))return false;
+  if(String(s.contextAware)!==String(c.contextAware??false))return false;
+  if(JSON.stringify(s.apiKeys||[])!==JSON.stringify(c.apiKeys||[]))return false;
+  if(JSON.stringify(s.translationPriority||[])!==JSON.stringify(c.translationPriority||[]))return false;
+  if(JSON.stringify(s.style||{})!==JSON.stringify(c.style||{}))return false;
+  if(String(s.savePath||'')!==String(c.savePath||''))return false;
+  return true;
+}
+function refreshStartBtn(){
+  if(!State.videoFile&&!State.localPath){sbtn.disabled=true;sbtn.textContent='选择视频文件开始';return}
+  if(State.doneJobConfig){
+    if(_settingsMatchDone()){sbtn.disabled=true;sbtn.textContent='已完成（修改设置后可重跑）'}
+    else{sbtn.disabled=false;sbtn.textContent='用新设置重跑';State.forceRerun=true}
+    return;
+  }
+  sbtn.disabled=false;sbtn.textContent=State.settings.burn?'开始翻译并烧录':'开始生成字幕'
+}
+
+// ============ Save Path ============
+$('savePathBtn').addEventListener('click',()=>{
+  const display=$('savePathDisplay');
+  const current=State.settings.savePath||'~/Downloads/Video-Subber';
+  const input=document.createElement('input');
+  input.type='text';input.value=current;
+  input.style.cssText='margin-left:8px;padding:4px 8px;border:1px solid var(--blue);border-radius:5px;font-size:12px;width:240px;background:var(--card);color:var(--text)';
+  input.addEventListener('blur',()=>{const v=input.value.trim();if(v&&v!==current){State.settings.savePath=v;$('savePathDisplay').textContent=v;saveConfig()}input.replaceWith(display);display.style.display=''});
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')input.blur();if(e.key==='Escape'){input.value=current;input.blur()}});
+  display.style.display='none';display.parentNode.insertBefore(input,display.nextSibling);input.focus();input.select();
+});
+function updateSavePathDisplay(){$('savePathDisplay').textContent=State.settings.savePath||'~/Downloads/Video-Subber'}
+
+// ============ Subtitle ============
+$('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.subtitles=e.target.dataset.v;refreshStartBtn()});
+$('burnSelect').addEventListener('change',()=>{State.settings.burn=$('burnSelect').value==='true';$('burnWarn').style.display=State.settings.burn?'block':'none';$('styleSubSection').style.display=State.settings.burn?'block':'none';refreshStartBtn()});
+
+// ============ Model Slider ============
+let modelDownloads={}; // model_id → {downloading, progress}
+
+async function fetchModelStatus(){
+  try{
+    const r=await fetch('/api/models/status',{cache:'no-store'});
+    if(!r.ok)return;
+    const data=await r.json();
+    modelDownloads=data;
+    // Dev simulate: ?nomodels=1 forces all models to appear as not downloaded
+    if((new URLSearchParams(location.search)).get('nomodels')==='1'){
+      Object.keys(modelDownloads).forEach(k=>{modelDownloads[k].downloaded=false});
+    }
+    buildModelSlider();
+    renderModelProgress();
+  }catch(e){}
+}
+function buildModelSlider(){
+  const dots=$('modelDots');dots.innerHTML='';
+  const hint=$('modelHintText');
+  const hasMissing=MODELS.some(m=>!modelDownloads[m]||(!modelDownloads[m].downloaded&&!modelDownloads[m].downloading));
+  hint.classList.toggle('visible',hasMissing);
+
+  MODELS.forEach(m=>{
+    const md=modelDownloads[m]||{downloaded:false,downloading:false,progress:0};
+    const active=m===State.settings.model;
+    const wrap=document.createElement('div');
+    let cls='model-dot-wrap';
+    if(active)cls+=' active';
+    if(!md.downloaded&&!md.downloading)cls+=' missing';
+
+    let circleCls='model-dot-circle';
+    if(active&&md.downloaded)circleCls+=' active downloaded';
+    else if(active&&!md.downloaded)circleCls+=' active missing';
+    else if(md.downloaded)circleCls+=' downloaded';
+    else if(md.downloading)circleCls+=' downloading';
+    else circleCls+=' missing';
+
+    wrap.className=cls;
+    wrap.innerHTML=`<div class="${circleCls}"></div><span class="model-dot-label">${m}</span>`;
+    wrap.addEventListener('click',()=>onModelDotClick(m));
+    dots.appendChild(wrap);
+  });
+  $('modelCurrent').textContent=`当前：${MODEL_INFO[State.settings.model]}`;
+}
+function renderModelProgress(){
+  const area=$('modelProgressArea');
+  const downloading=MODELS.filter(m=>modelDownloads[m]&&modelDownloads[m].downloading);
+  area.innerHTML=downloading.map(m=>{
+    const p=modelDownloads[m].progress||0;
+    return `<div class="model-progress-row" id="mp-${m}">
+      <span class="model-progress-name">${m}</span>
+      <div class="model-progress-bar-wrap"><div class="model-progress-fill" style="width:${p}%"></div></div>
+      <span class="model-progress-pct">${p}%</span>
+      <button class="model-progress-cancel" onclick="cancelModelDownload('${m}')" title="取消下载">✕</button>
+    </div>`;
+  }).join('');
+}
+async function onModelDotClick(modelId){
+  const md=modelDownloads[modelId]||{downloaded:false,downloading:false};
+  if(md.downloaded){State.settings.model=modelId;buildModelSlider();refreshStartBtn();return}
+  if(md.downloading)return;
+  // Start download
+  try{
+    const r=await fetch('/api/models/download/'+modelId,{method:'POST'});
+    if(!r.ok)return;
+    modelDownloads[modelId]={downloading:true,progress:0};
+    buildModelSlider();renderModelProgress();
+    pollModelProgress(modelId);
+  }catch(e){}
+}
+async function cancelModelDownload(modelId){
+  try{
+    await fetch('/api/models/download/'+modelId,{method:'DELETE'});
+  }catch(e){}
+  modelDownloads[modelId]={downloading:false,progress:modelDownloads[modelId]?modelDownloads[modelId].progress:0,downloaded:false};
+  buildModelSlider();renderModelProgress();
+}
+function pollModelProgress(modelId){
+  const check=async()=>{
+    try{
+      const r=await fetch('/api/models/status',{cache:'no-store'});
+      if(!r.ok)return;
+      const data=await r.json();
+      modelDownloads=data;
+      buildModelSlider();renderModelProgress();
+      const md=data[modelId];
+      if(md&&md.downloading)setTimeout(check,500);
+      else if(md&&md.downloaded){State.settings.model=modelId;buildModelSlider();refreshStartBtn()}
+    }catch(e){setTimeout(check,1000)}
+  };
+  setTimeout(check,300);
+}
+
+// ============ Translation Mode ============
+$('modeToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.translationMode=e.target.dataset.v;$('priorityList').classList.toggle('show',State.settings.translationMode==='quality');saveConfig();refreshStartBtn()});
+function buildPriorityList(){
+  const list=$('priorityList');
+  const labels={...DEFAULT_LABELS};
+  const avail=State.availableBackends&&State.availableBackends.free||[];
+  avail.forEach(b=>{labels[b.id]=b.name});
+  // Ensure every available backend is in the priority list
+  const cur=State.settings.translationPriority;
+  const curSet=new Set(cur);
+  avail.forEach(b=>{if(!curSet.has(b.id)){cur.push(b.id);curSet.add(b.id)}});
+  list.innerHTML='';
+  cur.forEach((bid,i)=>{
+    if(!labels[bid])return;
+    const item=document.createElement('div');item.className='priority-item';item.draggable=true;item.dataset.backend=bid;
+    item.innerHTML=`<span class="drag-handle">≡</span><span class="priority-rank">${i+1}</span><span>${labels[bid]}</span>`;
+    item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',bid);item.style.opacity='.5'});
+    item.addEventListener('dragend',()=>{item.style.opacity='1'});
+    item.addEventListener('dragover',e=>{e.preventDefault()});
+    item.addEventListener('drop',e=>{e.preventDefault();const src=e.dataTransfer.getData('text/plain');const srcIdx=State.settings.translationPriority.indexOf(src);if(srcIdx<0)return;const dstIdx=State.settings.translationPriority.indexOf(bid);const tmp=State.settings.translationPriority[srcIdx];State.settings.translationPriority.splice(srcIdx,1);State.settings.translationPriority.splice(dstIdx,0,tmp);buildPriorityList();saveConfig();refreshStartBtn()});
+    list.appendChild(item);
+  });
+}
+
+// ============ Advanced ============
+$('advToggle').addEventListener('click',()=>{$('advToggle').classList.toggle('open');$('advBody').classList.toggle('open')});
+$('ctxToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.contextAware=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
+$('speakerToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.speakerDetect=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
+$('tierToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.transcriptionTier=e.target.dataset.v;saveConfig();refreshStartBtn()});
+
+// ============ Platform / Model select ============
+const MODEL_ID_FORMAT={
+  claude:'例：claude-opus-4-8、claude-sonnet-4-6',
+  gpt:'例：gpt-4o、gpt-4.1、gpt-4o-mini',
+  gemini:'例：gemini-2.5-pro、gemini-2.0-flash',
+  deepseek:'例：deepseek-chat、deepseek-reasoner',
+  glm:'例：glm-4-flash、glm-4-plus',
+  doubao:'例：填豆包接入点 ID（ep-… 或官方模型 ID）',
+};
+
+function onPlatformChange(){
+  const platform=$('apiPlatform').value;
+  const modelSel=$('apiModel');
+  const customModel=$('apiCustomModel');
+  const modelHint=$('modelHint');
+  const apiEndpoint=$('apiEndpoint');
+  const apiModelName=$('apiModelName');
+
+  modelSel.style.display='none';
+  customModel.classList.remove('visible');
+  apiEndpoint.style.display='none';
+  apiModelName.style.display='none';
+  if(modelHint)modelHint.style.display='none';
+
+  if(!platform)return;
+
+  if(platform==='custom') apiEndpoint.style.display='';
+
+  const models=(State._llmModels&&State._llmModels[platform])||[];
+  if(models.length===0){
+    if(platform==='custom') apiModelName.style.display='';
+    return;
+  }
+
+  modelSel.innerHTML='';
+  models.forEach((m,i)=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.name;modelSel.appendChild(o)});
+  if(platform==='custom'){
+    const best=_pickBestModel(models);
+    modelSel.value=best.id;
+  }else{
+    const strongestIdx=Math.max(0,models.findIndex(m=>(m.name||'').includes('最强')));
+    modelSel.selectedIndex=strongestIdx;
+  }
+  const sep=document.createElement('option');sep.disabled=true;sep.textContent='──────────';modelSel.appendChild(sep);
+  const customOpt=document.createElement('option');customOpt.value='__custom__';customOpt.textContent='其他模型…';modelSel.appendChild(customOpt);
+
+  modelSel.style.display='';
+  if(modelHint){modelHint.style.display='';modelHint.textContent='以上为推荐模型。如需其他版本（旧版/私有模型），选「其他模型…」按规范填写模型 ID。'}
+}
+
+function onModelChange(){
+  const modelSel=$('apiModel');
+  const customModel=$('apiCustomModel');
+  const modelHint=$('modelHint');
+  const platform=$('apiPlatform').value;
+  if(modelSel.value==='__custom__'){
+    customModel.classList.add('visible');customModel.focus();
+    if(modelHint){modelHint.style.display='';modelHint.textContent='请填官方模型 ID（区分大小写，通常全小写、单词用连字符「-」连接，勿用空格或下划线）。'+(MODEL_ID_FORMAT[platform]?' '+MODEL_ID_FORMAT[platform]:'')}
+  }else{
+    customModel.classList.remove('visible');
+    if(modelHint){modelHint.textContent='以上为推荐模型。如需其他版本（旧版/私有模型），选「其他模型…」按规范填写模型 ID。'}
+  }
+}
+
+// ============ API Keys ============
+let _editingKeyIdx=-1;
+function _restoreEditModel(){
+  if(_editingKeyIdx<0)return;
+  const k=State.settings.apiKeys[_editingKeyIdx];
+  if(!k||!k.model)return;
+  const sel=$('apiModel');
+  const hasOpt=Array.from(sel.options).some(o=>o.value===k.model);
+  if(hasOpt){sel.value=k.model}
+  else{
+    const retired=document.createElement('option');
+    retired.value=k.model;
+    retired.textContent=k.model+' (已下线)';
+    const customOpt=Array.from(sel.options).find(o=>o.value==='__custom__');
+    if(customOpt){sel.insertBefore(retired,customOpt)}
+    else{sel.appendChild(retired)}
+    sel.value=k.model;
+  }
+  onModelChange();
+}
+function _pickBestModel(models){
+  // 挑最好的：免费的优先，版本号大的优先，名字长的优先
+  let best=models[0];
+  for(let i=1;i<models.length;i++){
+    const m=models[i],mid=m.id.toLowerCase();
+    const bid=best.id.toLowerCase();
+    const mFree=mid.includes('免费')||(m.name||'').includes('免费');
+    const bFree=bid.includes('免费')||(best.name||'').includes('免费');
+    if(mFree&&!bFree){best=m;continue}
+    if(bFree&&!mFree)continue;
+    // 2.x > 1.x, 更新 > 更旧
+    const mHas2=mid.includes('2.'),bHas2=bid.includes('2.');
+    if(mHas2&&!bHas2){best=m;continue}
+    if(bHas2&&!mHas2)continue;
+    if(mid.length>bid.length)best=m;
+  }
+  return best;
+}
+
+async function fetchAndFillModels(){
+  const platform=$('apiPlatform').value;
+  const key=$('apiKeyInput').value.trim();
+  const hint=$('modelHint');
+  if(!platform||!key)return;
+  State._llmModels=State._llmModels||{};
+  if(hint && _editingKeyIdx<0){hint.style.display='';hint.textContent='正在识别可用模型…'}
+  if(hint && _editingKeyIdx>=0){hint.style.display='';hint.textContent='正在刷新模型列表…'}
+  try{
+    const body={platform,key};
+    if(platform==='custom')body.endpoint=$('apiEndpoint').value.trim();
+    const r=await fetch('/api/llm-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d&&d.models&&d.models.length){
+      State._llmModels[platform]=d.models;
+      onPlatformChange();
+      _restoreEditModel();
+      if(hint){hint.style.display='';hint.textContent='✓ 已识别 '+d.models.length+' 个可用模型'}
+    }else{
+      onPlatformChange();_restoreEditModel();
+      if(platform==='custom' && hint){hint.style.display='';hint.textContent='没查到，请手动输入模型名';hint.style.color='var(--warn,#b8860b)'}
+      else if(hint)hint.style.display='none';
+    }
+  }catch(e){
+    onPlatformChange();_restoreEditModel();
+    if(platform==='custom' && hint){hint.style.display='';hint.textContent='没查到，请手动输入模型名';hint.style.color='var(--warn,#b8860b)'}
+    else if(hint)hint.style.display='none';
+  }
+}
+$('apiPlatform').addEventListener('change',()=>{onPlatformChange();onModelChange();fetchAndFillModels()});
+$('apiModel').addEventListener('change',onModelChange);
+$('apiKeyInput').addEventListener('blur',fetchAndFillModels);
+$('apiEndpoint').addEventListener('blur',fetchAndFillModels);
+
+$('apiAddBtn').addEventListener('click',()=>{
+  const platform=$('apiPlatform').value;
+  const name=$('apiName').value.trim();
+  const key=$('apiKeyInput').value.trim();
+  if(!platform||!key)return;
+
+  const entry={platform,name,key};
+
+  if(platform==='custom'){
+    entry.api_endpoint=$('apiEndpoint').value.trim()||'';
+  }
+  if($('apiModel').value==='__custom__'){
+    entry.model=$('apiCustomModel').value.trim();
+    if(!entry.model){showToast('请输入模型名称');return}
+    $('apiCustomModel').value='';$('apiCustomModel').classList.remove('visible');
+  }else{
+    const m=$('apiModel').value;
+    if(m)entry.model=m;
+    else if(platform==='custom')entry.model='gpt-4o';
+  }
+
+  if(_editingKeyIdx>=0){
+    State.settings.apiKeys[_editingKeyIdx]=entry;
+  }else{
+    State.settings.apiKeys.push(entry);
+  }
+  cancelEdit();
+  buildKeyList();saveConfig();refreshStartBtn();syncContextAwareBtn();
+});
+
+$('apiCancelBtn').addEventListener('click', cancelEdit);
+
+['apiPlatform','apiModel','apiCustomModel','apiModelName','apiEndpoint','apiName','apiKeyInput'].forEach(id=>{
+  $(id).addEventListener('input',_checkFormDirty);
+  $(id).addEventListener('change',_checkFormDirty);
+});
+function buildKeyList(){
+  $('apiKeyList').innerHTML=State.settings.apiKeys.map((k,i)=>{
+    const isEditing=(_editingKeyIdx===i);
+    const displayName=k.name||k.model||k.platform;
+    return `<li class="api-key-card${isEditing?' editing':''}" onclick="editKey(${i})"><span class="card-name">${displayName}</span><button class="api-key-del" onclick="event.stopPropagation();deleteKey(${i})">✕</button></li>`;
+  }).join('');
+}
+function deleteKey(i){
+  if(_editingKeyIdx===i) cancelEdit();
+  else if(_editingKeyIdx>i) _editingKeyIdx--;
+  State.settings.apiKeys.splice(i,1);
+  buildKeyList();saveConfig();refreshStartBtn();syncContextAwareBtn();
+}
+function maskKey(k){return k.length>8?'···'+k.slice(-4):'···'}
+
+function toggleKeyVisibility(){
+  const inp=$('apiKeyInput');
+  const show=inp.type==='password';
+  inp.type=show?'text':'password';
+  $('eyeOffIcon').style.display=show?'none':'';
+  $('eyeOnIcon').style.display=show?'':'none';
+}
+
+function _getFormEntry(){
+  const platform=$('apiPlatform').value;
+  const result={
+    platform:platform,
+    key:$('apiKeyInput').value.trim(),
+    name:$('apiName').value.trim()
+  };
+  if(platform==='custom'){
+    result.api_endpoint=$('apiEndpoint').value.trim();
+  }
+  if($('apiModel').value==='__custom__') result.model=$('apiCustomModel').value.trim();
+  else result.model=$('apiModel').value;
+  return result;
+}
+
+function _checkFormDirty(){
+  if(_editingKeyIdx<0) return;
+  const stored=State.settings.apiKeys[_editingKeyIdx];
+  if(!stored){$('apiAddBtn').disabled=false;return}
+  const current=_getFormEntry();
+  const same=(current.platform===stored.platform
+    && current.key===stored.key
+    && current.name===(stored.name||'')
+    && (current.model||'')===(stored.model||'')
+    && (current.api_endpoint||'')===(stored.api_endpoint||''));
+  $('apiAddBtn').disabled=same;
+}
+
+function editKey(i){
+  const k=State.settings.apiKeys[i];
+  if(!k) return;
+  _editingKeyIdx=i;
+
+  $('apiPlatform').value=k.platform;
+  onPlatformChange();
+
+  $('apiKeyInput').value=k.key||'';
+  $('apiName').value=k.name||'';
+
+  if(k.platform==='custom'){
+    $('apiEndpoint').value=k.api_endpoint||'';
+  }
+  fetchAndFillModels();
+
+  $('apiAddBtn').textContent='保存修改';
+  $('apiAddBtn').disabled=true;
+  $('apiCancelBtn').style.display='inline-block';
+
+  buildKeyList();
+  $('apiRow').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function cancelEdit(){
+  _editingKeyIdx=-1;
+
+  $('apiKeyInput').value='';$('apiKeyInput').type='password';
+  $('apiName').value='';
+  $('apiCustomModel').value='';$('apiCustomModel').classList.remove('visible');
+  $('apiModel').style.display='none';
+  $('apiModelName').value='';$('apiModelName').style.display='none';
+  $('apiEndpoint').value='';$('apiEndpoint').style.display='none';
+
+  $('apiAddBtn').textContent='添加';
+  $('apiAddBtn').disabled=false;
+  $('apiCancelBtn').style.display='none';
+
+  buildKeyList();
+}
+
+// ============ Style Preview ============
+function _readStyleFromDOM(){
+  return {font:$('styleFont').value,size:parseInt($('styleSize').value),color:$('styleColor').value,outlineColor:$('styleOutline').value,outlineWidth:parseInt($('styleOutlineWidth').value)||2,bgColor:'transparent'};
+}
+function updatePreview(){
+  const p=$('stylePreview');
+  const s=_readStyleFromDOM();
+  p.style.fontFamily=s.font;p.style.fontSize=s.size+'px';
+  const cmap={white:'#fff',yellow:'#ff0',green:'#0f0',cyan:'#0ff'};
+  p.style.color=cmap[s.color]||'#fff';
+  const olc=s.outlineColor==='none'?'transparent':(s.outlineColor==='white'?'#fff':'#000');
+  p.style.textShadow=olc==='transparent'?'none':`-1px -1px 0 ${olc},1px -1px 0 ${olc},-1px 1px 0 ${olc},1px 1px 0 ${olc}`;
+  $('styleConfirmed').style.display='none';
+}
+['styleFont','styleSize','styleColor','styleOutline','styleOutlineWidth'].forEach(id=>$(id).addEventListener('change',updatePreview));
+$('styleConfirmBtn').addEventListener('click',()=>{
+  State.settings.style=_readStyleFromDOM();
+  $('styleConfirmed').style.display='block';
+  saveConfig();refreshStartBtn();
+  showToast('样式已确认');
+});
+
+// ============ Config Persistence ============
+async function saveConfig(){
+  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,burn:State.settings.burn,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect,transcriptionTier:State.settings.transcriptionTier};
+  // localStorage: strip key values, save metadata only
+  const safeCfg={...cfg,apiKeys:(cfg.apiKeys||[]).map(k=>({platform:k.platform,name:k.name,model:k.model,api_endpoint:k.api_endpoint}))};
+  localStorage.setItem('video-subber-config',JSON.stringify(safeCfg));
+  for(let attempt=0;attempt<2;attempt++){try{const r=await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(r.ok)return}catch(e){if(attempt===0)await new Promise(r=>setTimeout(r,1000))}}}
+function loadConfig(){
+  const raw=localStorage.getItem('video-subber-config');
+  if(raw){try{const c=JSON.parse(raw);Object.assign(State.settings,c)}catch(e){}}
+  fetch('/api/config').then(r=>r.json()).then(c=>{
+    if(c&&c.translationMode)Object.assign(State.settings,c);
+    syncUI();updateSavePathDisplay();
+  }).catch(()=>{});
+}
+
+// ============ Job ============
+function reconnectJobs(){
+  const raw=localStorage.getItem('activeJobs');
+  if(!raw)return;
+  let ids=[];try{ids=JSON.parse(raw)}catch(e){return}
+  if(!ids.length)return;
+  let firstReconnect=true;
+  ids.forEach(jid=>{
+    fetch('/api/jobs/'+jid).then(r=>{if(!r.ok)throw new Error('gone');return r.json()}).then(j=>{
+      if(firstReconnect&&j.config){State.settings={...State.settings,...j.config};syncUI();firstReconnect=false}
+      const filename=j.video_filename||'恢复中…';
+      if(j.status==='running'||j.status==='queued'){addJobCard(jid,filename);if(!settingsLocked){lockUI();settingsLocked=true}$('fill-'+jid).style.width=(j.progress||0)+'%';$('step-'+jid).textContent=j.message||j.stage||'处理中…';connectCard(jid)}
+      else if(j.status==='done'){addJobCard(jid,filename);renderCardDone(jid,{result_video:!!(j.config&&j.config.burn),result_srt:j.result_srt});removeActiveJobId(jid)}
+      else if(j.status==='error'){addJobCard(jid,filename);const step=$('step-'+jid);const err=$('err-'+jid);if(step)step.textContent='处理失败';if(err){err.textContent=j.error||'未知错误';err.classList.add('show')}$('card-'+jid).classList.add('job-card-done');removeActiveJobId(jid)}
+      else if(j.status==='interrupted'){addJobCard(jid,filename);const step=$('step-'+jid);const fill=$('fill-'+jid);if(step){step.textContent='任务中断，请重新拖入此视频恢复';step.style.color='var(--yellow)'}if(fill){fill.style.width='50%';fill.style.background='var(--yellow)'}$('card-'+jid).classList.add('job-card-done');removeActiveJobId(jid)}
+      else{removeActiveJobId(jid)}
+    }).catch(()=>{removeActiveJobId(jid)});
+  });
+}
+function showToast(msg){
+  const t=document.createElement('div');t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:10px 20px;border-radius:5px;z-index:9999;animation:fadein .3s';
+  document.body.appendChild(t);setTimeout(()=>t.remove(),2000);
+}
+
+function handleFoundJob(d,filename){
+  let card=document.getElementById('card-'+d.job_id);
+  if(d.status==='done'){
+    if(!card){addJobCard(d.job_id,d.config?.video_filename||filename);renderCardDone(d.job_id,{result_video:!!(d.config&&d.config.burn)})}
+    else{card.scrollIntoView({behavior:'smooth'});card.classList.add('flash-highlight');setTimeout(()=>card.classList.remove('flash-highlight'),1000)}
+    State.doneJobConfig={...d.config};unlockUI();settingsLocked=false;
+    const _same=_settingsMatchDone();
+    showToast(_same?'✅ 该视频已完成，修改设置后可重跑':'💡 检测到设置已变更，可直接重跑');
+    refreshStartBtn();return
+  }
+  if(!card){State.settings={...State.settings,...d.config};syncUI();addJobCard(d.job_id,d.config?.video_filename||filename);connectCard(d.job_id);showToast('✅ 已检测到后台任务，正在恢复…')}
+  else{
+    card.classList.remove('job-card-done');
+    const fill=$('fill-'+d.job_id);const step=$('step-'+d.job_id);
+    if(step){step.textContent='正在恢复处理…';step.style.color=''}
+    if(fill){fill.style.width='0%';fill.style.background=''}
+    if(!activeJobs[d.job_id]){activeJobs[d.job_id]={ws:null,pollTimer:null,filename:card.querySelector('.job-card-name').textContent,config:{...d.config}};connectCard(d.job_id)}
+    card.scrollIntoView({behavior:'smooth'});
+    showToast('✅ 已恢复任务，正在继续处理…')
+  }
+  State.doneJobConfig=null;lockUI();settingsLocked=true;sbtn.disabled=true;sbtn.textContent='任务进行中';saveActiveJobs();State.videoFile=null;df.style.display='none'
+}
+
+sbtn.addEventListener('click',async()=>{
+  if(!State.videoFile&&!State.localPath)return;
+
+  // ── 本地路径模式 ──
+  if(State.localPath){
+    sbtn.disabled=true;sbtn.textContent='读取本地文件中…';
+    if(!settingsLocked){lockUI();settingsLocked=true}
+    const cfg={...State.settings,local_path:State.localPath};
+    if(State.forceRerun){cfg.force=true;State.forceRerun=false}
+    try{
+      const r=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:JSON.stringify(cfg)})});
+      if(!r.ok){const err=await r.json().catch(()=>({error:'读取失败'}));showToast(err.error||'读取失败');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}return}
+      const d=await r.json();
+      if(d.found){handleFoundJob(d,State.localPath.split('/').pop()||'本地视频')}
+      else{State.doneJobConfig=null;addJobCard(d.id,State.localPath.split('/').pop()||'本地视频');connectCard(d.id);saveActiveJobs();sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
+      State.localPath=null;lpi.value='';
+    }catch(e){showToast('读取本地文件失败，请检查路径是否正确');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}}
+    return;
+  }
+
+  // ── 文件上传模式（XMLHttpRequest for progress） ──
+  const file=State.videoFile;
+  sbtn.disabled=true;sbtn.textContent='上传中… 0%';
+  if(!settingsLocked){lockUI();settingsLocked=true}
+  const cfg={...State.settings};if(State.forceRerun){cfg.force=true;State.forceRerun=false}
+  const fd=new FormData();fd.append('file',file);fd.append('config',JSON.stringify(cfg));
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST','/api/jobs');
+  xhr.upload.addEventListener('progress',e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);sbtn.textContent=`上传中… ${pct}%`}});
+  xhr.addEventListener('load',()=>{
+    try{
+      if(xhr.status>=400){const err=JSON.parse(xhr.responseText||'{}');showToast(err.error||'上传失败，请重试');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}return}
+      const d=JSON.parse(xhr.responseText);
+      if(d.found){handleFoundJob(d,file.name)}
+      else{State.doneJobConfig=null;addJobCard(d.id,file.name);connectCard(d.id);saveActiveJobs();State.videoFile=null;df.style.display='none';sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
+    }catch(e){showToast('上传失败，请重试');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}}
+  });
+  xhr.addEventListener('error',()=>{showToast('上传失败，请重试');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}});
+  xhr.send(fd);
+});
+
+function resetAllJobs(){Object.keys(activeJobs).forEach(jid=>cancelCard(jid));sbtn.disabled=true;sbtn.textContent='选择视频文件开始';settingsLocked=false;unlockUI()}
+function lockUI(){
+  ['subToggle','burnSelect','modelSection','modeToggle','priorityList','apiPlatform','apiName','apiKeyInput','apiAddBtn','apiCancelBtn','ctxToggle','styleConfirmBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('disabled-ctl')});
+  sbtn.disabled=true;
+  const existing=document.getElementById('lockBanner');
+  if(!existing){
+    const banner=document.createElement('div');
+    banner.id='lockBanner';
+    banner.style.cssText='text-align:center;font-size:12px;color:var(--sub);margin-top:8px;padding:6px;background:var(--surface);border-radius:6px';
+    banner.textContent='任务进行中，设置暂不可修改';
+    sbtn.parentNode.insertBefore(banner,sbtn.nextSibling);
+  }
+}
+function unlockUI(){
+  document.querySelectorAll('.disabled-ctl').forEach(el=>el.classList.remove('disabled-ctl'));
+  document.querySelectorAll('.locked-dz').forEach(el=>el.classList.remove('locked-dz'));
+  const banner=document.getElementById('lockBanner');if(banner)banner.remove();
+}
+// syncUI was a 19-line function doing four jobs. Split into three single-purpose
+// helpers, each wrapped in try/catch so one failure does not block the others.
+// Splitting alone is not enough — they run sequentially, so a throw in the first
+// would still skip the rest without the try/catch. (V2.07)
+function renderSettingsToDOM(){
+  document.querySelectorAll('#subToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.subtitles)});
+  const bs=document.getElementById('burnSelect');bs.value=State.settings.burn?'true':'false';bs.dispatchEvent(new Event('change'));
+  document.querySelectorAll('#modeToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.translationMode)});
+  const pl=document.getElementById('priorityList');pl.classList.toggle('show',State.settings.translationMode==='quality');
+  document.querySelectorAll('#ctxToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.contextAware))});
+  document.querySelectorAll('#speakerToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.speakerDetect))});
+  document.querySelectorAll('#tierToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.transcriptionTier||'standard'))});
+  document.getElementById('styleConfirmed').style.display='none';
+  if(State.settings.style){
+    const s=State.settings.style;
+    const sf=document.getElementById('styleFont');if(sf&&s.font)sf.value=s.font;
+    const ss=document.getElementById('styleSize');if(ss&&s.size)ss.value=s.size;
+    const sc=document.getElementById('styleColor');if(sc&&s.color)sc.value=s.color;
+    const so=document.getElementById('styleOutline');if(so&&s.outlineColor)so.value=s.outlineColor;
+    const sw=document.getElementById('styleOutlineWidth');if(sw&&s.outlineWidth)sw.value=s.outlineWidth;
+    updatePreview();
+  }
+}
+
+function rebuildDynamicWidgets(){
+  buildModelSlider();
+  buildKeyList();
+  buildPriorityList();
+  fetchModelStatus();
+}
+
+function syncUI(){
+  try{ renderSettingsToDOM(); }catch(e){}
+  try{ rebuildDynamicWidgets(); }catch(e){}
+}
+
+// ── Multi-job ──
+const activeJobs={};
+let settingsLocked=false;
+function addJobCard(jid,filename){
+  if(activeJobs[jid])return;
+  const card=document.createElement('div');card.className='job-card';card.id='card-'+jid;
+  card.innerHTML=
+    `<div class="job-card-header"><span class="job-card-name">${filename}</span><button class="job-card-close" onclick="cancelCard('${jid}')">×</button></div>`+
+    `<div class="progress-bar"><div class="progress-fill" id="fill-${jid}"></div></div>`+
+    `<div class="job-card-step" id="step-${jid}">排队中…</div>`+
+    `<div class="job-card-result" id="result-${jid}"><a href="#" id="dlV-${jid}" target="_blank">下载视频</a><a href="#" id="dlS-${jid}" target="_blank">下载 SRT</a></div>`+
+    `<div class="job-card-error" id="err-${jid}"></div>`;
+  $('jobCards').appendChild(card);
+  activeJobs[jid]={ws:null,pollTimer:null,filename:filename,config:{...State.settings}};
+}
+function connectCard(jid){
+  const job=activeJobs[jid];if(!job)return;
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  try{job.ws=new WebSocket(`${proto}//${location.host}/ws/${jid}`);job.ws.onmessage=e=>{try{handleCardMsg(jid,JSON.parse(e.data))}catch(ex){}};job.ws.onclose=()=>{job.ws=null};job.ws.onerror=()=>{job.ws=null}}catch(e){}
+  const poll=()=>{if(!activeJobs[jid])return;fetch('/api/jobs/'+jid).then(r=>r.json()).then(j=>{
+    const fill=$('fill-'+jid);const step=$('step-'+jid);
+    const processDead=(j.status==='running'||j.status==='queued')&&j.process_alive===false;
+    if(processDead){
+      if(fill){fill.style.width='100%';fill.style.background='var(--red)';fill.classList.remove('working')}
+      if(step){step.textContent='处理异常中断，请取消后重试';step.style.color='var(--red)'}
+      job.pollTimer=setTimeout(poll,5000)}
+    else if(j.status==='running'||j.status==='queued'){if(fill){fill.style.width=j.progress+'%';fill.style.background='';fill.classList.add('working')}if(step){step.textContent=j.message||j.stage||'处理中…';step.style.color=''}if(j.stage==='transcribe'&&j.progress>=10&&j.progress<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}job.pollTimer=setTimeout(poll,2000)}
+    else if(j.status==='done'){handleCardMsg(jid,{type:'done',result_video:j.result_video,result_srt:j.result_srt,failed_segments:j.failed_segments,segment_count:j.segment_count,success_count:j.success_count})}
+    else if(j.status==='error'){handleCardMsg(jid,{type:'error',message:j.error})}
+    else if(j.status==='cancelled'){removeCard(jid)}
+    else{job.pollTimer=setTimeout(poll,2000)}
+  }).catch(()=>{job.pollTimer=setTimeout(poll,2000)})};
+  job.pollTimer=setTimeout(poll,1000);
+}
+function handleCardMsg(jid,msg){
+  const card=$('card-'+jid);if(!card)return;const fill=$('fill-'+jid);const step=$('step-'+jid);
+  if(msg.type==='progress'){if(fill){fill.style.width=msg.percent+'%';fill.style.background=''}if(step){step.textContent=msg.message+(msg.detail?' ('+msg.detail+')':'');step.style.color=''}if(msg.stage==='transcribe'&&msg.percent>=10&&msg.percent<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}}
+  else if(msg.type==='done'){renderCardDone(jid,msg);const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone();refreshStartBtn()}
+  else if(msg.type==='error'){if(step)step.textContent='出错';const err=$('err-'+jid);if(err){err.textContent=msg.message;err.classList.add('show')}card.classList.add('job-card-done');const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone()}
+  else if(msg.type==='llm_failed'){
+    if(step)step.textContent='等待选择…';step.style.color='var(--yellow)';
+    $('llmFallbackMsg').textContent=msg.message||'LLM 翻译全部失败，是否改用免费引擎继续？';
+    window._pendingFallbackJob=jid;
+    $('llmFallbackOverlay').classList.add('active');
+  }
+}
+let _llmFallbackPending=null;
+async function llmFallbackDecide(decision){
+  const jid=window._pendingFallbackJob;
+  if(!jid)return;
+  $('llmFallbackOverlay').classList.remove('active');
+  try{await fetch('/api/jobs/'+jid+'/llm-fallback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})})}catch(e){}
+  const step=$('step-'+jid);if(step){step.style.color='';step.textContent=decision==='use_free'?'正在用免费引擎重新翻译…':'已保留失败结果'}
+  window._pendingFallbackJob=null;
+}
+function renderCardDone(jid,msg){
+  const fill=document.getElementById('fill-'+jid);const step=document.getElementById('step-'+jid);
+  const card=document.getElementById('card-'+jid);const result=document.getElementById('result-'+jid);
+  if(fill){fill.style.width='100%';fill.classList.remove('working')}
+  if(step)step.textContent='完成';
+  if(card)card.classList.add('job-card-done');
+  if(result){result.classList.add('show');const va=document.getElementById('dlV-'+jid);if(va&&msg.result_video){va.href='/api/jobs/'+jid+'/download/video'}else if(va)va.style.display='none';const sa=document.getElementById('dlS-'+jid);if(sa)sa.href='/api/jobs/'+jid+'/download/srt'}
+  if(msg.failed_segments&&msg.failed_segments.length){const err=document.getElementById('err-'+jid);if(err){err.textContent=msg.failed_segments.length+' 条翻译失败（共 '+(msg.segment_count||'?')+' 条）';err.classList.add('show')}}
+}
+function cancelCard(jid){const job=activeJobs[jid];const name=job&&job.filename||'此任务';if(!confirm(`确定要取消「${name}」吗？已完成的进度将丢失。`))return;fetch('/api/jobs/'+jid,{method:'DELETE'}).catch(()=>{});removeCard(jid)}
+function removeCard(jid){const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer)}delete activeJobs[jid];const card=$('card-'+jid);if(card)card.remove();removeActiveJobId(jid);checkAllDone()}
+function checkAllDone(){if(Object.keys(activeJobs).length===0&&settingsLocked){settingsLocked=false;unlockUI()}}
+function saveActiveJobs(){localStorage.setItem('activeJobs',JSON.stringify(Object.keys(activeJobs)))}
+function removeActiveJobId(jid){const ids=Object.keys(activeJobs).filter(id=>id!==jid);localStorage.setItem('activeJobs',JSON.stringify(ids))}
+function showError(msg){$('errorText').textContent=msg;$('errorOverlay').classList.add('active');sbtn.disabled=false;sbtn.textContent='重试'}
+function closeError(){$('errorOverlay').classList.remove('active')}
+
+// ============ Init ============
+document.addEventListener('DOMContentLoaded',async()=>{
+  fetch('/api/health').then(r=>r.json()).then(d=>{const v=$('versionTag');if(v)v.textContent='v'+d.version}).catch(()=>{});
+  const burnSelect=document.getElementById('burnSelect');if(burnSelect)burnSelect.dispatchEvent(new Event('change'));
+  if(typeof loadConfig==='function')loadConfig();
+  try{const res=await fetch('/api/backends');if(res.ok){const data=await res.json();if(typeof updateBackendLists==='function')updateBackendLists(data)}}catch(err){}
+  if(typeof buildModelSlider==='function'){try{buildModelSlider()}catch(e){}}
+  updatePreview();
+  const rawActive=localStorage.getItem('activeJobs');
+  if(!rawActive||rawActive==='[]'){try{const res=await fetch('/api/active-jobs');if(res.ok){const data=await res.json();if(data.jobs&&data.jobs.length>0){const ids=data.jobs.map(j=>j.job_id);localStorage.setItem('activeJobs',JSON.stringify(ids))}}}catch(e){}}
+  if(typeof reconnectJobs==='function')reconnectJobs();
+});
+</script>
+</body>
+</html>
