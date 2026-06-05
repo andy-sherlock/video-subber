@@ -46,20 +46,25 @@ def is_qwen_asr_available() -> bool:
 
 
 # ── P147: anti-collapse generation parameters ──
-_QWEN_REPETITION_PENALTY = 1.4   # default 1.2 too weak to break repetition loops
-_QWEN_REPETITION_WINDOW = 256    # default 100 too short for long repeats
-_QWEN_TOKENS_PER_SEC = 10        # real speech ~3-5 words/s; default ~50 let a
-                                 # collapse run to 15000 tok/chunk (13.5 min hang)
+# ── P156 recalibration: aligned to WhisperJAV (repetition_penalty=1.1, 20 tok/s).
+# P147 first attempt (1.4 + 10 tok/s) overshot — killed normal output (qwen: 185→12).
+# 1.1 is a gentle nudge, not a gag.  20 tok/s gives 3× headroom while still
+# capping collapse at 6000 tok/chunk (was 15000 pre-P147, 3000 post-P147).
+_QWEN_REPETITION_PENALTY = 1.1   # P156: 1.4→1.1; gentle reminder, not a muzzle
+_QWEN_REPETITION_WINDOW = 256    # window is fine; the old PENALTY was the problem
+_QWEN_TOKENS_PER_SEC = 20        # P156: 10→20; 5min×20=6000 tok budget (3× headroom)
+                                 # normal speech ~6 tok/s; collapse still stops at 6000
 _QWEN_MIN_TOKENS = 256
 
 
 def _qwen_gen_kwargs(duration_s, language=None, use_mlx=True) -> dict:
-    """Anti-collapse kwargs for model.transcribe() (P147).
+    """Build kwargs for model.transcribe() (P147 → P156 recalibrated).
 
-    Caps generated tokens to ~10/sec so a repetition collapse force-stops in
-    minutes instead of running to the default ~50/sec ceiling, tightens the
-    repetition penalty/window, and forwards the language Whisper already
-    detected so Qwen doesn't re-guess (and mis-guess) per chunk.
+    Caps generated tokens to ~20/sec so a repetition collapse force-stops in
+    ~2 minutes instead of running to the default ~50/sec ceiling (~13.5 min).
+    P147 first attempt (10/sec + 1.4 penalty) overshot: killed normal output
+    (qwen 185→12 sentences).  P156 recalibrated to 20/sec (3× headroom) +
+    1.1 penalty (gentle nudge, aligned with WhisperJAV).
 
     Param names differ by backend: the MLX `transcribe()` takes `max_tokens` +
     `repetition_penalty`/`repetition_context_size`; the PyTorch wrapper takes

@@ -363,6 +363,20 @@ def _review_seam(
     return reviewed if reviewed else None
 
 
+_TRANSLATION_CJK_MIN_RATIO = 0.1  # 10% CJK characters — below this, treat as untranslated
+
+
+def _is_valid_translation(zh: str) -> bool:
+    """Return True if *zh* looks like a real Chinese translation (P156 gate).
+
+    A non-empty string whose CJK character ratio is >= 10% passes.
+    """
+    if not zh or not zh.strip():
+        return False
+    cjk = sum(1 for c in zh if '一' <= c <= '鿿')
+    return cjk / max(len(zh), 1) >= _TRANSLATION_CJK_MIN_RATIO
+
+
 def _translate_one_chunk(
     chunk: list[tuple[int, str]],
     prompt_prefix: str,
@@ -396,6 +410,10 @@ def _translate_one_chunk(
             idx = int(m.group(1))
             zh = m.group(2).strip()
             if zh:
+                if not _is_valid_translation(zh):
+                    _log.warning("翻译内容校验失败 (CJK<%.0f%%): idx=%d text=%r",
+                                 _TRANSLATION_CJK_MIN_RATIO * 100, idx, zh[:60])
+                    continue
                 chunk_result[idx] = zh
 
     return ci, chunk_result, result.tokens_used

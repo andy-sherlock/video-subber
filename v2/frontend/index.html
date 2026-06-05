@@ -294,7 +294,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="card-label">字幕样式</div>
   <div class="row">
     <select id="styleFont"><option>PingFang SC</option><option>Noto Sans CJK SC</option><option>Heiti SC</option><option>Songti SC</option><option>Kaiti SC</option></select>
-    <select id="styleSize"><option value="16">16px</option><option value="20" selected>20px</option><option value="24">24px</option><option value="28">28px</option></select>
+    <select id="styleSize"><option value="34">34px</option><option value="38">38px</option><option value="42" selected>42px</option><option value="46">46px</option><option value="50">50px</option><option value="56">56px</option></select>
     <select id="styleColor"><option value="white" selected>白色</option><option value="yellow">黄色</option><option value="green">绿色</option><option value="cyan">青色</option></select>
     <select id="styleOutline"><option value="black" selected>黑色描边</option><option value="white">白色描边</option><option value="none">无描边</option></select>
     <select id="styleOutlineWidth"><option value="1">描边 1px</option><option value="2" selected>描边 2px</option><option value="3">描边 3px</option><option value="4">描边 4px</option></select>
@@ -449,7 +449,7 @@ const State={
     contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
     speakerDetect:false,
     transcriptionTier:"standard",
-    style:{font:"PingFang SC",size:20,color:"white",outlineColor:"black",bgColor:"transparent"}
+    style:{font:"PingFang SC",size:42,color:"white",outlineColor:"black",bgColor:"transparent"}
   }
 };
 const MODELS=["tiny","base","small","medium","large-v3"];
@@ -599,7 +599,7 @@ function updateSavePathDisplay(){$('savePathDisplay').textContent=State.settings
 
 // ============ Subtitle ============
 $('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.subtitles=e.target.dataset.v;refreshStartBtn()});
-$('outputModeSelect').addEventListener('change',()=>{State.settings.outputMode=$('outputModeSelect').value;$('burnWarn').style.display=State.settings.outputMode==='burn'?'block':'none';$('muxHint').style.display=State.settings.outputMode==='mux'?'block':'none';$('styleSubSection').style.display=State.settings.outputMode==='burn'?'block':'none';refreshStartBtn();saveConfig()});
+$('outputModeSelect').addEventListener('change',()=>{State.settings.outputMode=$('outputModeSelect').value;$('burnWarn').style.display=State.settings.outputMode==='burn'?'block':'none';$('muxHint').style.display=State.settings.outputMode==='mux'?'block':'none';$('styleSubSection').style.display=State.settings.outputMode==='burn'?'block':'none';refreshStartBtn()});
 
 // ============ Model Slider ============
 let modelDownloads={}; // model_id → {downloading, progress}
@@ -1255,7 +1255,7 @@ function showQmWarning(msg){
 // ============ Init ============
 document.addEventListener('DOMContentLoaded',async()=>{
   fetch('/api/health').then(r=>r.json()).then(d=>{const v=$('versionTag');if(v)v.textContent='v'+d.version}).catch(()=>{});
-  const burnSelect=document.getElementById('outputModeSelect');if(burnSelect)burnSelect.dispatchEvent(new Event('change'));
+  const burnSelect=document.getElementById('outputModeSelect');if(burnSelect){const v=State.settings.outputMode||'burn';burnSelect.value=v;$('burnWarn').style.display=v==='burn'?'block':'none';$('muxHint').style.display=v==='mux'?'block':'none';$('styleSubSection').style.display=v==='burn'?'block':'none'}
   if(typeof loadConfig==='function')loadConfig();
   try{const res=await fetch('/api/backends');if(res.ok){const data=await res.json();if(typeof updateBackendLists==='function')updateBackendLists(data)}}catch(err){}
   if(typeof buildModelSlider==='function'){try{buildModelSlider()}catch(e){}}

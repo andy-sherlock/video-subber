@@ -10,7 +10,7 @@ DEFAULT_CONFIG = {
     "model": "medium",
     "style": {
         "font": "Microsoft YaHei" if sys.platform == "win32" else "PingFang SC",
-        "size": 20,
+        "size": 42,
         "color": "white",
         "outlineColor": "black",
         "outlineWidth": 2,

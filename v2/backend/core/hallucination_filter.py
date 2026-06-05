@@ -10,6 +10,98 @@ from difflib import SequenceMatcher
 
 _log = logging.getLogger("hallucination_filter")
 
+
+class LightweightStemmer:
+    """Zero-dependency multi-language stemmer (P160).
+
+    Desktop-app safe — no NLTK, no model downloads, no network required.
+    Each language gets a different key because word morphology differs:
+
+      zh — no stemming; extract individual characters
+      en — strip -ing/-ed/-es/-s/-tion/-ment/-ness/-ly
+      ru — manual Snowball-esque suffix list (case/tense/aspect)
+      ja/ko — filter grammatical particles, keep content words
+    """
+    @staticmethod
+    def clean_and_stem(text, lang):
+        if not text or not text.strip():
+            return set()
+        text = text.lower()
+
+        # Chinese: extract individual hanzi characters
+        if lang == "zh":
+            return set(re.findall(r'[一-龥]', text))
+
+        # English: lightweight suffix stripping
+        if lang == "en":
+            words = re.findall(r"[a-z0-9']+", text)
+            stems = []
+            for w in words:
+                if len(w) >= 4:
+                    if w.endswith('tion') or w.endswith('ment') or w.endswith('ness'):
+                        w = w[:-4]
+                    elif w.endswith('ing'):
+                        w = w[:-3]
+                        # double-consonant reduction: running → runn → run
+                        if len(w) >= 3 and w[-1] == w[-2]:
+                            w = w[:-1]
+                    elif w.endswith('ed') or w.endswith('er') or w.endswith('ly'):
+                        w = w[:-2]
+                    elif w.endswith('es'):
+                        w = w[:-2]
+                    elif w.endswith('s') and not w.endswith('ss'):
+                        w = w[:-1]
+                stems.append(w)
+            return set(stems)
+
+        # Russian: manual suffix stripping (Snowball-inspired, P160)
+        if lang == "ru":
+            words = re.findall(r'[а-яё0-9]+', text)
+            stems = []
+            ru_suffixes = (
+                'его', 'ого',                # adj genitive - P160: missing in v1
+                'ами', 'ями', 'ов', 'ев', 'ей', 'ег',
+                'ах', 'ях', 'ом', 'ем', 'ой', 'ей',
+                'ую', 'юю', 'ая', 'яя', 'ое', 'ее',
+                'ые', 'ие', 'ым', 'им', 'их', 'ых',
+                'ешь', 'ет', 'ем', 'ете', 'ут', 'ют',
+                'ишь', 'ит', 'им', 'ите', 'ат', 'ят',
+                'ся', 'сь',                   # reflexive - P160: missing in v1
+                'л', 'ла', 'ло', 'ли',
+                'ть', 'ти', 'а', 'я', 'о', 'е', 'ы', 'и', 'ь',
+            )
+            for w in words:
+                if len(w) > 3:
+                    stemmed = False
+                    for suff in ru_suffixes:
+                        if w.endswith(suff):
+                            w = w[:-len(suff)]
+                            stemmed = True
+                            break
+                    if not stemmed:
+                        for suff in ('а', 'я', 'о', 'е', 'ы', 'и', 'ь'):
+                            if w.endswith(suff) and len(w) - len(suff) >= 3:
+                                w = w[:-len(suff)]
+                                break
+                    # re-strip trailing soft sign after longer suffix removal
+                    if w.endswith('ь') and len(w) > 3:
+                        w = w[:-1]
+                stems.append(w)
+            return set(stems)
+
+        # Japanese/Korean: filter grammatical particles
+        if lang in ("ja", "ko"):
+            words = re.findall(r'[぀-ゟ゠-ヿ一-龯가-힣]+', text)
+            if lang == "ja":
+                ja_particles = {'は', 'が', 'を', 'に', 'の', 'で', 'へ', 'と', 'から',
+                                'まで', 'です', 'ます', 'た'}
+                return {w for w in words if w not in ja_particles}
+            return set(words)
+
+        # Default: split on whitespace
+        return set(text.split())
+
+
 HALLUCINATION_KEYWORDS = (
     "音乐", "music", "♪", "♫", "[music]", "[applause]", "[laughter]",
     "掌声", "笑声", "鼓掌", "谢谢观看", "请订阅", "字幕组", "字幕由",
@@ -193,17 +285,117 @@ def _qwen_is_reliable(segments: list) -> bool:
     return True
 
 
-def _layer2_cross_validate(seg, qwen_reliable: bool = True) -> None:
-    qwen_text = getattr(seg, "qwen_text", None)
-    if not qwen_text:  # None or empty string
-        return
-    if not qwen_reliable:  # P148: collapsed Qwen is not a trustworthy referee
-        return
-    ratio = SequenceMatcher(None, seg.text, qwen_text).ratio()
-    if ratio < 0.3:
-        seg.uncertain = True
-        _log.info("L2 交叉验证: start=%.2f sim=%.2f whisper=%r qwen=%r",
-                  seg.start, ratio, seg.text[:30], qwen_text[:30])
+def _layer2_cross_validate(segments: list, language: str = "auto",
+                           custom_thresholds: dict = None):
+    """P160: 30s-window stem-overlap cross-validation (B+A architecture).
+
+    Replaces the old per-segment SequenceMatcher approach.  Two passes:
+
+      1. Dual-confirm — SenseVoice + qwen_text: non-human without Qwen
+         output is auto-flagged.
+      2. Windowing — chop audio into 30s windows, stem words, compare
+         stem sets.  Windows above threshold → GREEN, below → YELLOW.
+
+    Returns (annotated_segments, window_stats).  Caller replaces segments
+    with the returned list.
+    """
+    if not segments:
+        return segments, {}
+
+    # ── Per-language thresholds ──
+    thresholds = {
+        "zh": 0.55, "en": 0.35, "ru": 0.28,
+        "ja": 0.45, "ko": 0.45,
+    }
+    if custom_thresholds:
+        thresholds.update(custom_thresholds)
+    current_threshold = thresholds.get(language, 0.30)
+
+    # ── Pass 1: dual-confirm ──
+    for seg in segments:
+        sv_tag = getattr(seg, "sensevoice_tag", None)
+        qwen_text = (getattr(seg, "qwen_text", None) or "").strip()
+
+        if sv_tag and sv_tag != "Speech" and not qwen_text:
+            # Both agree: non-human and Qwen silent → hallucination
+            seg.filtered = True
+            seg.filter_reason = "layer2_sensevoice_qwen_agree"
+        elif sv_tag and sv_tag != "Speech" and qwen_text:
+            # Disagreement: SV says non-human, Qwen heard speech → suspicious
+            seg.uncertain = True
+
+    # ── Pass 2: window stemming ──
+    WINDOW_SIZE = 30
+    total_duration_s = max(getattr(s, "end", 0) for s in segments)
+    if total_duration_s <= 0:
+        return segments, {}
+    num_windows = int(total_duration_s // WINDOW_SIZE) + 1
+
+    whisper_windows = ["" for _ in range(num_windows)]
+    qwen_windows = ["" for _ in range(num_windows)]
+
+    def _find_best_window(start, end):
+        best = int(start // WINDOW_SIZE)
+        max_overlap = 0
+        for w in range(int(start // WINDOW_SIZE),
+                       min(int(end // WINDOW_SIZE) + 1, num_windows)):
+            ws = w * WINDOW_SIZE
+            we = ws + WINDOW_SIZE
+            overlap = min(end, we) - max(start, ws)
+            if overlap > max_overlap:
+                max_overlap = overlap
+                best = w
+        return best
+
+    for seg in segments:
+        if seg.filtered:
+            continue
+        win = _find_best_window(seg.start, seg.end)
+        if win < num_windows:
+            whisper_windows[win] += " " + seg.text
+            qwen_windows[win] += " " + (getattr(seg, "qwen_text", None) or "")
+
+    # ── Stem + score each window ──
+    window_stats = {}
+    for idx in range(num_windows):
+        w_text = whisper_windows[idx].strip()
+        q_text = qwen_windows[idx].strip()
+
+        if not w_text and not q_text:
+            window_stats[idx] = {"status": "EMPTY", "score": 1.0}
+            continue
+
+        # No Qwen text in this window → nothing to cross-validate
+        if not q_text:
+            window_stats[idx] = {"status": "NO_QWEN", "score": 1.0}
+            continue
+
+        w_stems = LightweightStemmer.clean_and_stem(w_text, language)
+        q_stems = LightweightStemmer.clean_and_stem(q_text, language)
+
+        shared = w_stems & q_stems
+        score = len(shared) / len(w_stems) if w_stems else 0.0
+
+        if score >= current_threshold:
+            window_stats[idx] = {"status": "GREEN", "score": score}
+        else:
+            window_stats[idx] = {"status": "YELLOW", "score": score}
+
+    # ── Annotate surviving segments ──
+    for seg in segments:
+        if seg.filtered:
+            continue
+        win = _find_best_window(seg.start, seg.end)
+        ws = window_stats.get(win)
+        if ws and ws["status"] == "YELLOW":
+            seg.uncertain = True
+
+    _log.info("L2 窗口比对完成: %d 窗口, 阈值=%.2f, %s",
+              num_windows, current_threshold,
+              {s: sum(1 for v in window_stats.values() if v["status"] == s)
+               for s in ("GREEN", "YELLOW", "EMPTY", "NO_QWEN")})
+
+    return segments, window_stats
 
 
 def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
@@ -265,9 +457,11 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
     surviving = [s for s in segments if not s.filtered]
     surviving = _layer5_dedup(surviving)
 
+    # P160: L2 now operates on all surviving segments at once
+    # (30s-window stemming needs the full picture, not one at a time)
     qwen_reliable = _qwen_is_reliable(surviving)
-    for seg in surviving:
-        _layer2_cross_validate(seg, qwen_reliable)
+    if qwen_reliable:
+        surviving, _ignore_stats = _layer2_cross_validate(surviving, source_lang)
 
     for seg in surviving:
         if not seg.filtered:

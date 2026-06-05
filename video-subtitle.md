@@ -53,6 +53,47 @@
 1. **永远从上一个版本复制。** 做 V2.03 → 复制 V2.02 全部文件 → 在 V2.03 里改。不碰 V2.01 及更早版本。
 2. **需要改旧代码时，复制到新版本再改。** 旧版本锁定了不改？复制一份进新版本，在新版本里改。原文件永远不动。
 3. **旧版本文件夹只读保留。** 不删除、不修改、不覆盖。效果不好随时换回去。
+4. **版本迭代 = 触发 git commit（2026-06-05 生效）**。当用户说"版本迭代""提交版本""收尾版本"时，等同于触发 git commit——把活跃代码改动 + 版本快照文件夹 + 问题库/主档案/progress/task_plan 一起提交至当前目录的 git 仓库。commit message 格式固定为 `VX.XX: <一句话版本内容简述>`。
+
+### Bug 修复流水线（强制顺序·2026-06-05 生效）
+
+本项目同时有 CLI（命令行）和 Web UI（FastAPI + 单页 HTML），因此 ⑧ 和 ⑨ 都跑。
+
+```
+① investigate              诊断根因 + 给出修复方案
+   优先读 problems.md + learnings 历史记录
+   重点查：transcriber_v2.py / orchestrator.py / hallucination_filter.py
+② plan-eng-review          审查方案的 Python 数据流、边界情况、缓存完整性
+③ ln-021-codegraph         项目根：/Users/andy/Andy-agent/video-subtitle/v2/
+   检查改动波及的模块依赖
+④ code-review（全项目范围）  扫 v2/ 全部活跃代码，挖旧 bug
+⑤ cso 或 security-review   涉及 API Key 存储 / 用户上传 / 凭据加密时必跑
+⑥ test-driven-development  pytest，优先补 test/test_pure_functions.py
+⑦ verification-before-completion  跑 pytest 全量测试（当前 231+ 测试）
+⑧ qa-only                 浏览器打开 Web UI（localhost）
+   上传 test-video_tiny_zh.mp4 → 选转录/翻译模式 → 跑全流程
+   检查 UI 交互、进度推送、下载功能
+⑨ 端到端实测               用真实视频文件走完整 CLI 流程
+   检查：字幕语言 / 翻译完整率 / 时间轴对齐 / 输出文件正确
+```
+
+前三步不动代码，纯审查方案。
+
+### 版本收尾流程（强制顺序·2026-06-05 生效）
+
+```
+① code-review（全项目范围）  扫 v2/ 全部活跃代码 + 快照目录
+② cso 或 security-review    API Key 加密 / 凭据泄露 / 上传安全
+③ ln-021-codegraph          analyze_architecture + audit_workspace
+④ verification-before-completion  pytest 全量测试
+⑤ qa-only                  Web UI 全流程模拟操作
+   上传 → 转录（三档各测一次）→ 翻译（免费/LLM）→ 字幕输出（烧录/封装/SRT）
+⑥ 多语种端到端实测
+   中文视频 test-video_tiny_zh.mp4：完整管线，检查翻译质量 + 时间轴
+   英文视频（至少 1 个）：检查语言检测 + 中文字幕质量
+   俄语视频（至少 1 个）：检查弱势语言翻译完整率 ≥ 90%
+   检查：幻觉过滤率 / [?] 标记比例 / 翻译失败条数 / 输出文件完整性
+```
 
 ---
 
