@@ -65,7 +65,7 @@ class TestLayer2ChineseWindowMatch(unittest.TestCase):
 
     def test_identical_text_green(self):
         from backend.core.hallucination_filter import _layer2_cross_validate
-        seg = _make_seg(0, 5, 8, "你好世界", qwen_text="你好世界")
+        seg = _make_seg(0, 5, 8, "你好世界欢迎来到这里", qwen_text="你好世界欢迎来到这里")
         result, stats = _layer2_cross_validate([seg], language="zh")
         win = stats[0]
         self.assertEqual(win["status"], "GREEN",
@@ -73,7 +73,7 @@ class TestLayer2ChineseWindowMatch(unittest.TestCase):
 
     def test_different_text_yellow(self):
         from backend.core.hallucination_filter import _layer2_cross_validate
-        seg = _make_seg(0, 5, 8, "你好世界", qwen_text="再见朋友们")
+        seg = _make_seg(0, 5, 8, "你好世界欢迎来到", qwen_text="再见朋友们谢谢大家")
         result, stats = _layer2_cross_validate([seg], language="zh")
         win = stats[0]
         self.assertEqual(win["status"], "YELLOW",
@@ -117,8 +117,8 @@ class TestLayer2ThresholdPerLanguage(unittest.TestCase):
 
     def test_chinese_uses_higher_threshold(self):
         from backend.core.hallucination_filter import _layer2_cross_validate
-        # "你我他" vs "天地人" = 0 shared / 3 = 0%.  Chinese threshold 0.55 → YELLOW
-        seg = _make_seg(0, 5, 8, "你我他", qwen_text="天地人")
+        # 6 unique chars each, 0 shared → score 0.0, threshold 0.55 → YELLOW
+        seg = _make_seg(0, 5, 8, "你我他她它们", qwen_text="天地人山水云")
         result, stats = _layer2_cross_validate([seg], language="zh")
         self.assertEqual(stats[0]["status"], "YELLOW")
 

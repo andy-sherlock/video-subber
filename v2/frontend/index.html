@@ -60,6 +60,9 @@ body{
 .local-path-guide{font-size:11px;color:var(--sub);margin-top:6px;cursor:pointer;user-select:none}
 .local-path-guide .expand{display:none;margin-top:4px;line-height:1.8;padding:8px 12px;background:var(--surface);border-radius:6px}
 .local-path-guide.open .expand{display:block}
+.url-input-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--sub)}
+.url-input-row input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;background:var(--card);color:var(--text)}
+.url-input-row input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,.12)}
 
 /* ── Row / Toggle ── */
 .row{display:flex;align-items:center;gap:10px;padding:3px 0;flex-wrap:wrap}
@@ -252,6 +255,10 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
     <span style="flex-shrink:0;opacity:.7">或输入本地路径</span>
     <input type="text" id="localPathInput" placeholder="/Users/andy/Movies/video.mp4 或 D:\Movies\video.mp4">
   </div>
+  <div class="url-input-row">
+    <span style="flex-shrink:0;opacity:.7">或粘贴视频链接</span>
+    <input type="text" id="urlInput" placeholder="https://www.youtube.com/watch?v=... 或 https://www.bilibili.com/video/...">
+  </div>
   <div class="local-path-guide" id="localPathGuide" onclick="this.classList.toggle('open')">
     💡 适用于 5GB 以上的大文件 — 无需上传，直接读取本地文件 · 如何获取路径？ ▸
     <div class="expand">
@@ -441,6 +448,7 @@ const $=id=>document.getElementById(id);
 const State={
   videoFile:null,
   localPath:null,
+  sourceUrl:null,
   doneJobConfig:null,
   availableBackends:{free:[],llm:[]},
   settings:{
@@ -544,7 +552,7 @@ function syncContextAwareBtn(){
 }
 
 // ============ Upload ============
-const dz=$('dz'),fi=$('fileInput'),df=$('dzFile'),sbtn=$('startBtn'),lpi=$('localPathInput');
+const dz=$('dz'),fi=$('fileInput'),df=$('dzFile'),sbtn=$('startBtn'),lpi=$('localPathInput'),uri=$('urlInput');
 dz.addEventListener('click',()=>{fi.value='';fi.click()});
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('active')});
 dz.addEventListener('dragleave',()=>dz.classList.remove('active'));
@@ -552,11 +560,16 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('active');
 fi.addEventListener('change',()=>{const f=fi.files[0];if(f)selectFile(f)});
 lpi.addEventListener('input',()=>{
   const p=lpi.value.trim();
-  if(p){State.localPath=p;State.videoFile=null;State.forceRerun=false;State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
-  else{State.localPath=null;sbtn.disabled=!State.videoFile;sbtn.textContent='选择视频文件开始'}
+  if(p){State.localPath=p;State.videoFile=null;State.sourceUrl=null;uri.value='';State.forceRerun=false;State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
+  else{State.localPath=null;sbtn.disabled=!State.videoFile&&!State.sourceUrl;sbtn.textContent='选择视频文件开始'}
+});
+uri.addEventListener('input',()=>{
+  const u=uri.value.trim();
+  if(u){State.sourceUrl=u;State.videoFile=null;State.localPath=null;lpi.value='';State.forceRerun=false;State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
+  else{State.sourceUrl=null;sbtn.disabled=!State.videoFile&&!State.localPath;sbtn.textContent='选择视频文件开始'}
 });
 function selectFile(f){
-  State.videoFile=f;State.localPath=null;lpi.value='';State.forceRerun=false;State.doneJobConfig=null;
+  State.videoFile=f;State.localPath=null;lpi.value='';State.sourceUrl=null;uri.value='';State.forceRerun=false;State.doneJobConfig=null;
   df.style.display='block';df.textContent=f.name+' ('+(f.size/1024/1024).toFixed(0)+'MB)';refreshStartBtn()
 }
 function _settingsMatchDone(){
@@ -573,7 +586,7 @@ function _settingsMatchDone(){
   return true;
 }
 function refreshStartBtn(){
-  if(!State.videoFile&&!State.localPath){sbtn.disabled=true;sbtn.textContent='选择视频文件开始';return}
+  if(!State.videoFile&&!State.localPath&&!State.sourceUrl){sbtn.disabled=true;sbtn.textContent='选择视频文件开始';return}
   if(State.doneJobConfig){
     if(_settingsMatchDone()){sbtn.disabled=true;sbtn.textContent='已完成（修改设置后可重跑）'}
     else{sbtn.disabled=false;sbtn.textContent='用新设置重跑';State.forceRerun=true}
@@ -1021,11 +1034,11 @@ async function saveConfig(){
   for(let attempt=0;attempt<2;attempt++){try{const r=await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(r.ok)return}catch(e){if(attempt===0)await new Promise(r=>setTimeout(r,1000))}}}
 function loadConfig(){
   const raw=localStorage.getItem('video-subber-config');
-  if(raw){try{const c=JSON.parse(raw);if(c.burn!==undefined&&c.outputMode===undefined){c.outputMode=c.burn?'burn':'srt'}Object.assign(State.settings,c)}catch(e){}}
+  if(raw){try{const c=JSON.parse(raw);if(c.burn!==undefined&&c.outputMode===undefined){c.outputMode=c.burn?'burn':'srt'}delete c.apiKeys;Object.assign(State.settings,c)}catch(e){}}
   fetch('/api/config').then(r=>r.json()).then(c=>{
     if(c&&c.translationMode)Object.assign(State.settings,c);
-    syncUI();updateSavePathDisplay();
-  }).catch(()=>{});
+    State.configReady=true;syncUI();updateSavePathDisplay();
+  }).catch(()=>{State.configReady=true;syncUI();updateSavePathDisplay()});
 }
 
 // ============ Job ============
@@ -1037,12 +1050,12 @@ function reconnectJobs(){
   let firstReconnect=true;
   ids.forEach(jid=>{
     fetch('/api/jobs/'+jid).then(r=>{if(!r.ok)throw new Error('gone');return r.json()}).then(j=>{
-      if(firstReconnect&&j.config){State.settings={...State.settings,...j.config};syncUI();firstReconnect=false}
+      if(firstReconnect&&j.config){const jobMeta=Object.fromEntries(Object.entries(j.config).filter(([k])=>!['source_url','source_dir','video_filename','video_path','force','local_path'].includes(k)));State.settings={...State.settings,...jobMeta};syncUI();firstReconnect=false}
       const filename=j.video_filename||'恢复中…';
       if(j.status==='running'||j.status==='queued'){addJobCard(jid,filename);if(!settingsLocked){lockUI();settingsLocked=true}$('fill-'+jid).style.width=(j.progress||0)+'%';$('step-'+jid).textContent=j.message||j.stage||'处理中…';connectCard(jid)}
       else if(j.status==='done'){addJobCard(jid,filename);renderCardDone(jid,{result_video:!!(j.config&&(j.config.burn||j.config.outputMode==='burn'||j.config.outputMode==='mux')),result_srt:j.result_srt});removeActiveJobId(jid)}
-      else if(j.status==='error'){addJobCard(jid,filename);const step=$('step-'+jid);const err=$('err-'+jid);if(step)step.textContent='处理失败';if(err){err.textContent=j.error||'未知错误';err.classList.add('show')}$('card-'+jid).classList.add('job-card-done');removeActiveJobId(jid)}
-      else if(j.status==='interrupted'){addJobCard(jid,filename);const step=$('step-'+jid);const fill=$('fill-'+jid);if(step){step.textContent='任务中断，请重新拖入此视频恢复';step.style.color='var(--yellow)'}if(fill){fill.style.width='50%';fill.style.background='var(--yellow)'}$('card-'+jid).classList.add('job-card-done');removeActiveJobId(jid)}
+      else if(j.status==='error'){addJobCard(jid,filename);const step=$('step-'+jid);const err=$('err-'+jid);if(step)step.textContent='处理失败';if(err){err.textContent=j.error||'未知错误';err.classList.add('show')}removeActiveJobId(jid)}
+      else if(j.status==='interrupted'){addJobCard(jid,filename);const step=$('step-'+jid);const fill=$('fill-'+jid);if(step){step.textContent='任务中断，可重新提交恢复';step.style.color='var(--yellow)'}if(fill){fill.style.width='50%';fill.style.background='var(--yellow)'}removeActiveJobId(jid)}
       else{removeActiveJobId(jid)}
     }).catch(()=>{removeActiveJobId(jid)});
   });
@@ -1063,7 +1076,7 @@ function handleFoundJob(d,filename){
     showToast(_same?'✅ 该视频已完成，修改设置后可重跑':'💡 检测到设置已变更，可直接重跑');
     refreshStartBtn();return
   }
-  if(!card){State.settings={...State.settings,...d.config};syncUI();addJobCard(d.job_id,d.config?.video_filename||filename);connectCard(d.job_id);showToast('✅ 已检测到后台任务，正在恢复…')}
+  if(!card){const jobMeta=Object.fromEntries(Object.entries(d.config).filter(([k])=>!['source_url','source_dir','video_filename','video_path','force','local_path'].includes(k)));State.settings={...State.settings,...jobMeta};syncUI();addJobCard(d.job_id,d.config?.video_filename||filename);connectCard(d.job_id);showToast('✅ 已检测到后台任务，正在恢复…')}
   else{
     card.classList.remove('job-card-done');
     const fill=$('fill-'+d.job_id);const step=$('step-'+d.job_id);
@@ -1073,11 +1086,11 @@ function handleFoundJob(d,filename){
     card.scrollIntoView({behavior:'smooth'});
     showToast('✅ 已恢复任务，正在继续处理…')
   }
-  State.doneJobConfig=null;lockUI();settingsLocked=true;sbtn.disabled=true;sbtn.textContent='任务进行中';saveActiveJobs();State.videoFile=null;df.style.display='none'
+  State.doneJobConfig=null;lockUI();settingsLocked=true;sbtn.disabled=true;sbtn.textContent='任务进行中';saveActiveJobs();State.videoFile=null;State.sourceUrl=null;uri.value='';df.style.display='none'
 }
 
 sbtn.addEventListener('click',async()=>{
-  if(!State.videoFile&&!State.localPath)return;
+  if(!State.videoFile&&!State.localPath&&!State.sourceUrl)return;
 
   // ── 本地路径模式 ──
   if(State.localPath){
@@ -1093,6 +1106,23 @@ sbtn.addEventListener('click',async()=>{
       else{State.doneJobConfig=null;addJobCard(d.id,State.localPath.split('/').pop()||'本地视频');connectCard(d.id);saveActiveJobs();sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
       State.localPath=null;lpi.value='';
     }catch(e){showToast('读取本地文件失败，请检查路径是否正确');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}}
+    return;
+  }
+
+  // ── URL 直传模式（P174：B站/YouTube 链接直传） ──
+  if(State.sourceUrl){
+    sbtn.disabled=true;sbtn.textContent='正在提交链接…';
+    if(!settingsLocked){lockUI();settingsLocked=true}
+    const cfg={...State.settings};if(State.forceRerun){cfg.force=true;State.forceRerun=false}
+    const urlFname=State.sourceUrl.split('/').pop().split('?')[0]||'在线视频';
+    try{
+      const r=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:State.sourceUrl,config:JSON.stringify(cfg)})});
+      if(!r.ok){const err=await r.json().catch(()=>({error:'提交链接失败'}));showToast(err.error||'提交链接失败');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}return}
+      const d=await r.json();
+      if(d.found){handleFoundJob(d,urlFname)}
+      else{State.doneJobConfig=null;addJobCard(d.id,urlFname);connectCard(d.id);saveActiveJobs();sbtn.textContent='选择视频文件开始';sbtn.disabled=false}
+      State.sourceUrl=null;uri.value='';
+    }catch(e){showToast('提交链接失败，请检查网络连接');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}}
     return;
   }
 
@@ -1169,6 +1199,7 @@ function rebuildDynamicWidgets(){
 function syncUI(){
   try{ renderSettingsToDOM(); }catch(e){}
   try{ rebuildDynamicWidgets(); }catch(e){}
+  try{ syncContextAwareBtn(); }catch(e){}
 }
 
 // ── Multi-job ──
@@ -1209,7 +1240,7 @@ function handleCardMsg(jid,msg){
   const card=$('card-'+jid);if(!card)return;const fill=$('fill-'+jid);const step=$('step-'+jid);
   if(msg.type==='progress'){if(fill){fill.style.width=msg.percent+'%';fill.style.background=''}if(step){step.textContent=msg.message+(msg.detail?' ('+msg.detail+')':'');step.style.color=''}if(msg.stage==='transcribe'&&msg.percent>=10&&msg.percent<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}}
   else if(msg.type==='done'){renderCardDone(jid,msg);showQmWarning(msg);const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone();refreshStartBtn()}
-  else if(msg.type==='error'){if(step)step.textContent='出错';const err=$('err-'+jid);if(err){err.textContent=msg.message;err.classList.add('show')}card.classList.add('job-card-done');const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone()}
+  else if(msg.type==='error'){if(step)step.textContent='出错';const err=$('err-'+jid);if(err){err.textContent=msg.message;err.classList.add('show')}const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone()}
   else if(msg.type==='llm_failed'){
     if(step)step.textContent='等待选择…';step.style.color='var(--yellow)';
     $('llmFallbackMsg').textContent=msg.message||'LLM 翻译全部失败，是否改用免费引擎继续？';

@@ -1,5 +1,6 @@
 """#9 yt-dlp video download — paste URL, download, enter pipeline."""
 import logging
+import os
 
 _log = logging.getLogger(__name__)
 
@@ -10,11 +11,6 @@ def is_ytdlp_available() -> bool:
         return True
     except ImportError:
         return False
-
-
-def _build_output_template(output_dir: str) -> str:
-    import os
-    return os.path.join(output_dir, "%(title)s.%(ext)s")
 
 
 def _make_progress_hook(callback=None):
@@ -32,16 +28,17 @@ def _make_progress_hook(callback=None):
     return _hook
 
 
-def download_video(url: str, output_dir: str, progress_callback=None) -> str | None:
+def _download_stream(url, output_dir, fmt, suffix, progress_callback):
+    """Download a single stream (video-only or audio-only)."""
     try:
         import yt_dlp
     except ImportError:
-        _log.warning("yt-dlp 未安装")
         return None
 
+    outtmpl = os.path.join(output_dir, f"%(title)s_{suffix}.%(ext)s")
     ydl_opts = {
-        "format": "best",
-        "outtmpl": _build_output_template(output_dir),
+        "format": fmt,
+        "outtmpl": outtmpl,
         "progress_hooks": [_make_progress_hook(progress_callback)],
         "quiet": True,
     }
@@ -51,5 +48,23 @@ def download_video(url: str, output_dir: str, progress_callback=None) -> str | N
             info = ydl.extract_info(url, download=True)
             return ydl.prepare_filename(info)
     except Exception:
-        _log.warning("yt-dlp 下载失败: %s", url, exc_info=True)
+        _log.warning("yt-dlp 下载失败 (%s): %s", suffix, url, exc_info=True)
         return None
+
+
+def download_video(url: str, output_dir: str, progress_callback=None) -> tuple[str, str | None] | None:
+    """Download video and audio as separate files.
+
+    Returns (video_path, audio_path) on success.
+    audio_path may be None if separate audio is unavailable.
+    Returns None on total failure.
+    """
+    video_path = _download_stream(
+        url, output_dir, "bestvideo[ext=mp4]/bestvideo/best", "video", progress_callback)
+    if not video_path:
+        return None
+
+    audio_path = _download_stream(
+        url, output_dir, "bestaudio[ext=m4a]/bestaudio", "audio", progress_callback)
+
+    return video_path, audio_path

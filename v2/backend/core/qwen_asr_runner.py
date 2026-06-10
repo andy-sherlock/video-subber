@@ -16,7 +16,7 @@ import re
 import subprocess
 import tempfile
 import time
-from difflib import SequenceMatcher
+from backend.core.hallucination_filter import LightweightStemmer
 
 _log = logging.getLogger("qwen_asr_runner")
 
@@ -45,41 +45,36 @@ def is_qwen_asr_available() -> bool:
     return _USE_MLX or _USE_PYTORCH
 
 
-# ── P147: anti-collapse generation parameters ──
-# ── P156 recalibration: aligned to WhisperJAV (repetition_penalty=1.1, 20 tok/s).
-# P147 first attempt (1.4 + 10 tok/s) overshot — killed normal output (qwen: 185→12).
-# 1.1 is a gentle nudge, not a gag.  20 tok/s gives 3× headroom while still
-# capping collapse at 6000 tok/chunk (was 15000 pre-P147, 3000 post-P147).
-_QWEN_REPETITION_PENALTY = 1.1   # P156: 1.4→1.1; gentle reminder, not a muzzle
-_QWEN_REPETITION_WINDOW = 256    # window is fine; the old PENALTY was the problem
-_QWEN_TOKENS_PER_SEC = 20        # P156: 10→20; 5min×20=6000 tok budget (3× headroom)
-                                 # normal speech ~6 tok/s; collapse still stops at 6000
-_QWEN_MIN_TOKENS = 256
+def _load_qwen_model():
+    """Load Qwen3-ASR model (MLX or PyTorch depending on platform)."""
+    if _USE_MLX:
+        from qwen3_asr_mlx import Qwen3ASR
+        return Qwen3ASR.from_pretrained("mlx-community/Qwen3-ASR-1.7B-bf16")
+    else:
+        from qwen_asr import Qwen3ASRModel
+        return Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
 
 
-def _qwen_gen_kwargs(duration_s, language=None, use_mlx=True) -> dict:
-    """Build kwargs for model.transcribe() (P147 → P156 recalibrated).
+# ── P207 qwen-asr v0.0.6: transcribe() takes (audio, context, language, return_time_stamps).
+# max_new_tokens=512 is built into the model constructor — no external cap needed.
+# P147→P156 anti-collapse params (repetition_penalty, max_tokens, etc.) removed;
+# v0.0.6 handles these internally.
 
-    Caps generated tokens to ~20/sec so a repetition collapse force-stops in
-    ~2 minutes instead of running to the default ~50/sec ceiling (~13.5 min).
-    P147 first attempt (10/sec + 1.4 penalty) overshot: killed normal output
-    (qwen 185→12 sentences).  P156 recalibrated to 20/sec (3× headroom) +
-    1.1 penalty (gentle nudge, aligned with WhisperJAV).
+# P222: v0.0.6 requires full language names ("English"), not short codes ("en").
+_LANG_NAME = {
+    "zh": "Chinese", "en": "English", "ja": "Japanese",
+    "ko": "Korean", "de": "German", "fr": "French",
+    "es": "Spanish", "it": "Italian", "pt": "Portuguese",
+    "ru": "Russian",
+}
 
-    Param names differ by backend: the MLX `transcribe()` takes `max_tokens` +
-    `repetition_penalty`/`repetition_context_size`; the PyTorch wrapper takes
-    `max_new_tokens` (its repetition params are unverified here, so omitted).
-    """
-    kwargs = {}
-    if language and language not in ("auto", ""):
-        kwargs["language"] = language
-    if duration_s and duration_s > 0:
-        cap = max(_QWEN_MIN_TOKENS, int(duration_s * _QWEN_TOKENS_PER_SEC))
-        kwargs["max_tokens" if use_mlx else "max_new_tokens"] = cap
-    if use_mlx:
-        kwargs["repetition_penalty"] = _QWEN_REPETITION_PENALTY
-        kwargs["repetition_context_size"] = _QWEN_REPETITION_WINDOW
-    return kwargs
+
+def _resolve_language(lang: str | None) -> str | None:
+    """Map short language code to full name for v0.0.6 transcribe()."""
+    if not lang or lang == "auto":
+        return None
+    return _LANG_NAME.get(lang, lang)
+
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -90,22 +85,27 @@ def _split_sentences(text: str) -> list[str]:
 def _match_qwen_to_whisper(
     qwen_sentences: list[str],
     whisper_segments: list,
+    language: str = "en",
 ) -> list[tuple[str, int]]:
     pairs: list[tuple[str, int]] = []
-    segment_texts = [
-        s.text.lower().strip() if s.text else "" for s in whisper_segments
+    segment_stems = [
+        LightweightStemmer.clean_and_stem(s.text or "", language)
+        for s in whisper_segments
     ]
 
     for qs in qwen_sentences:
-        qs_key = qs.lower().strip()
-        if not qs_key:
+        if not qs.strip():
+            continue
+        q_stems = LightweightStemmer.clean_and_stem(qs, language)
+        if not q_stems:
             continue
         best_idx = -1
         best_score = 0.0
-        for i, st in enumerate(segment_texts):
-            if not st:
+        for i, w_stems in enumerate(segment_stems):
+            if not w_stems:
                 continue
-            score = SequenceMatcher(None, qs_key, st).ratio()
+            shared = q_stems & w_stems
+            score = len(shared) / len(q_stems)
             if score > best_score:
                 best_score = score
                 best_idx = i
@@ -261,12 +261,7 @@ def _transcribe_raw_chunked(audio_path: str, segments, language=None) -> dict | 
 
     t0 = time.time()
 
-    if _USE_MLX:
-        from qwen3_asr_mlx import Qwen3ASR
-        model = Qwen3ASR.from_pretrained("mlx-community/Qwen3-ASR-1.7B-bf16")
-    else:
-        from qwen_asr import Qwen3ASRModel
-        model = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
+    model = _load_qwen_model()
 
     try:
         for idx, (_seg_start, _seg_end, t_start, t_end) in enumerate(chunks):
@@ -277,16 +272,17 @@ def _transcribe_raw_chunked(audio_path: str, segments, language=None) -> dict | 
                 _extract_audio_chunk(audio_path, t_start, t_end, chunk_path)
                 result = model.transcribe(
                     chunk_path,
-                    **_qwen_gen_kwargs(t_end - t_start, language, _USE_MLX))
+                    language=_resolve_language(language),
+                    )
 
                 if _USE_MLX:
                     text = result.text if result.text else ""
                     lang = getattr(result, 'language', None)
                     ts = None
                 else:
-                    text = result.text if hasattr(result, 'text') else ""
-                    lang = getattr(result, 'language', None)
-                    raw_ts = getattr(result, 'time_stamps', None)
+                    text = result[0].text if result else ""
+                    lang = result[0].language if result and hasattr(result[0], 'language') else None
+                    raw_ts = result[0].time_stamps if result else None
                     ts = raw_ts
 
                 if text:
@@ -294,20 +290,20 @@ def _transcribe_raw_chunked(audio_path: str, segments, language=None) -> dict | 
                 if lang:
                     all_languages.append(lang)
                 if ts is not None:
-                    # Offset timestamps by this chunk's start time
+                    extract_start = max(0.0, t_start - _AUDIO_PAD_S)
                     for t in ts:
                         if hasattr(t, 'items'):
                             for item in t.items:
                                 item.start_time = (
-                                    getattr(item, 'start_time', 0) + t_start)
+                                    getattr(item, 'start_time', 0) + extract_start)
                                 item.end_time = (
-                                    getattr(item, 'end_time', 0) + t_start)
+                                    getattr(item, 'end_time', 0) + extract_start)
                         elif isinstance(t, list):
                             for item in t:
                                 item.start_time = (
-                                    getattr(item, 'start_time', 0) + t_start)
+                                    getattr(item, 'start_time', 0) + extract_start)
                                 item.end_time = (
-                                    getattr(item, 'end_time', 0) + t_start)
+                                    getattr(item, 'end_time', 0) + extract_start)
                     all_timestamps.extend(ts)
 
                 _log.info("Qwen3-ASR chunk %d/%d 完成 (%.1fs–%.1fs)",
@@ -330,6 +326,98 @@ def _transcribe_raw_chunked(audio_path: str, segments, language=None) -> dict | 
     return {"text": merged_text, "language": merged_lang, "timestamps": merged_ts}
 
 
+def _process_single_chunk(model, audio_path, chunk_segments,
+                          t_start, t_end, language,
+                          chunk_idx=0, total_chunks=1,
+                          seg_start=0, seg_end=0):
+    """Process a single audio chunk: extract, transcribe, align to segments."""
+    fd, chunk_path = tempfile.mkstemp(
+        suffix=".wav", prefix=f"qwen_chunk_{chunk_idx}_")
+    os.close(fd)
+    try:
+        _extract_audio_chunk(audio_path, t_start, t_end, chunk_path)
+
+        result = model.transcribe(
+            chunk_path,
+            language=_resolve_language(language),
+            )
+        if _USE_MLX:
+            full_text = result.text if result.text else ""
+        else:
+            full_text = result[0].text if result else ""
+
+        if not full_text or not full_text.strip():
+            _log.info("Qwen3-ASR chunk %d/%d 无文字, 跳过",
+                      chunk_idx + 1, total_chunks)
+            return
+
+        has_timestamps = False
+        if not _USE_MLX:
+            try:
+                has_timestamps = bool(result[0].time_stamps) if result else False
+            except Exception:
+                pass
+
+        if has_timestamps:
+            extract_start = max(0.0, t_start - _AUDIO_PAD_S)
+            ts_all = []
+            for ts_obj in result[0].time_stamps if result else []:
+                if hasattr(ts_obj, 'items'):
+                    items = ts_obj.items
+                elif isinstance(ts_obj, list):
+                    items = ts_obj
+                else:
+                    items = []
+                for it in items:
+                    it.start_time = (
+                        getattr(it, 'start_time', 0) + extract_start)
+                    it.end_time = (
+                        getattr(it, 'end_time', 0) + extract_start)
+                ts_all.extend(items)
+            align_by_timestamps(ts_all, chunk_segments)
+        else:
+            align_by_similarity(full_text, chunk_segments)
+
+        _log.info("Qwen3-ASR chunk %d/%d 完成 (segs %d–%d, %.1fs–%.1fs)",
+                  chunk_idx + 1, total_chunks, seg_start, seg_end,
+                  t_start, t_end)
+    except Exception:
+        _log.warning("Qwen3-ASR chunk %d/%d 失败",
+                     chunk_idx + 1, total_chunks, exc_info=True)
+    finally:
+        try:
+            os.unlink(chunk_path)
+        except OSError:
+            pass
+
+
+def _qwen_consumer(q, audio_path, language):
+    """Consumer thread: load model, process chunks from queue until sentinel."""
+    try:
+        model = _load_qwen_model()
+    except Exception:
+        _log.warning("千ASR 消费者线程模型加载失败")
+        while True:
+            chunk = q.get()
+            if chunk is None:
+                break
+        return
+
+    try:
+        while True:
+            chunk = q.get()
+            if chunk is None:
+                break
+            chunk_segments, t_start, t_end = chunk
+            _process_single_chunk(model, audio_path, chunk_segments,
+                                  t_start, t_end, language)
+    except Exception:
+        _log.warning("千ASR 消费者线程异常", exc_info=True)
+    finally:
+        del model
+        gc.collect()
+
+
 def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> list:
     """Chunked cross-validation for long audio.
 
@@ -343,12 +431,7 @@ def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> lis
 
     t0 = time.time()
     try:
-        if _USE_MLX:
-            from qwen3_asr_mlx import Qwen3ASR
-            model = Qwen3ASR.from_pretrained("mlx-community/Qwen3-ASR-1.7B-bf16")
-        else:
-            from qwen_asr import Qwen3ASRModel
-            model = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
+        model = _load_qwen_model()
     except Exception:
         _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证")
         return segments
@@ -356,66 +439,9 @@ def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> lis
 
     for idx, (seg_start, seg_end, t_start, t_end) in enumerate(chunks):
         chunk_segments = segments[seg_start:seg_end]
-
-        fd, chunk_path = tempfile.mkstemp(
-            suffix=".wav", prefix=f"qwen_chunk_{idx}_")
-        os.close(fd)
-        try:
-            _extract_audio_chunk(audio_path, t_start, t_end, chunk_path)
-
-            result = model.transcribe(
-                chunk_path,
-                **_qwen_gen_kwargs(t_end - t_start, language, _USE_MLX))
-            if _USE_MLX:
-                full_text = result.text if result.text else ""
-            else:
-                full_text = result.text if hasattr(result, 'text') else ""
-
-            if not full_text or not full_text.strip():
-                _log.info("Qwen3-ASR chunk %d/%d 无文字, 跳过",
-                          idx + 1, len(chunks))
-                continue
-
-            # ── Alignment for this chunk ──
-            has_timestamps = False
-            if not _USE_MLX:
-                try:
-                    has_timestamps = (
-                        hasattr(result, 'time_stamps')
-                        and bool(result.time_stamps))
-                except Exception:
-                    pass
-
-            if has_timestamps:
-                ts_all = []
-                for ts_obj in result.time_stamps:
-                    if hasattr(ts_obj, 'items'):
-                        items = ts_obj.items
-                    elif isinstance(ts_obj, list):
-                        items = ts_obj
-                    else:
-                        items = []
-                    for it in items:
-                        it.start_time = (
-                            getattr(it, 'start_time', 0) + t_start)
-                        it.end_time = (
-                            getattr(it, 'end_time', 0) + t_start)
-                    ts_all.extend(items)
-                align_by_timestamps(ts_all, chunk_segments)
-            else:
-                align_by_similarity(full_text, chunk_segments)
-
-            _log.info("Qwen3-ASR chunk %d/%d 完成 (segs %d–%d, %.1fs–%.1fs)",
-                      idx + 1, len(chunks), seg_start, seg_end,
-                      t_start, t_end)
-        except Exception:
-            _log.warning("Qwen3-ASR chunk %d/%d 失败",
-                         idx + 1, len(chunks), exc_info=True)
-        finally:
-            try:
-                os.unlink(chunk_path)
-            except OSError:
-                pass
+        _process_single_chunk(model, audio_path, chunk_segments,
+                              t_start, t_end, language, idx, len(chunks),
+                              seg_start, seg_end)
 
     del model
     gc.collect()
@@ -468,23 +494,18 @@ def transcribe_raw(audio_path: str, segments_hint=None, language=None) -> dict |
     _dur = _get_audio_duration(audio_path)
     model = None
     try:
+        model = _load_qwen_model()
+        result = model.transcribe(
+            audio_path,
+            language=_resolve_language(language),
+            )
+        lang = result[0].language if result and hasattr(result[0], 'language') else None
         if _USE_MLX:
-            from qwen3_asr_mlx import Qwen3ASR
-            model = Qwen3ASR.from_pretrained("mlx-community/Qwen3-ASR-1.7B-bf16")
-            result = model.transcribe(
-                audio_path, **_qwen_gen_kwargs(_dur, language, True))
-            lang = getattr(result, 'language', None)
             text = result.text if result.text else ""
             ts = None
         else:
-            from qwen_asr import Qwen3ASRModel
-            model = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
-            result = model.transcribe(
-                audio_path, return_time_stamps=True,
-                **_qwen_gen_kwargs(_dur, language, False))
-            lang = getattr(result, 'language', None)
-            text = result.text if hasattr(result, 'text') else ""
-            ts = getattr(result, 'time_stamps', None)
+            text = result[0].text if result else ""
+            ts = result[0].time_stamps if result else None
     except Exception:
         _log.warning("Qwen3-ASR 转录失败", exc_info=True)
         return None
@@ -505,6 +526,8 @@ def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
         return segments
 
     # ── Chunked path: total audio > 20 min ──
+    if not segments:
+        return segments
     total_duration = segments[-1].end
     if total_duration > _LONG_AUDIO_THRESHOLD_S:
         _log.info("音频 %.0fs > 20min，启用 Qwen 分段对齐", total_duration)
@@ -513,12 +536,7 @@ def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
     # ── Direct path (original behaviour) ──
     t0 = time.time()
     try:
-        if _USE_MLX:
-            from qwen3_asr_mlx import Qwen3ASR
-            model = Qwen3ASR.from_pretrained("mlx-community/Qwen3-ASR-1.7B-bf16")
-        else:
-            from qwen_asr import Qwen3ASRModel
-            model = Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
+        model = _load_qwen_model()
     except Exception:
         _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证")
         return segments
@@ -528,13 +546,14 @@ def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
     try:
         result = model.transcribe(
             audio_path,
-            **_qwen_gen_kwargs(total_duration, language, _USE_MLX))
+            language=_resolve_language(language),
+            )
         if _USE_MLX:
             detected_lang = getattr(result, 'language', None)
             full_text = result.text if result.text else ""
         else:
-            detected_lang = getattr(result, 'language', None)
-            full_text = result.text if hasattr(result, 'text') else ""
+            detected_lang = result[0].language if result and hasattr(result[0], 'language') else None
+            full_text = result[0].text if result else ""
     except Exception:
         _log.warning("Qwen3-ASR 转录失败，跳过交叉验证")
         del model
@@ -552,14 +571,14 @@ def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
     has_timestamps = False
     if not _USE_MLX:
         try:
-            has_timestamps = hasattr(result, 'time_stamps') and bool(result.time_stamps)
+            has_timestamps = bool(result[0].time_stamps) if result else False
         except Exception:
             pass
 
     if has_timestamps:
         _log.info("Qwen->Whisper 使用时间戳对齐（PyTorch 路径）")
         ts_all = []
-        for ts in result.time_stamps:
+        for ts in (result[0].time_stamps if result else []):
             if hasattr(ts, 'items'):
                 ts_all.extend(ts.items)
             elif isinstance(ts, list):

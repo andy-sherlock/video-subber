@@ -1086,7 +1086,7 @@ if status == "interrupted":
 
 ---
 
-## P039 | 2026-05-21 | V2 后端 | 服务端 tier 无鉴权，免费用户可绕过付费墙（🔴 blocking）
+## P164 | 2026-05-21 | V2 后端 | 服务端 tier 无鉴权，免费用户可绕过付费墙（🔴 blocking）
 
 **问题**：整个 tier 体系完全依赖客户端传入。攻击路径：
 ```
@@ -1102,7 +1102,7 @@ if status == "interrupted":
 1. 短期：加环境变量 `VIDEO_SUBBER_TIER` 控制全局 tier，所有请求以此为准，忽略客户端传入值
 2. 长期（V3）：完整账号系统 + JWT token，每个请求从 token 中提取 tier
 
-**已修** ❌
+**已过时**（V3 砍掉付费墙，tier 体系已删除。orchestrator.py 注释："Tier system removed"）
 
 
 ---
@@ -1143,7 +1143,7 @@ function cancelCard(jid){function cancelCard(jid){  // 外层只声明内层函�
 3. 检查 git history 确认是否已推送，如已推送需清理历史或视为已泄露
 4. 添加 `.env.example` 模板文件，`.env` 加入 `.gitignore`
 
-**已修** ❌
+**已修** ✅（V3 删除 PLATFORM_KEYS，改为 _ALL_FREE 字典。orchestrator.py:16-20 不再硬编码任何 API Key）
 
 
 ---
@@ -1161,7 +1161,7 @@ if backend and backend.is_llm:
 
 **解决方案**：修改两个 mode 函数，返回 `(translated_list, TranslationResult | None)` 而非 `(translated_list, backend_name | None)`。在第一次调用时就拿到 token 信息。
 
-**已修** ❌
+**已修** ✅（V3 重构 _run_speed_mode_batch 直接返回 r.tokens_used，一次 API 调用同时拿到翻译+用量。旧的双调用死代码已删除）
 
 
 ---
@@ -1178,7 +1178,7 @@ all_backends = ordered_backends + llm_backends
 
 **解决方案**：免费模式（`tier == "free"`）下忽略 `api_keys` 参数，不调用 `_build_llm_backends`。`all_backends` 仅使用 `ordered_backends`。
 
-**已修** ❌
+**已过时**（V3 砍掉付费墙，所有用户均可自备 Key 使用 LLM。orchestrator.py:1-2："Tier system removed — LLM access gated by whether user provides API keys"）
 
 
 ---
@@ -1197,7 +1197,7 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 
 **解决方案**：烧录完成后立即 `ck.save("burn", meta=config)`，然后 `ck.save("done", meta=config)`。或在步骤判断中加「输出文件已存在 → 跳过」逻辑。
 
-**已修** ❌
+**已修** ✅（2026-06-05。worker.py:493-502 — 烧录前检查 video_out 是否存在，封装前检查 video_out_mux 是否存在。存在则跳过，避免崩溃恢复后重复编码。5 个回归测试，全量 278 测试通过）
 
 
 ---
@@ -1210,7 +1210,7 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 
 **解决方案**：使用稳定机器标识（如 Mac 序列号 `ioreg -l | grep IOPlatformSerialNumber`、或直接用 macOS Keychain）。解密失败时给出明确提示而非静默返回密文。
 
-**已修** ❌
+**已过时** ✅（2026-06-05 核查）。V3 已实质性砍掉加密方案——`encrypt_api_key`/`decrypt_api_key` 在整个项目中无任何调用方（grep 全项目零结果）。API Key 现明文存储于 `~/.video-subber/config.json`。`key_manager.py` 中仅 `scrub_logs`（日志脱敏）仍在使用，加密相关函数为死代码。清理归入 V3.08（目录整理时顺带删）。
 
 
 ---
@@ -1221,7 +1221,7 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 
 **建议方案**：去掉确认按钮改为即时生效，或用户未确认时点击「开始翻译」给出醒目提示。
 
-**已修** ❌
+**已过时**（V3.09 PySide6 重写前端，字幕样式交互将随新 UI 重新设计）
 
 
 ---
@@ -1232,13 +1232,11 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 
 **解决方案**：添加 `logging.getLogger("baidu").warning("翻译失败: %s", e)`。
 
-**已修** ❌
+**已过时**（V3 砍掉百度翻译，BaiduBackend 类已从代码库中移除）
 
 ---
 
-## P039 | 2026-05-21 | V2.04 前端 | 初始化时序混乱——页面加载时灰蒙蒙锁死，模型滑块消失
-
-**问题**（持续了五六轮修复都没修好）：
+## P163 | 2026-05-21 | V2.04 前端 | 初始化时序混乱——页面加载时灰蒙蒙锁死，模型滑块消失
 1. Whisper 模型选择滑块（5 个圆点）消失
 2. API Key 平台下拉框空白
 3. 翻译模式无法点击切换
@@ -1271,6 +1269,8 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 - 异步数据加载必须 `await`，不能"发射后不管"
 - 改动面越小越安全——只换外壳、不动血肉
 
+**已过时**（V3.09 PySide6 重写前端，HTML 前端及 init 逻辑将废弃）
+
 
 ---
 
@@ -1290,8 +1290,64 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 2. 或：要求前端传 `X-Reset-Token` header，服务端从环境变量读取校验
 3. 长期（V3）：仅管理员账号可调用
 
-**已修** ❌
+**已修** ✅（V3 删除 /api/reset 端点。grep main.py 无匹配结果）
 
+---
+
+## P165 | 2026-06-06 | LLM 翻译 | 内容闸 + LLM 健康检查应前移到 P1 之后——浪费 token（🟡 important）
+
+**问题**：当前内容闸（`_is_valid_translation`，CJK 比例 < 10% 判定非中文）只在 P2 滑窗翻译的每行输出做逐行检查。但 LLM 健康检查在 `translate_with_orchestrator` 中没有前置检查——P1 跑完直接跑 P2，如果 LLM 在 P2 全部失败（如 DeepSeek 间歇性俄语照抄），P1 的 token 也白花了。
+
+**具体缺陷**：
+1. P1 输出需要中文（术语提取要求"原文→中文翻译"，语境摘要要求"中文，100字内"），但当前代码没有检查 P1 输出是否真的含中文
+2. P1 本身既是功能调用，也是天然的烟雾测试——如果 LLM 摘要都返回不了中文，后面翻译肯定废了
+3. 内容闸放在 P2 每行检查是对的（细粒度兜底），但缺少 P1 层面的粗粒度前置检查（省 token）
+
+**根因**：`translate_with_orchestrator` 中，P1（`extract_terminology` + `_generate_context_summary`）的返回值没有做目标语言校验就进入了 P2。
+
+**解决方案**（2026-06-06 Jobs 讨论锁定）：
+1. P1 之后加一层粗粒度内容闸：语境摘要 CJK 比例 < 10% → 判定 LLM 不可靠 → 降级免费引擎，不跑 P2
+2. P1 超时/异常 → `except Exception` 已有处理，自动进入降级链（现状正确，保持）
+3. P2 逐行 `_is_valid_translation` 保留，作为细粒度兜底
+4. 不需要额外加"预检"步骤——P1 本身就是烟雾测试
+
+**归属**：V3.07
+
+**已修** ✅（2026-06-07 — orchestrator.py P1 摘要后 CJK<10% → `continue` 跳到降级链下一个 LLM）
+
+---
+
+## P166 | 2026-06-06 | 幻觉过滤 | L4 正则硬过滤在双模型确认后仍丢弃——处理顺序与规则力度需调整（🟡 important）
+
+**问题**：当前五层过滤处理顺序为 L1 → L4 → L5 → L2 → L3。L4（正则规则匹配）在 L2（Whisper vs Qwen3-ASR 交叉验证）之前执行——L4 做丢弃决策时不知道 L2 是否已双模型确认该文本。L4 的规则是单模型时代产物，在双模型架构下部分规则会误杀真实对话。
+
+**具体场景**：
+- 说话人大笑说"哈哈哈哈哈" → Whisper+P6转录为"哈哈哈哈哈"→ L2 交叉验证：两个模型一致，文本可信 → 但 L4 重复模式正则跑在 L2 前面 → 检测到重复字符 → 直接丢弃
+- 两个独立 AI 都确认的内容，被一条正则规则推翻
+
+**根因**：L4 规则无差别硬丢弃，不区分"单模型时代的高风险模式"和"双模型确认后的真实内容"。
+
+**解决方案**（2026-06-06 plan-eng-review 锁定）：
+
+**1. 调整处理顺序：L1 → L2 → L4 → L5 → L3**
+- L2 提前，先完成交叉验证，让 L4 知道双模型是否确认了该文本
+
+**2. L4 规则分两类**：
+
+| L4 规则 | 双模型确认后 | 原因 |
+|---------|:--:|------|
+| 纯符号 | 仍丢弃 | 两个模型都只出符号 = AI 崩溃 |
+| 括号描述 "(掌声)" | 仍丢弃 | Whisper 内部格式泄露 |
+| 循环句式 | 仍丢弃 | 安全兜底 |
+| 关键词黑名单 | **不丢** | 双模型确认可信度 > 关键词猜测 |
+| 重复模式 "哈哈哈" | **不丢** | 双模型确认可信度 > 重复检测 |
+| 重复词 | **不丢** | 双模型确认可信度 > 重复检测 |
+
+**3. 改动面**：单文件 `hallucination_filter.py`，`filter_hallucinations()` 调整执行顺序 + L4 加条件判断。~10 行。
+
+**归属**：V3.07
+
+**已修** ✅（2026-06-07 TDD 通过，顺序 L1→L2→L4→L5→L3，l2_status 标注，6 测试）
 
 ---
 
@@ -1310,7 +1366,7 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 2. DOMContentLoaded 中将 `loadConfig()` 改为 `await loadConfig()`（先等 config 就绪，再用最终 tier 调 `/api/backends`）
 3. `reloadEnv()` 保留在 DOMContentLoaded 外（环境检测不依赖 API 数据，可尽早触发）
 
-**已修** ❌
+**已过时**（V3.09 PySide6 重写前端，HTML init 双重执行问题不复存在）
 
 
 ---
@@ -1323,7 +1379,7 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 
 **解决方案**：删除该函数。
 
-**已修** ❌
+**已修** ✅（V3 重写 orchestrator.py，_flatten_batches 函数已不存在。grep 无结果）
 
 
 ---
@@ -1351,7 +1407,7 @@ build_srt → build_ass_styled → burn_subtitles（耗时长）
 
 **解决方案**：每条翻译后 `time.sleep(0.15)`（V1 已验证的安全间隔），或当结果连续失败 3 条时暂停 5 秒后重试。
 
-**已修** ❌
+**已修** ✅（V3 GoogleBackend 改用 `|||` 分隔符批量拼接全部文本，一次 HTTP 请求完成所有翻译。google.py:14-25）
 
 ---
 
@@ -2638,9 +2694,11 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 
 **原因**：Phase 1D 在 SenseVoice 之后插入了 Qwen3-FA，改变了时间戳。
 
-**解决方案**：调换 SenseVoice 和 Qwen3-FA 的执行顺序。架构调整，实际影响极小。
+**解决方案**：调换执行顺序——SenseVoice 移到 Qwen3-FA 之后，同时 Qwen3-FA 对齐置信度作为独立信号④喂给 L2。已合并进 P152+P144（V3.07 转录流水线重构）。
 
-**已修** ❌（推迟到架构重构时处理）
+**归属**：V3.07（合并进 P152+P144 转录流水线重构）
+
+**已修** ✅（2026-06-07 ARCH ⑦ 正式修复：FA 对齐先于 SV 贴标，_apply_sv_tags 拆为模块级函数在 Step 5 调用。347 测试全过）
 
 ---
 
@@ -2686,7 +2744,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 **问题**：`_CHUNK_MAX_DURATION_S = 300`。模型支持 20 分钟，应改为 15 分钟。2 小时视频从 24 chunk 降到 8 chunk。
 **解决方案**：`300 → 900`。
 
-**已修** ❌（V3.05 一次性修复全部 6 项）
+**已修** ✅（V3.05 已修复。main.py:175-209 启动时扫描全部历史 job 重建 GLOBAL_HASH_INDEX；main.py:656-675 interrupted 任务自动重启 Worker；/api/active-jobs 端点就绪）
 
 ## P147 | 2026-06-05 | Phase 1D 转录 | 千问 ASR 重复坍缩/生成失控（13.5 分钟卡死）
 **测试**：job 97c57255ec，24 分钟俄语成人视频，V3.05，tier=precise。
@@ -2736,7 +2794,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 **问题**：想用千问 context（喂背景/人名/术语纠偏）提准确率，但本地 `qwen3_asr_mlx` 0.1.1 的 `transcribe()` 没这个参数，`build_prompt` 只能塞语言。
 **原因**：context 是千问模型本身的能力，官方开源版（transformers/vllm）和云端 Flash 都支持，但你装的这个社区 MLX 小包没实现。
 **解决方案**：用户决策——**延期到 V3 后期，Windows 系统实测。** Mac MLX 版缺 context 是平台限制，非 bug。Windows 用户用的官方 transformers 版理论上支持 context，届时实测验证。不需在 Mac 上换包。
-**已修** ❌（延期到 V3 Windows 实测）
+**已修** ❌（延期到 V3 Windows 实测。2026-06-05 核查确认：第三方 MLX 包限制，非本项目代码问题。Mac 路径无法修复，等 Windows PyTorch 路径实测后再评估是否需要自行封装）
 
 ## P152 | 2026-06-05 | 转录调度 | Whisper 和千问没真正并行，修复方案：错开流水线
 
@@ -2750,7 +2808,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 
 **前置条件（关键）**：**必须先端到端验证 P147/P148，确认千问不再坍缩。** 否则只是让一个 4% 有用、还拖垮 Whisper 的功能跑得更快——优化负价值功能的速度仍是负价值（Steve Jobs 审查结论：先跑测试，数字说话）。
 
-**已修** ❌（计划锁定，端到端验证 P147/P148 通过后解锁）
+**已修** ✅（2026-06-07，V3.07 ARCH ⑦ 生产者-消费者流水线。Whisper 边转录边喂千ASR，并行省时 ~13min。347 测试全过）
 
 ## P154 | 2026-06-05 | 配置 | API Key 加密导致 key 反复丢失
 
@@ -2876,9 +2934,11 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 - Worker 在转录阶段改 emit，把 `step` 从统一的 "转译中" 改为子阶段描述（"Whisper 转录中…""交叉验证中…(Qwen3)""声音分类中…(SenseVoice)"）
 - 不加新字段、不改数据结构、不碰前端代码
 
-**推迟原因**：当前前端是临时 HTML（Phase 2 被 PySide6 替换）。在即将废弃的代码上加 UI 优化是浪费。Phase 2 做 PySide6 时一并重构进度体验。
+**推迟原因**：当前前端是临时 HTML（即将被 PySide6 替换）。在即将废弃的代码上加 UI 优化是浪费——就像给纸板模型喷漆。
 
-**已修** ❌（推迟到 Phase 2，与 PySide6 前端一起做）
+**归属**：V3.09（PySide6 前端重写时一并实现）
+
+**已修** ❌
 
 ## P160 | 2026-06-05 | 千问对齐 | 千问产 2062 短句 vs Whisper 266 段 → 量级差触相似度匹配 → 映射率仅 35%
 
@@ -2899,7 +2959,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 - C) 改词级比对（P149 备选方案）
 - D) 先不动——35% 的交叉验证覆盖也比 6% 强，且翻译 254/254 全成功，终端用户无感
 
-**已修** ❌（方案锁定，待进入版本迭代后执行）
+**已修** ✅（2026-06-07 TDD 通过，SequenceMatcher→LightweightStemmer）
 
 ### ✅ P160 终版解决方案（2026-06-05 Steve Jobs 审查锁定）
 
@@ -2958,11 +3018,1694 @@ Whisper + 千问各自转录
 
 **影响**：新 L2 的双重确认逻辑代码本身是正确的，但被上游截流了。当前不影响核心功能——剩下的 266 段人声区仍然完整进入窗口比对。但"非人声区域双重确认"的设计意图没有完全落地。
 
-**解决方案**（Steve Jobs + 用户决策·Phase 2 执行）：
-- `transcriber_v2.py` L283-292 修改：`trim_segments_by_sensevoice()` 改为只标记 `seg.sensevoice_tag`，不做物理删除
-- 全量段落下推至 `filter_hallucinations()`，由新 L2 统一做双重确认判决（`HALLUCINATION_RED` / `SUSPICIOUS_AMBIGUOUS`）
+**深度分析**（2026-06-06 · Steve Jobs + 用户审查）：
 
-**推迟原因**：当前不改 `transcriber_v2.py`，保持本轮改动集中在 `hallucination_filter.py` 单文件。核心目标（调校俄语窗口比对门槛）不受影响——266 段人声区完整可用。
+P161 不是"缺一个功能"，而是三个历史遗留问题叠加：
 
-**已修** ❌（推迟到 Phase 2，与 P159 一起做）
+**问题一：保安有两处可以独自删段。** 第一道门在 `transcriber_v2.py:292`——`trim_segments_by_sensevoice()` 在审稿之前就物理删除段。第二道门在 `hallucination_filter.py:169-175`——L1 单信号 fallback，当校对员（王五/Qwen3-FA）没交报告时，保安一个人决定删除。两道门都违背了"双确认才删除"的原则。
+
+**问题二：并行搭档搭错人。** 代码里已有并行执行（`transcriber_v2.py:245-262`），但把保安（SenseVoice）和第二个速记员（李四/Qwen3-ASR）配成一对。保安应该跟校对员（王五/Qwen3-FA）搭档——两者回答同一个问题："这段到底有没有人在说话？"
+
+**问题三：校对员只在精确档上班。** 标准模式下保安来上班了，但校对员不来（`transcriber_v2.py:323` 限制了 `transcription_tier == "precise"`）。保安没搭档→备用条款生效→一个人说了算。而标准模式是大多数用户选的。
+
+**解决方案**（Steve Jobs + 用户决策·V3.07 执行）：
+
+- ① **砍掉第一道门**：删掉 `trim_segments_by_sensefuture` 调用。保安只贴标签（`seg.sensevoice_tag`），不撕稿子。
+- ② **砍掉第二道门的备用条款**：删掉 L1 的单信号降级路径。双信号是唯一路径——没有双信号就没有删除判决。不是"改软"，是彻底删除。修完后标准和精确档保安和王五都在，不存在保安一个人在场的情况。
+- ③ **修正并行搭档**：把并行执行的配对从"保安+李四"改成"保安+王五"。李四跟张三搭档（维度A的内容对比）。
+- ④ **王五在标准档也上班**：Qwen3-FA 不再锁在精确档。标准和精确都需要维度B。修完后：
+  - 标准 = 张三一人转录 + 保安+王五人声确认
+  - 精确 = 张三+李四双转录 + 保安+王五人声确认
+  - 维度A（内容对比）仅精确档开，维度B（人声确认）两个档都开
+
+**不改的东西**：维度A和维度B的判断逻辑（2×2 矩阵、窗口词干比对）已在 `hallucination_filter.py` 中，不需要重写。快速模式不受影响。翻译管线、字幕生成、烧录完全不碰。
+
+**归属**：V3.07（后端精度收尾批次）
+**已修** ✅（2026-06-07 TDD 通过，4 子任务全部完成，8 测试）
+
+
+## P162 | 2026-06-05 | 翻译 | P157 根因 — DeepSeek prompt 缺目标语言声明
+
+**问题**：P157 的内容闸正确拦截了 DeepSeek 返回俄语原文的症状，但根因未修——`_SUBTITLE_PROMPT` 从未显式声明"翻译成简体中文"。V2.12 时代 prompt 短（4 条规则），DeepSeek 能从"你是专业视频字幕翻译"推断目标语言。V3 重构后 prompt 大幅扩展（+内容类型策略 +术语表 +上下文摘要），DeepSeek (`deepseek-chat`) 在复杂多段 prompt 上指令跟随能力弱于 GPT-4/Claude，面对俄语输入 + 没明确目标语言的复杂 prompt → 选择了最安全的做法：保留原文。
+
+**证据**：
+- DeepSeek 后端代码（`deepseek.py`、`base.py`）V2.08→V3.06 **零改动**——模型、API、temperature 完全一样
+- `_SUBTITLE_PROMPT` 从 V2.12 的 4 行简短规则变为 V3 的多段复杂结构
+- 两个版本都没写"翻译成中文"，但简短版 DeepSeek 能推断，复杂版推断失败
+- 用户四次测试：前两次（V3.01-V3.03？）翻译正常，后两次（V3.05+）返回俄语——与 prompt 在 V3.01 就变了矛盾，需用户确认前两次测试是否也是俄语视频+DeepSeek
+
+**解决方案**（Steve Jobs 锁定）：新增 `_TARGET_LANGUAGE` 变量，嵌入 prompt——今天值是 `"简体中文"`，未来从 config 读用户选择的语言。一个变量，一个 prompt，不和未来冲突。
+
+```python
+_TARGET_LANGUAGE = "简体中文"
+
+_SUBTITLE_PROMPT = (
+    f"你是专业视频字幕翻译，所有翻译的目标语言为{_TARGET_LANGUAGE}。翻译规则：\n"
+    ...
+)
+```
+
+**归属**：V3.07（与 P149/P161 同批）
+
+**已修** ✅（2026-06-07 TDD 通过，`_TARGET_LANGUAGE = "简体中文"` 嵌入 prompt）
+
+---
+
+## P167 | 2026-06-07 | SenseVoice | SenseVoice 标签匹配用严格包含——跨边界段落漏贴标签
+**问题**：transcriber_v2.py 第 289 行，给段落贴 SenseVoice 标签时，要求段落完全落在事件范围内（`ev["start_s"] <= seg.start and seg.end <= ev["end_s"]`）。如果段落跨越事件边界（比如音乐事件到 2.5 秒，段落从 2.3 到 4.1 秒），标签不会被贴上。
+**原因**：条件判断用了"完全包含"而非"有重叠"
+**解决方案**：改为 overlap 匹配，取最大重叠事件，≥50% 重叠率才贴标签
+**归属**：V3.07 第一批 [BUG]（与 P161/P166/P160 同批）
+**已修** ✅（2026-06-07 TDD 通过，overlap ≥50% 匹配，5 测试）
+
+---
+
+## P168 | 2026-06-07 | 千问分段 | 分段转录时间戳偏移 5 秒——缓冲区未修正
+**问题**：qwen_asr_runner.py 第 302 行和第 399 行，分段转录时提取音频多切了 5 秒前导缓冲（`extract_start = max(0, t_start - 5)`），但回算时间戳时用的是 `t_start` 而非 `extract_start`，导致所有词的时间戳系统性偏后 5 秒
+**原因**：偏移量用错变量
+**解决方案**：传入 `extract_start = max(0, t_start - _AUDIO_PAD_S)` 做偏移基准。改 2 个函数各 2 行
+**归属**：V3.07 第三批 [ARCH]（P152+P144 流水线重构时一并修）
+**已修** ✅（2026-06-07 TDD 通过，extract_start 替代 t_start，347 测试全过）
+
+---
+
+## P169 | 2026-06-07 | 千问对齐 | run_qwen_asr 直接路径缺 return_time_stamps=True
+**问题**：qwen_asr_runner.py 第 529 行，run_qwen_asr() 调用 model.transcribe() 时未传 return_time_stamps=True，导致 PyTorch 路径永远拿不到时间戳，退化为文字相似度对齐
+**原因**：遗漏参数（transcribe_raw 有传，run_qwen_asr 没传）
+**解决方案**：在 PyTorch 分支加 `return_time_stamps=True`。1 行改动
+**归属**：V3.07 第三批 [ARCH]（P152+P144 流水线重构时一并修）
+**已修** ✅（2026-06-07 TDD 通过，return_time_stamps 统一放 _qwen_gen_kwargs()，347 测试全过）
+
+---
+
+## P170 | 2026-06-07 | 千问对齐 | run_qwen_asr 对空段落列表未做防护
+**问题**：qwen_asr_runner.py 第 508 行，`total_duration = segments[-1].end` 未检查 segments 是否为空。纯静音音频经 Whisper 返回 0 段落时，触发 IndexError 崩溃
+**原因**：缺空列表检查
+**解决方案**：第 508 行前加 `if not segments: return segments`。1 行
+**归属**：V3.07 HARDEN 就地修
+**已修** ✅（2026-06-07 — run_qwen_asr() 第 544-545 行加 `if not segments: return segments`。_chunk_segments() 第 207 行已有同名防护，现覆盖全部入口）
+
+---
+
+## P171 | 2026-06-07 | 幻觉过滤 | L2 窗口分数只用 Whisper 词干数做分母——短窗口偏向高分
+**问题**：hallucination_filter.py 第 377 行，score = len(shared) / len(w_stems)。Whisper 在某窗口只出 3 个词时，3/3=1.0=绿灯，即使这 3 个词是幻觉
+**原因**：分母只取一侧，未考虑双方词数差异
+**解决方案**：两步修复——
+1. MIN_STEMS=5 门槛：词干数<5 时标记 LOW_DATA 而非 GREEN/YELLOW
+2. Steve Jobs 审查（2026-06-07）：分母从 `min(w, q)` 改为 `max(w, q)`。当 Qwen 6 字/Whisper 20 字/相同 6 字时，旧分数 6/6=100%（假绿灯），新分数 6/20=30%（正确暴露信息缺失）。不需要新参数——`max` 自动惩罚量级不平衡
+**归属**：V3.07 第二批 [FEATURE]
+**已修** ✅（MIN_STEMS 门槛 + max 分母，385 测试全过）
+
+---
+
+## P172 | 2026-06-07 | 幻觉过滤 | L4 重复词正则漏 2 次重复
+**问题**：hallucination_filter.py 第 122 行，`_RE_REPEATED_WORDS` 正则要求至少重复 3 次（`\2{2,}`），"谢谢 谢谢"这种 2 次重复不会被捕获
+**原因**：正则门槛偏高
+**解决方案**：将 `{2,}` 改为 `{1,}`。但需评估误杀率（"你好 你好"可能是正常对话）
+**归属**：V3.07 HARDEN 就地修（评估后决定）
+**已修** ✅（2026-06-07 — 正则从 `^((\S+)\s+)\2{2,}\2*$` 改为 `^(\S+)(\s+\1)+$`。原结构对有空格分隔的 3+ 词根本不上匹配——不仅是门槛问题。新正则同时修复了匹配逻辑和门槛问题）
+
+---
+
+## P173 | 2026-06-07 | 千问对齐 | 模型加载/释放代码重复 4 处
+**问题**：qwen_asr_runner.py 中 4 个函数各自写了一套 MLX/PyTorch 分支加载模型的代码（第 264、347、471、517 行），模型 ID 散布在 4 处
+**原因**：历史堆叠，未提取公共函数
+**解决方案**：提取 `_load_qwen_model()` 公共函数，4 处统一调用
+**归属**：V3.07 HARDEN [CLEANUP]
+**已修** ✅（2026-06-07 TDD 通过，归入 ARCH ⑦ P152+P144 流水线重构，347 测试全过）
+
+---
+
+## P174 | 2026-06-07 | 功能 | YouTube/B站 链接直传——下载到缓存自动入流水线
+**问题**：当前 video_downloader.py 已实现 yt-dlp 下载能力，但下载路径是用户可见的 ~/Downloads/Video-Subber/，且下载后不自动进入流水线，需要用户手动操作
+**解决方案**（2026-06-07 实现）：
+1. main.py `create_job` 新增 URL 模式：`{"url": "https://..."}` → 创建 job，config 中设 `source_url`，hash 基于 URL 字符串
+2. worker.py 管线启动前检测 `config["source_url"]`：`stderr_progress("download", ...)` 推送进度 → `download_video()` 下载到 job_dir → 更新 `video_path` 和 `video_filename` → 继续正常流水线
+3. video_downloader.py 无改动，`download_video(url, output_dir)` 直接复用
+4. 旧 `/api/download-video` 端点保留（独立下载功能）
+**前端**：URL 输入框留给 V3.09 PySide6
+**归属**：V3.07 第二批 [FEATURE]
+**已修** ✅
+
+---
+
+## P175 | 2026-06-07 | P152 审查 | Whisper 模型释放时机——流水线模式下必须等 generator 迭代完
+**问题**：plan-eng-review 审查 P152 流式并行方案时确认——Whisper generator 引用了 model 对象，generator 迭代完之前不能 del model，否则 segfault
+**结论**：当前代码 line 229-231 的 `del model; gc.collect()` 位置就在 for 循环之后，已经安全。流水线模式下不需改动此处。Whisper 在 GPU VRAM（~3GB），千ASR 在 CPU RAM（~4.7GB），不冲突
+**归属**：V3.07 第三批 [ARCH]（P152 实现时确认即可）
+**已修** 🔧（无需改代码，实现时确认位置）
+
+---
+
+## P176 | 2026-06-07 | P152 审查 | Producer-Consumer 同步机制选型——主线程和千ASR线程怎么配合
+**问题**：流水线模式下主线程跑 Whisper 产出 segments，消费者线程跑千ASR 处理。需要一个同步机制让消费者知道"有新数据了"
+**方案**：`threading.Event` + `threading.Lock` + 共享 `results` 列表。Event 做通知（producer 每 10 段 set 一次唤醒 consumer），Lock 保护 results 列表的并发读写。比 `queue.Queue` 改动更小——results 列表已经存在，consumer 需要读 segments 的 .start/.end 来分块
+**归属**：V3.07 第三批 [ARCH]（P152 实现）
+**已修** ✅（2026-06-07 — queue.Queue + threading.Thread 在 ARCH ⑦ 流水线重构中实现）
+
+---
+
+## P177 | 2026-06-07 | P152 审查 | 消费者动态分批逻辑——攒够多少段才处理一批
+**问题**：`_chunk_segments()` 需要一次性拿到所有 segments 才能分批。流水线模式下 segments 逐渐到达，consumer 需要自己判断"够一批了"
+**方案**：
+1. Consumer 每次被 Event 唤醒后检查新增 segments 的累计时长
+2. 累计时长 >= 300s（5 分钟）→ 取出这批，调千ASR 处理
+3. Producer 结束后设 done Event → consumer 处理剩余的（不够 5 分钟的尾批）
+4. 不复用 `_chunk_segments()`，consumer 自己维护 `processed_up_to` 指针
+**归属**：V3.07 第三批 [ARCH]（P152 实现）
+**已修** ✅（2026-06-07 — 动态分批 + 尾批处理在 ARCH ⑦ 流水线重构中实现）
+
+---
+
+## P178 | 2026-06-07 | Steve Jobs 审查 ARCH ⑨ | _CHUNK_SIZE / _OVERLAP_SIZE 死代码残留
+**问题**：ARCH ⑨ 完成后，`_translate_whole_with_markers()` 已改用 `_compute_chunk_size(llm)` 动态计算分块大小，但 `orchestrator.py:326-328` 的 `_CHUNK_SIZE = 1200` 和 `_OVERLAP_SIZE = int(_CHUNK_SIZE * _OVERLAP_RATIO)` 仍在文件中，已成为死代码。
+**原因**：`_compute_chunk_size()` 内部用 `max_input_tokens` 动态算，旧常量不再被任何代码引用。
+**解决方案**：删除 `_CHUNK_SIZE` 和 `_OVERLAP_SIZE` 两行。`_OVERLAP_RATIO = 0.2` 保留（`_translate_whole_with_markers()` 中 `overlap_size = int(chunk_size * _OVERLAP_RATIO)` 仍在使用）。
+**归属**：V3.07 第四批 HARDEN 就地清理
+**已修** ✅（2026-06-07 — 删除 `_CHUNK_SIZE = 1200` 和 `_OVERLAP_SIZE = int(_CHUNK_SIZE * _OVERLAP_RATIO)`，保留 `_OVERLAP_RATIO = 0.2`（_translate_whole_with_markers 仍使用））
+
+---
+
+## P179 | 2026-06-07 | L2 时间维度 | L2 未使用 Whisper 已有的逐字时间戳（🟡 important）
+
+**背景**：Steve Jobs 审查发现——段落级时间戳无法区分「老张在静音区编了内容」和「小李漏听了」。但 Whisper 已输出逐字时间戳（`word_timestamps=True`，存于 `segment.words`），SenseVoice 已有人声区间地图。两样数据都在，L2 只是没接上线。
+
+**问题**：L2 当前只用 segment.text 做窗口级词干比对，完全没用 `.words` 里的逐字时间戳。无法判断「老张的字出现在没人说话的时段」。
+
+**解决方案**（Steve Jobs 锁定）：
+1. L2 拿到每个 window 的 segment.words
+2. 每个字的 start/end 跟 SenseVoice 人声区间比对
+3. 落在人声区外的字 → 标记「时间戳异常」
+4. L2 输出两维：内容一致性 + 时间有效性（人声区内字数 ÷ 总字数）
+5. 不依赖 Qwen FA——Whisper 自己的逐字时间戳 Mac 上就有
+
+**归属**：V3.07
+
+---
+
+## P180 | 2026-06-07 | Qwen ASR 逐字时间戳 | Windows 上有逐字时间戳但未结构化存储（🟢 架构预留）
+
+**背景**：Qwen ASR PyTorch 路径通过 `align_by_timestamps()` 用了逐字时间戳做对齐（qwen_asr_runner.py:135），但最终只存 `qwen_text` 字符串——逐字时间戳被丢弃了。Windows 上 Qwen+FA 的时间戳是「百分百正确」的，不该丢掉。
+
+**问题**：Qwen 的逐字时间戳没有像 Whisper `.words` 那样结构化存储到 Segment。
+
+**解决方案**（Steve Jobs 锁定）：
+1. Qwen ASR 转录完成后，逐字时间戳存到 `segment.qwen_words`（与 `.words` 同构）
+2. L2 同时用 Whisper `.words` 和 Qwen `.qwen_words` 双向时间验证
+3. Qwen FA 只跑一次——时间戳既是验证依据也是字幕渲染依据
+4. 砍掉单独给 Whisper 做 FA 对齐的第二次调用
+
+**归属**：V3.09
+
+---
+
+## P181 | 2026-06-07 | 前端重连 | handleFoundJob 跳过 connectCard 导致卡片进度永不更新（🟡 important）
+
+**问题**：`reconnectJobs` 先调 `addJobCard` 创建卡片并在 `activeJobs[jid]` 中注册条目，随后用户提交同一任务触发 hash 命中 → `handleFoundJob` 看到 `activeJobs[jid]` 已存在就跳过 `connectCard()`。结果 WebSocket 和 HTTP 轮询都没启动，卡片永远停在"正在恢复处理…"，后端进度正常但不推送。
+
+**触发条件**：
+1. 页面刷新时 `reconnectJobs` 创建了卡片（`addJobCard` → `activeJobs[jid]` 已存在）
+2. 用户重新提交同一任务（hash 命中）→ `handleFoundJob` else 分支 → 看到 `activeJobs[d.job_id]` 已存在 → 跳过 `connectCard`
+3. 卡片上的 `activeJobs[jid]` 是 `addJobCard` 创建的空壳（`ws:null, pollTimer:null`），没有实际连接
+
+**根因**：`handleFoundJob` 只检查 `activeJobs` 中是否存在该 job_id，不检查是否已建立连接。`addJobCard` 创建的初始 entry 和 `connectCard` 建立的连接态无法区分。
+
+**历史关联**：P043（WebSocket 跨 event loop 失败）、P035（后端重启后 interrupted 任务不重连）均表现为"后端进度正常但前端不更新"。本次根因不同——不是 WebSocket/event loop 问题，而是重连入口被活跃条目空壳误判为"已连接"。
+
+**解决方案**（待定）：
+1. `reconnectJobs` 的 error/interrupted 分支不再调用 `removeActiveJobId`（因为它不清理 `activeJobs` 对象），改为调用 `delete activeJobs[jid]` + `removeActiveJobId`
+2. 或：`handleFoundJob` 的 else 分支加判断 `if(!activeJobs[d.job_id] || !activeJobs[d.job_id].ws)` → 强制重连
+3. 或：统一清理函数——`removeCard` 已正确清理，error/interrupted 分支改用 `removeCard`
+
+**已修** ❌（待 V3.07 后期或 V3.08 修复）
+
+---
+
+## P182 | 2026-06-07 | V3.07 审查 | 流水线尾巴丢失——短视频千ASR 交叉验证完全失效（🔴 critical）
+
+**问题**：P152 生产者-消费者流水线按 300s（5 分钟）为阈值分批发送。循环结束后只发 `None` 终止信号，最后一批不足 300s 的段落从未入队。
+
+**触发条件**：
+1. precise 模式 + 16GB+ 内存 → 启用流水线
+2. 视频总长 < 5 分钟：一批都发不出去，千ASR 白加载
+3. 视频总长 > 5 分钟但非 5 的整数倍：最后 1-4 分钟的段落丢失交叉验证
+
+**根因**：`transcriber_v2.py:273-281`，循环结束后直接 `qwen_queue.put(None)`，没有先 flush 剩余段落。同时 `qwen_thread` 是 truthy，所以串行回退路径（`if not qwen_thread:`）也不会运行。
+
+**影响**：短视频在精准模式下完全丧失千ASR 交叉验证能力。长视频丢失尾部验证。
+
+**解决方案**：在 finally 块中，发 None 之前先把 `results[chunk_start_idx:]` 入队：
+```python
+finally:
+    if chunk_start_idx < len(results):
+        remaining = results[chunk_start_idx:]
+        qwen_queue.put((list(remaining), remaining[0].start, remaining[-1].end))
+    qwen_queue.put(None)
+```
+
+**已修** ✅ (2026-06-07 TDD: test/test_p182_tail_flush.py)
+
+---
+
+## P183 | 2026-06-07 | V3.07 审查 | L1 单信号兜底删除——FA 失败时噪音段穿透（🟡 important）
+
+**问题**：P161 删除了 L1 的 SenseVoice 单信号回退。正常流程中 SenseVoice 和 FA 总是一起工作（标准/精准模式），所以没问题。但如果 FA 加载失败或运行崩溃，`aligner_result` 为 None，L1 直接跳过——SenseVoice 检测到的非人声段（音乐、噪音）会穿透所有五层过滤。
+
+**触发条件**：标准/精准模式下，SenseVoice 正常但 FA 模型加载失败（磁盘空间不足、模型文件损坏等）
+
+**根因**：`hallucination_filter.py:147-148`，`aligner_result` 为 None 时 L1 返回 False（不过滤）。删除单信号兜底后，缺少 FA 失败时的防护。
+
+**解决方案**（待用户确认方向）：
+- 方案 A：FA 失败时恢复 L1 单信号兜底（SenseVoice 说非人声就丢）
+- 方案 B：FA 失败时不丢段落，但标 uncertain（黄色警告）
+- 需要在 `transcriber_v2.py` 调用 `filter_hallucinations` 之前检测 FA 状态
+
+**已修** ✅ (2026-06-07 TDD: test/test_p183_l1_fallback.py)
+
+---
+
+## P184 | 2026-06-07 | V3.07 审查 | transcriber_v2.py Step 注释编号混乱
+
+**问题**：代码中 Step 5（SenseVoice 标签）出现在 Step 4（幻觉过滤）之前，且有两个 Step 5。重构后注释未更新。
+
+**文件**：`transcriber_v2.py:418-431`
+
+**解决方案**：按实际执行顺序重新编号（Step 4 → Step 5 → Step 6）
+
+**已修** ✅ (2026-06-07: Step 4→6, Step 5→7) | 2026-06-07 | V3.07 审查 | 未使用的 import _chunk_segments
+
+**问题**：`transcriber_v2.py:234` 导入了 `_chunk_segments` 但流水线路径中从未使用。
+
+**解决方案**：删除该 import
+
+**已修** ✅ (2026-06-07: removed unused _chunk_segments import)
+
+---
+
+## P186 | 2026-06-07 | V3.07 审查 | 循环依赖——翻译层 import 服务器模块
+
+**问题**：`translation/base.py:67` 用 `from backend.main import _MODEL_CONTEXT_CACHE` 让翻译层依赖 Web 服务器内部数据结构。lazy import 避免了启动崩溃，但架构上不干净。
+
+**解决方案**：将 `_MODEL_CONTEXT_CACHE` 移到共享模块（如 `backend/model_cache.py`），翻译层和 main.py 都从那里读取。
+
+**已修** ✅ (2026-06-07: extracted _MODEL_CONTEXT_CACHE to backend/model_cache.py, updated main.py + translation/base.py)
+
+---
+
+## P187 | 2026-06-07 | V3.07 审查 | orchestrator.py _compute_chunk_size 后缺空行
+
+**问题**：`orchestrator.py:338-339`，`_compute_chunk_size()` 函数定义后紧跟 `_SEAM_CONTEXT = 50`，中间没有 PEP 8 要求的两个空行。
+
+**解决方案**：加一个空行
+
+**已修** ✅ (2026-06-07: added blank line)
+
+---
+
+## P188 | 2026-06-07 | V3.07 安全审查 | P174 URL 输入无校验（🟡 中等）
+
+**问题**：`main.py:588` 的 `source_url = body.get("url", "").strip()` 对用户传入的 URL 没做任何格式/协议校验。理论上可传入 `file:///etc/passwd`、`ftp://`、空白字符填充的恶意 URL 等。虽然 yt-dlp 自身对 URL 有一定校验（只支持已知视频站点的 extractor），但依赖下游库做安全校验不是好实践。
+
+**原因**：P174 URL 直传功能新增时只做了功能实现，未加输入校验层。
+
+**解决方案**：在 `create_job()` 入口处加 URL 校验——至少检查协议为 `http://` 或 `https://`，可选地检查域名非 `localhost`/`127.0.0.1`/内网 IP 段（防 SSRF）。
+
+**已修** ✅ (2026-06-07 TDD: test/test_p188_url_validation.py)
+
+---
+
+## P189 | 2026-06-07 | V3.07 安全审查 | job_id 路径遍历理论风险（🟢 低）
+
+**问题**：`main.py:779-791` 的 download 端点用 `JOBS_DIR / job_id` 拼接路径，`job_id` 来自 URL 路径参数。虽然 FastAPI 的 URL 路径参数默认不含 `/`（所以 `../` 遍历不通过 URL 层），但直接用字符串拼路径未做 `.resolve()` 校验是不够严谨的安全实践。当前为桌面应用（localhost），攻击面极小。
+
+**原因**：本应用设计为本地桌面工具，API 仅监听 localhost，所以安全设计没考虑外部攻击者。但如未来开放远程访问或被其他本地进程调用，此处可被利用。
+
+**解决方案**：在 download/cancel 等端点中加 `resolved = (JOBS_DIR / job_id).resolve()`，确认 `resolved` 仍在 `JOBS_DIR.resolve()` 之下。不紧急，可留到安全加固阶段。
+
+**已修** ✅ (2026-06-07: .resolve() guard added to 3 download endpoints)
+
+---
+
+## P190 | 2026-06-07 | V3.07 安全审查 | 远程配置 URL 由环境变量控制（🟢 信息）
+
+**问题**：`main.py:116-119` 的 `_REMOTE_BASE` 通过 `VSUB_REMOTE_CONFIG_URL` 环境变量覆盖默认值。如果攻击者能控制环境变量（恶意 .env 文件、共享主机等），可将模型列表/价格数据重定向到恶意服务器，影响模型选择和 context window 计算。当前默认值指向 GitHub 公开仓库，正常使用下无风险。
+
+**原因**：设计合理（允许自部署配置源），但缺少文档说明此风险。
+
+**解决方案**：纯信息项，无需修改。如后续发布，可在文档中说明此环境变量的安全含义。
+
+**已修** ℹ️ 关闭（信息项，无需代码改动）
+
+---
+
+## P191 | 2026-06-07 | V3.07 架构分析 | transcribe() 圈复杂度 41（🟡 架构债）
+
+**问题**：`transcriber_v2.py:167` 的 `transcribe()` 函数圈复杂度高达 41（项目最高），集成了 Whisper 转录、SenseVoice 降噪、FA 对齐、Qwen ASR 交叉验证（含生产者-消费者模式）、说话人检测等逻辑。P182 的 trailing chunk bug 正好藏在此函数内，高复杂度增加了隐藏 bug 的概率。
+
+**原因**：V3 阶段持续叠加功能（P152 生产者-消费者、P167 SV 标签、说话人检测），功能堆积在一个函数中未做拆分。
+
+**解决方案**：留到 V3.08 架构整理时拆分——将 SenseVoice 线程启动、FA 线程启动、生产者-消费者队列管理、说话人检测各提取为独立函数，`transcribe()` 只做编排（目标复杂度 ≤15）。
+
+**已修** ❌（架构债，不阻塞当前版本。Steve Jobs 审查：V3.08 第一天做，不要发布前拆最复杂函数）
+**V3.08 待办**：拆分成 5-6 个独立函数，目标复杂度 ≤15
+
+---
+
+## P192 | 2026-06-07 | V3.07 架构分析 | 快照目录被索引工具扫描的噪音（🟢 信息）
+
+**问题**：hex-graph 索引了所有只读快照目录（v2.10/v2.11/v2.12/v3.01-v3.06），导致报告 1092 个"未使用导出"和 254 个"克隆组"。这些全是跨版本快照的正常重复，不是代码问题。
+
+**原因**：项目版本管理使用文件夹快照方式，索引工具无法区分活跃代码和只读快照。
+
+**解决方案**：在项目根目录添加 `.hexignore` 或类似机制排除快照目录。或在分析时使用 `scope: "backend/"` 限定范围。纯信息项。
+
+**已修** ℹ️ 关闭（信息项，加 .hexignore 或分析时限定 scope）
+
+---
+
+## P193 | 2026-06-07 | V3.07 端到端测试 | L2 Pass 1 用 Qwen3-ASR 转录文本交叉验证 SenseVoice，英文视频 [?] 率 64%
+
+**问题**：London Vlog 英文测试视频 253/393 条字幕被标记 [?]（64%），中文视频仅 5-15%。`hallucination_filter.py` L2 Pass 1（第 307-317 行）将 SenseVoice 音频分类与 Qwen3-ASR 转录文本做对比——两个不同维度的信号。SenseVoice 判 BGM 且 Qwen3-ASR 恰好也有输出（即使它在幻觉，如 "Color is darling"），就标"分歧"→ 打 [?]。
+
+**流程分析**：
+- L1（SenseVoice × Qwen3-FA 对齐）设计正确：音频分类 vs 强制对齐——FA 能在音频中找到词的时间对齐 = 音频里真的有语音。四向判断覆盖所有情况。
+- L2 Pass 1 篡越了 L1 的职责：SenseVoice 的"人声 vs 非人声" L1 已经用 FA 对齐数据回答过了。L2 又用 Qwen3-ASR 转录文本再答一次——但 Qwen3-ASR 在背景音乐下也产生幻觉，它的输出不能作为"语音存在"的证据。
+- L1 的正确结论被 L2 的错误交叉验证覆盖：不可靠的信号（Qwen3-ASR 转录）推翻了另一个信号（SenseVoice 分类），混乱标记给了用户。
+
+**为什么中文没暴露**：SenseVoice 和 Qwen3-ASR 都面向中文优化。英文背景音场景两个模型同时失准——SenseVoice 误判 BGM、Qwen3-ASR 产生幻觉文本，"分歧"恰好触发 L2 Pass 1 所有条件，问题被放大。
+
+**解决方案**：删除 `hallucination_filter.py` 第 314-325 行整个 Pass 1 块（含 `seg.filtered = True` 的"双确认"分支和 `seg.uncertain = True` 的"分歧"分支）。删后 L2 只剩 Pass 2 窗口词干比对——文字比文字，不再跨层污染。SenseVoice 交叉验证只走 L1（SenseVoice × Qwen3-FA 对齐，第 127-168 行）。
+
+**2026-06-08 诊断审计**：代码核查确认 Pass 1 代码在当前 `hallucination_filter.py` 中**不存在**。L2 (`_layer2_cross_validate`, L287-401) 仅做窗口词干比对（Whisper × Qwen），无 SenseVoice 交叉验证。此问题已在早期修复中解决。
+
+**已修** ✅
+
+
+## P194 | 2026-06-08 | V3.07 HARDEN /review | worker_manager.py 非零退出一律报"内存不足"，误导用户
+
+**问题**：worker_manager.py:93-97 — Worker 非零退出且未发送 done/error 消息时，fallback 错误统一报"处理过程异常中断。可能原因：内存不足。建议选择更小的模型"。但实际上 yt-dlp 未安装、FFmpeg 崩溃、视频文件损坏、权限不足等任何原因导致的非零退出都触发同一消息。
+
+**根因**：P174 新增 URL 模式后，worker 退出原因多了 yt-dlp 相关的可能性，但错误消息仍假设"模型太大 → OOM"这一个原因。
+
+**解决方案**：改为 `f"处理过程异常中断（退出码 {proc.returncode}），请查看日志排查"` — 报告实际退出码，引导用户查日志。
+
+**2026-06-08 诊断审计**：代码核查确认 `worker_manager.py:94-96` 已改为 `f"处理过程异常中断（退出码 {proc.returncode}），请查看 debug.log 日志排查具体原因。"`，与方案一致。
+
+**已修** ✅
+
+
+## P195 | 2026-06-08 | V3.07 HARDEN /review | orchestrator.py `_build_llm_backends` 静默吞异常
+
+**问题**：orchestrator.py:90-93 — `_build_llm_backends()` 中 `except ImportError: pass` 和 `except Exception: pass` 无条件静默丢弃所有错误。用户添加自定义 API Key 后，若 URL 格式错误、模型名不存在、或后端构造失败，无任何日志提示，后端静默不出现在翻译池中。
+
+**根因**：开发期便利代码——加新后端时缺依赖不阻塞，但生产环境中静默失败是坏 UX。
+
+**解决方案**：两处 `pass` 改为 `_log.warning("LLM backend %s skipped: %s", platform, e)`，至少留一条 debug.log 线索。
+
+**2026-06-08 诊断审计**：代码核查确认 `orchestrator.py:90-93` 两处 except 块已包含 `_log.warning("LLM backend %s skipped: %s", platform, e)`，与方案一致。
+
+**已修** ✅
+
+
+## P196 | 2026-06-08 | 全局流程设计 | Bug 修复流水线缺少独立的诊断复核和方案复核
+
+**问题**：当前 Bug 修复流水线 `① investigate → ② plan-eng-review → ③ ln-021-codegraph → ④ /review → ...` 中，`investigate` 同时输出诊断和修复方案，`plan-eng-review` 一次审查同时看诊断和方案。存在两个盲区：
+
+1. **诊断未独立复核** — 诊断人（investigate）自己说的根因没人独立验证。如果根因找错了，后面全在错误路线上修。
+2. **方案未独立复核** — 同一个 skill（investigate）出诊断又出方案，同一个 skill（plan-eng-review）审诊断又审方案。"自证其好"——介绍方案时只讲好的那点，隐藏了方案的漏洞。
+
+**真实教训**：用户经历过大量这样的场景——修复方案被诊断人推销得很好，用户被说服→修完→测试不过或引入新问题→再查→发现当初修复方案本身有缺陷。浪费一整圈。
+
+**现有工具箱**：
+- 工程工具：`investigate`（诊断+方案）、`plan-eng-review`（工程审查）、`ln-021-codegraph`（调用图/影响面）、`/review`（diff 审查）、`test-driven-development`（写测试+修代码）、`verification-before-completion`（全量回归）
+- 人格 skill：`steve-jobs-perspective`（产品/设计判断）、`elon-musk`（第一性原理/工程直觉）、`bill-gates`（系统思维/架构安全）、`feynman`（逻辑严密/可解释性）
+
+**核心约束**：
+- 人格 skill 覆盖判断力盲区（方向对吗？太复杂吗？值得修吗？），不可替代工程工具
+- 工程工具覆盖技术盲区（修A坏B吗？波及谁？diff隐藏bug？），不可替代人格
+- 相邻步骤不能是同一个 skill
+
+### 方案A：诊断+方案二合一，审查分拆给不同人（Steve Jobs 推荐）
+
+```
+① investigate → 诊断+修复方案（原生行为，不阉割）
+
+② 双签审查（并行）：
+   主审 plan-eng-review → 审方案技术正确性（修法对吗？边界全吗？）
+   副审 steve-jobs-perspective → 审诊断逻辑（根因真对吗？方向对吗？太复杂吗？）
+
+③ 双签影响面（并行）：
+   主审 ln-021-codegraph → 调用图/波及范围
+   副审 bill-gates → 系统层面会炸吗？架构安全吗？
+
+④ 双签 diff + 简化（并行）：
+   主审 /review（全项目）→ diff 扫雷
+   副审 elon-musk → 有更简单修法吗？能删代码而不是加代码吗？
+
+⑤ test-driven-development → 写失败测试 → 写修复代码 → 测试通过
+
+⑥ verification-before-completion → 全量回归
+```
+
+**优点**：investigate 原生行为，不阉割。工程工具主审（守门员），人格副审（魔鬼代言人）。不多步骤。
+**缺点**：诊断人=方案人（同一条思维链）。审的人也同时审诊断和方案，可能审方案时忘了再审诊断。
+
+### 方案B：诊断和方案拆成两步（用户倾向，更安全但更重）
+
+```
+① investigate(Phase 1-3 only) → 只诊断，输出根因假设，不修复
+
+② 双签诊断复核（并行）：
+   主审 plan-eng-review → 审根因找对了吗？证据充分吗？
+   副审 steve-jobs-perspective → 审方向对吗？值得修吗？
+
+③ plan-eng-review（新 session，换人）→ 基于已核准诊断，出修复方案
+
+④ 双签方案复核（并行）：
+   主审 /review → diff 审查
+   副审 elon-musk → 更简单修法？
+
+⑤ test-driven-development → 写测试 + 修代码
+
+⑥ verification-before-completion → 全量回归
+```
+
+**优点**：诊断人不管方案，方案人不能改诊断，两个决策点独立。每一步责任清晰。
+**缺点**：多一步。investigate 被阉割（原生四阶段连续流程：调查→分析→假设→实现）。步骤③还是 plan-eng-review，与②同一个 skill。
+
+### 当前状态
+
+- [ ] 两个方案待定，尚未决策。下次对话继续讨论，可从本条目直接加载上下文。
+- [ ] 选定方案后需同步更新 `CLAUDE.md` Bug 修复流水线和 Obsidian 工作流
+- [ ] 开发线 HEAL 阶段的审查步骤也需同步更新
+
+**决定** ⏸ 待定
+
+**已修** ❌
+
+---
+
+## P197 | 2026-06-08 | 前端 | localStorage 剥离 api_key 值后覆盖磁盘，API Key 再次丢失
+
+**问题**：用户重新打开前端后，`~/.video-subber/config.json` 中 `apiKeys` 变成空数组 `[]`。需要重新输入 DeepSeek API Key。
+
+**根因**：P154 砍掉了 Fernet 加密（正确），但漏了第二个数据丢失渠道——前端 `saveConfig()` 存 localStorage 时故意剥离了 `api_key` 字段（安全考虑，只存 {platform, name, model, api_endpoint}），而 `loadConfig()` 在服务器 fetch 返回之前就先用 localStorage 的值覆盖了 `State.settings`。三种触发路径：
+
+| 路径 | 触发条件 | 机制 |
+|------|---------|------|
+| **A** | 服务器未启动时打开页面 | localStorage 剥离版覆盖 State → `fetch('/api/config')` 失败 `.catch(()=>{})` → State 里 apiKeys 无 key 值 → 任何 UI 交互触发 `saveConfig()` → 空 key 写回磁盘 |
+| **B** | 服务器启动中但 fetch 慢 | localStorage 先覆盖 State → 在 fetch 回调到达前，用户操作（模型滑块/env bar）触发 `saveConfig()` → 剥离版写回磁盘覆盖真实数据 |
+| **C** | 浏览器换了/清了 localStorage | localStorage 为空 → State 初始 `apiKeys:[]` → 服务器未启动 → 同上 |
+
+**代码位置**：
+- [index.html:1032](v2/frontend/index.html#L1032) `saveConfig()` — localStorage 剥离 key 值：`apiKeys.map(k=>({platform, name, model, api_endpoint}))` 无 `api_key`
+- [index.html:1035-1041](v2/frontend/index.html#L1035-L1041) `loadConfig()` — 先同步用 localStorage 覆盖 State，再异步从服务器拉完整数据
+
+**历史关联**：P048（tier 三数据源竞态，2026-05-21）是同根因——多个数据源（localStorage/服务器/URL参数）在不同时间点写入 `State.settings`，异步回调到达顺序不确定，旧值覆盖新值。P048 修了 tier 一个字段，但没有推广到所有字段。P154（加密导致 key 丢失，2026-06-05）是另一个并发的根因（加密层），两个 bug 叠加让 key 丢了两次。
+
+**为什么之前没发现**：
+1. P048 修的是 tier 竞态，方案是删掉 tier 持久化、loadConfig 改同步——但没有审视「localStorage 剥离策略是否安全」这个更底层的问题
+2. P154 的加密丢失是更频繁的触发路径（每次重启都可能变），覆盖了 localStorage 竞态的症状——加密修好后，第二个 bug 才暴露出来
+3. `/review` 和 `/code-review` 都是 diff-based，只查新增/修改行。这个 bug 是两段旧代码的交互（`saveConfig` L1032 + `loadConfig` L1035）——各自单独看都没问题，只有放在一起走时序才出 bug。diff-based 审查工具系统性看不到这类问题
+4. 测试覆盖的是后端 config_manager（P154 修复时加了 `test_plaintext_keys.py`），没覆盖前端 JS 的 localStorage↔服务器同步逻辑
+
+**Steve Jobs 诊断（2026-06-08）**：
+
+> 这不是 P154 和 P197 两个 root cause，是一个 root cause——数据没有 owner。每个字段应该只有一个 truth source。三个 source 互相覆盖的设计，不修掉这个根，还会出 P198、P199、P200。
+
+**为什么修了三次都没根除**：
+1. 每次修的是「当前这个 bug 的表象」，没人停下来问「这个设计哪里错了」
+2. P048 修 tier 竞态时，正确的判断是「一个值不应该有三个数据源」——但修复局限在 tier 一个字段，没人追问 apiKeys、model、style 等其他 11 个字段是否有同样的问题
+3. 用 debugger 思维修 bug（找到 symptom → 找 root cause → 修掉），而不是 architect 思维（修完后问：这个 root cause 的模式在整个系统里还出现在哪里？）
+4. 每次修 bug 顺便加了新代码（fallback、保护逻辑），这些新代码变成了下一个 bug 的原材料
+
+**Jobs 方案：三步减法（只删不增）**
+
+```
+Step 1: 给每个字段定 owner
+  apiKeys → server only（敏感数据，浏览器不应存）
+  其他 10 个字段 → server, localStorage 做展示缓存不是 truth
+
+Step 2: 砍掉 loadConfig() 的 localStorage → State 覆盖
+  index.html:1035-1036 — 删除:
+    const raw = localStorage.getItem('video-subber-config');
+    if(raw){ Object.assign(State.settings, JSON.parse(raw)) }
+  改为: 服务器返回后一次性 Object.assign, catch 分支保持 State 初始值不动
+
+Step 3: 砍掉 saveConfig() 的 apiKeys 剥离 + 不再存 apiKeys 到 localStorage
+  index.html:1032 — 从:
+    const safeCfg = {...cfg, apiKeys: (cfg.apiKeys||[]).map(k=>({platform,name,model,api_endpoint}))}
+  改为:
+    const localCfg = {...cfg}; delete localCfg.apiKeys;
+    localStorage.setItem('video-subber-config', JSON.stringify(localCfg));
+```
+
+**效果**：改前三数据源互相覆盖靠异步回调顺序决胜负 → 改后每字段一个 truth source。apiKeys 只走服务器。localStorage 不再触碰敏感数据。
+
+**原则**：
+- 不新增任何文件、模块、抽象
+- 不新写 fallback 逻辑
+- 改动范围：`index.html` 中 `saveConfig()` 和 `loadConfig()` 共三段删除
+- 验证方式：打开页面 → 输入 API Key → 保存 → 刷新 → key 还在
+
+**Jobs 修正（第二轮）**：用户提出是否应该全删重写。Jobs 否决——
+
+> 重写是当代码烂到无法修补时才做的事。你的代码不烂——它只是承载了已经过时的假设。把过时的部分剪掉，剩下的就是新设计。
+>
+> V2.03-V2.05 时期的产品是浏览器里的 Web 应用。localStorage 会丢、浏览器会换、用户可能多设备打开。所以需要 localStorage↔服务器同步层。这些假设在当时是对的。
+>
+> 现在 V3.07 正在往 V3.09 PySide6 桌面应用走。用户一台电脑一个窗口。localStorage 永远不会被其他浏览器访问。产品形态变了，但同步层的代码没跟着变——还在为一个已经不存在的威胁模型做防御。
+>
+> 砍掉那 5 行同步胶水代码就是重新设计。新的设计思路：State.settings 的 truth source 是服务器。localStorage 只缓存非敏感 UI 偏好。apiKeys 不经过 localStorage。
+
+**决策** ⏸ 方案已锁定（三步减法，不重写）。待用户确认后按 bug 修复流水线执行
+
+**已修** ✅（2026-06-09 TDD：loadConfig 删 apiKeys 后再 Object.assign + configReady 防竞态）
+
+
+---
+
+## P198 | 2026-06-08 | V3.07 下载 | yt-dlp format="best" 默认下载最低画质（约 480p-720p）
+
+**问题**：`video_downloader.py:43` 使用 `"format": "best"`，这是 yt-dlp 的"最佳单文件（音画合并）"选择器。YouTube 在 1080p 及以上使用 DASH 协议，音视频流分开存储——`best` 永远选不到 1080p+ 的视频流。用户实际下载到的是 480p 或 720p 的合并文件。
+
+**竞品做法（2026-06-08 代码核查）**：
+
+| 竞品 | Star | 画质配置 | 默认 | 可调？ |
+|------|------|---------|------|--------|
+| **VideoLingo** | ⭐17,277 | `bestvideo[height<=1080]+bestaudio/best` | 1080p | ✅ |
+| **Linly-Dubbing** | ⭐3,233 | `bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best` | 1080p | ✅ |
+| **generate-subtitles** | ⭐808 | `bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best` | 720p | ❌ |
+| **pyvideotrans** | 知名 | 不内置下载，用户提供视频 | — | — |
+| **autosub** | ⭐1,969 | 不内置下载，用户提供视频 | — | — |
+
+**方案（Jobs 审查 + 用户确认）**：
+
+分别下载最高画质视频流 + 最高音质音频流，音频直接进转录管线（无需额外剥离音轨），最后 ffmpeg 将视频+音频+字幕合成。**不给用户画质选项——默认最高。**
+
+```
+bestvideo → 最高画质视频（无音频）→ 保留待合成
+bestaudio → 最高音质音频         → 送入转录+翻译管线
+
+ffmpeg 合成: 视频流 + 翻译音频 + 字幕 → 最终成品
+```
+
+**好处**：
+1. 不做无用功：现在下载 720p 合并文件→剥离音频→扔掉视频数据。新方案只下载需要的
+2. 质量层级正确：转录用最高音质音频（准确率↑），最终输出最高画质视频（用户满意↑）
+3. 不引入新工具：ffmpeg 合成已在管线中（V3.03 软字幕封装），只多喂更好的视频流
+
+**实施**：改 `video_downloader.py:43` 一行：
+```python
+# 旧
+"format": "best",
+# 新
+"format": "bestvideo+bestaudio/best",
+```
+`/best` 降级：合并不了时回退到最佳合并文件。
+
+**已修** ✅（2026-06-09 重构：分轨下载 video-only + audio-only，音频直送转录，最终合并 video+audio+字幕）
+
+
+---
+
+## P199 | 2026-06-08 | V3.07 转录管线 | standard 模式 SenseVoice + FA 串行执行（应并行）
+
+> **2026-06-08 诊断审计纠正**：原描述称"四模型全部串行"——事实错误。Standard 模式只跑三个模型（Whisper、SenseVoice、FA），不跑 Qwen3-ASR（`transcriber_v2.py:384` 仅 `precise` 模式才启动千问）。需要并行的是 SenseVoice + FA 两个模型，不是三个。
+
+**问题**：`transcriber_v2.py` standard 模式执行路径：
+```
+Whisper → SenseVoice（串行）→ Qwen3-FA（串行）
+```
+SenseVoice 和 Qwen3-FA 串行执行，但两者互不依赖——都只需要 Whisper 的输出（SV 需 segments，FA 需全文 text），不需要对方的结果。
+
+**依赖分析**（与 findings.md 设计图一致）：
+
+```
+SenseVoice:  需要音频 + Whisper segments → Whisper 结束后即可运行
+Qwen3-FA:    需要音频 + Whisper text    → Whisper 结束后即可运行
+两者之间：    没有互相依赖关系（设计图 Step 3 明确标注并行）
+```
+
+**正确做法**：Whisper 结束后，SenseVoice + FA 同时启动（两个线程），等全部完成。
+
+**代码位置**：
+- `transcriber_v2.py:366-374`：SenseVoice 串行路径（`if not use_parallel`）
+- `transcriber_v2.py:401-419`：FA 串行路径（standard/precise 共用）
+- 两者顺序执行，中间无数据依赖
+
+**修复方向**：
+1. Standard 模式下 SenseVoice + Qwen3-FA 并行启动（合计 ~2.8GB，8GB 机器也够）
+2. 不涉及 Qwen3-ASR，不需要改 producer-consumer 管道
+
+**已修** ✅（2026-06-09 TDD：should_parallel_svfa() 独立判定，SV+FA 线程启动与 Qwen pipeline 解耦）
+
+---
+
+## P200 | 2026-06-08 | V3.07 转录管线 | precise 模式 Qwen3-ASR join 阻塞 SenseVoice 启动
+
+**问题**：`transcriber_v2.py:291-293` precise 并行模式中，Whisper 转录结束后代码先 `qwen_thread.join()` 等待 Qwen3-ASR 完全结束，然后才启动 SenseVoice 和 Qwen3-FA 线程（line 335-363）。
+
+```
+当前执行：
+  Whisper ████████████████
+           │ (Qwen3-ASR 消费者已在跑)
+  Qwen3-ASR  ████████████████████
+                                │ join() ← SenseVoice 空等
+  SenseVoice                        ████████
+  Qwen3-FA                           ████████
+
+正确执行：
+  Whisper ████████████████
+           │ (Qwen3-ASR 消费者已在跑)
+  Qwen3-ASR  ████████████████████
+  SenseVoice                    ████████  ← 立即启动，不等 Qwen
+  Qwen3-FA                      ████████  ← 立即启动
+```
+
+**根因**：`qwen_thread.join()` 写在 SenseVoice 启动之前。应该把 SenseVoice + FA 的线程启动移到 Qwen join 之前。
+
+**与 P199 的关系**：P199 是 standard 模式全串行，P200 是 precise 模式的局部串行瓶颈。两个问题互相独立，但根因相同——没有正确建模四个模型之间的依赖关系。
+
+**已修** ✅（2026-06-09 TDD：should_qwen_pipeline() 独立判定，SV+FA 线程启动移到 qwen_thread.join() 之前）
+
+---
+
+## P201 | 2026-06-08 | 端到端实测 | FA 模型缺失导致 SenseVoice 单信号模式误杀 85% 段落
+
+**问题**：London Vlog（带背景音乐的英文视频，precise 模式）实测，Whisper 转录 208 段，L1 过滤后只剩 31 段，177 段真人对话被误杀（如 "Hey Taylor, what time is it?"）。翻译完的字幕只剩视频最后几分钟的做饭片段，前面 20 分钟内容全部丢失。
+
+**根因**（四级级联，与 P199/P200 共同暴露）：
+
+1. Qwen3-ForcedAligner 模型从未下载（~1.84GB）。`env_check.py` 未检测 FA 状态，`is_qwen_aligner_available()` 只查 Python 包不查模型文件。
+2. FA 缺失 → `aligner_result` 始终为 None → L1 退化为 P183 单信号兜底模式。
+3. SenseVoice 对带 BGM 的 vlog 天然误判——分不清"纯背景音乐"和"人声+背景音乐"。22 分钟视频仅产出 5 个粗粒度标签（BGM:4, Speech:1），被标记为 BGM 的时间段跨度极大。
+4. 单信号模式下 L1 无条件信任 SenseVoice → 所有标 BGM 的段落硬丢弃。208 → 31 段，L2 的 46 个验证窗口里 40 个变成空的（内容已被 L1 杀光，无东西可比）。
+
+**同一视频的前一天测试为什么没暴露**：Jun 7 用 large-v3 跑同一视频，464 段，SenseVoice 产出 BGM:3/Speech:2。因为分段更细，`_apply_sv_tags` 的 ≥50% 重叠匹配结果不同——恰好大部分段落没落在 BGM 标签覆盖区，L1 触发 0 次。两次结果的差异纯粹来自 SenseVoice 5 个粗标签在 200-464 段上的随机分布——这一次运气好，下一次全杀。这恰恰证明了单信号模式不可靠。
+
+**主修复**：下载 Qwen3-ForcedAligner 模型（~1.84GB，HuggingFace `Qwen/Qwen3-ForcedAligner-0.6B`，走 `hf-mirror.com` 镜像）。FA 就位后 L1 自动回到双信号路径——SV 说 BGM 但 FA 找到了词对齐 → 保留段落，只有两个法官一致确认才丢弃。
+
+**防御纵深**（P183 改进，FA 下载后不再触发，优先级降低）：P183 的单信号兜底应改为软标记（只标 `[?]` 不硬丢弃）。SenseVoice 单独判断不足以作为硬过滤依据。但 FA 就位后此路径不会触发，可在后续版本中作为安全网改进。
+
+**环境检测补漏**：`env_check.py` 需新增 `check_qwen_aligner()` 检测项，检查模型文件是否已下载（非仅检查 Python 包）。
+
+**已修** ✅（2026-06-09 TDD：is_qwen_aligner_available() 用 AutoConfig local_files_only 检查，env_check 新增 check_qwen_aligner。注：仅检测，未下载模型）
+
+---
+
+## P202 | 2026-06-09 | /review 全项目审查 | _friendly_error 错误提示"一刀切"——含 memory 的错误全报内存不足
+
+**问题**：`worker.py:591-605` 的 `_friendly_error()` 用 `"Memory" in raw or "memory" in raw` 匹配错误。任何错误信息只要包含 "memory" 这个词（如 shared_memory、memory_map、yt-dlp 内部报错含 memory allocation），全部被翻译为"内存不足，无法处理该视频"。用户被误导。
+
+**根因**：字符串匹配太宽泛。"memory" 出现在很多非 OOM 的错误消息里。
+
+**解决方案**：改用更精确的匹配模式：只匹配 `"MemoryError"` 或 `"Cannot allocate memory"` 或 `"killed"` + `"memory"` 组合，过滤掉无关的 memory 提及。
+
+**已修** ✅（2026-06-09 TDD：_friendly_error 改为精确关键词匹配 memoryerror/out of memory/cannot allocate memory）
+
+---
+
+## P203 | 2026-06-09 | /review 全项目审查 | 文件归档覆盖旧版本——归档文件名固定，重复处理同一视频丢失上次结果
+
+**问题**：`worker.py:549-565` 保存处理结果时，如果输出文件夹已有同名文件，先 `.rename()` 为归档文件名。但归档文件名是固定的（`{视频名}_{上下文/逐段}_zh.mp4`），如果上次归档的文件还在，本次 `.rename()` 直接覆盖，用户丢失之前的处理结果。
+
+**根因**：归档命名方案不含时间戳或序号，无法区分不同次处理。
+
+**解决方案**：归档文件名加时间戳后缀，如 `{视频名}_{模式}_zh_20260609_143022.mp4`，避免覆盖。
+
+**已修** ✅（2026-06-09 TDD：_archive_path() 加 _%H%M%S 时间戳后缀）
+
+---
+
+## P204 | 2026-06-09 | FA 模型下载 | 依赖链发现——FA 模型不是独立 transformers 模型，需 qwen-asr 包注册模型类型
+
+**问题**：尝试用 `AutoModel.from_pretrained("Qwen/Qwen3-ForcedAligner-0.6B")` 直接下载 FA 模型，报 `KeyError: 'qwen3_asr'`。无论装 transformers 5.9.0、5.10.2（最新 release），还是从 GitHub main 分支装 dev 版，全部不认识 `qwen3_asr` 这个模型类型。查 transformers 源码的 `models/` 目录，确认所有版本（包括最新 dev）的模型列表里都没有 `qwen3_asr`。
+
+**根因**（2026-06-09 阅读模型 README 后确认）：
+
+FA 模型**不是**通过 `transformers.AutoModel.from_pretrained()` 直接加载的。它依赖 Qwen 官方发布的 `qwen-asr` Python 包来注册模型类型。
+
+两个关键事实：
+1. Qwen3-ForcedAligner 的 `config.json` 中 `model_type: "qwen3_asr"`，`architectures: ["Qwen3ASRForConditionalGeneration"]`，`transformers_version: "4.57.6"`——但这个 `qwen3_asr` 类型**不是 transformers 内置的**，而是 `qwen-asr` 包注册进去的
+2. 模型 README 明确写了安装方式：`pip install -U qwen-asr`，然后通过 `qwen-asr` 包的 API 加载模型，不是直接调 transformers
+
+**依赖冲突叠加（三轮才通）**：
+
+下载前发现三层坑：
+
+| 第几坑 | 包名 | 它要的 tokenizers 版本 | 实际情况 |
+|--------|------|----------------------|---------|
+| 1 | transformers 5.9.0（旧） | `0.22.0 ~ 0.23.0` | 当前装的是 0.23.1 → 报错 |
+| 2 | qwen3-asr-mlx（已装） | `>= 0.23.0` | 降级 tokenizers 后它不干 |
+| 3 | transformers 全版本 | 无 `qwen3_asr` 支持 | 升级到最新 dev 版也不认 |
+
+解决路径：
+```
+tokenizers 0.23.1 → 降到 0.22.2（满足 transformers）
+transformers 5.9.0 → 升到 5.10.2（看最新版是否支持 qwen3_asr）→ 不支持
+transformers 5.10.2 → 从 GitHub 源码装 dev 版 → 仍不支持
+最终发现：必须装 qwen-asr 包，它注册 qwen3_asr 类型后 transformers 才认识
+```
+
+**当前项目的 `qwen_aligner.py` 问题**：
+
+项目代码 `v2/backend/core/qwen_aligner.py:47` 用的是：
+```python
+self._model = AutoModel.from_pretrained(model_id, ...)
+```
+这条路径在没有 `qwen-asr` 包的情况下**永远跑不通**。正确做法要么：
+- 装 `qwen-asr` 包（它会注册 `qwen3_asr` 到 transformers），然后用 `AutoModel` 加载
+- 或者改用 `qwen-asr` 包自己的 API 加载模型
+
+**打包参考（重要）**：
+
+为 Windows 用户打包时，FA 模型依赖链是：
+```
+qwen-asr 包（注册模型类型）
+    ↓ 安装后
+transformers.AutoModel.from_pretrained("Qwen/Qwen3-ForcedAligner-0.6B") 才认识它
+    ↓ 首次调时
+HuggingFace 自动下载模型文件（~1.84GB）到 HF_HOME 缓存
+```
+
+打包时需要：
+1. 安装 `qwen-asr`（不只是 transformers）
+2. 解决 tokenizers 版本兼容（qwen3-asr-mlx 要 >=0.23.0，transformers 要 0.22.0-0.23.0——选择 0.23.0 刚好满足两边，或确认 qwen3-asr-mlx 在 Windows 上不存在，只处理 transformers + qwen-asr 的兼容）
+3. FA 模型文件 ~1.84GB，需提前下载或通过镜像加速（国内用 hf-mirror.com）
+4. `env_check.py` 的 `check_qwen_aligner()` 目前只查 `transformers.AutoConfig.from_pretrained(local_files_only=True)`——这意味着模型必须先手动下载到缓存，否则始终返回"不可用"。需要在首次启动时自动触发下载或给明确指引
+
+**已修** ❌（FA 模型尚未下载，`qwen-asr` 包尚未安装，`qwen_aligner.py` 的加载路径待验证/修改）
+
+---
+
+## P205 | 2026-06-09 | FA 模型下载 | qwen_aligner.py 缺少 `import qwen_asr.core.transformers_backend`，env_check 返回假阴性
+
+**问题**：FA 模型已下载到 HuggingFace 缓存（1.7GB），`qwen-asr` 包也已安装，但 `is_qwen_aligner_available()` 仍然返回 `False`，报 `KeyError: 'qwen3_asr'`——transformers 不认识这个模型类型。
+
+**根因**：`qwen-asr` 包的 `__init__.py` 只导出了 `Qwen3ASRModel` 和 `Qwen3ForcedAligner` 两个类，**没有导入 `core.transformers_backend` 子模块**。模型类型注册代码在 `transformers_backend/__init__.py` 里（导入时会自动执行 `AutoConfig.register("qwen3_asr", Qwen3ASRConfig)` 等注册逻辑），但因为这个子模块未被导入，注册从未触发。
+
+`qwen_aligner.py` 的 `is_qwen_aligner_available()` 调用 `AutoConfig.from_pretrained("Qwen/Qwen3-ForcedAligner-0.6B", local_files_only=True)` 时，transformers 查找 `CONFIG_MAPPING["qwen3_asr"]` → KeyError → 返回 False。这是**假阴性**——模型文件实际存在，只是类型没注册。
+
+**解决**：在 `qwen_aligner.py` 开头加：
+```python
+try:
+    import qwen_asr.core.transformers_backend  # noqa: F401
+except ImportError:
+    pass
+```
+`import` 语句执行时自动触发子模块 `__init__.py` 中的模型类型注册。之后 `AutoConfig.from_pretrained()` 能正确识别 `qwen3_asr` → `is_qwen_aligner_available()` 返回 True。
+
+**教训**：`qwen-asr` 包的模型类型注册是**惰性的**（不自动触发），依赖上层代码显式 import `transformers_backend` 子模块。这是一种脆弱的设计——`is_qwen_aligner_available()` 本身是"检查是否可用"，但它依赖一个要先 import 才能用的模块，形成了**循环悖论**：检查模型可用 → 需要先注册类型 → 注册类型需要 import → import 需要包已安装 → 检查包安装又是检测的一环。
+
+更稳健的做法是分两步检测：
+1. 先检查 `qwen-asr` 包是否可导入（如果不可导入 → 直接 False）
+2. 导入后注册类型，再检查模型文件是否存在
+
+**已修** ✅（`qwen_aligner.py` 已加入 import，`is_qwen_aligner_available()` 返回 True）
+
+---
+
+## P206 | 2026-06-09 | FA 模型加载 | 争议——项目在用 AutoModel 修路，但官方 API 是 Qwen3ForcedAligner（乔布斯审查发现）
+
+**来源**：乔布斯（steve-jobs-perspective Skill）联网查阅 Qwen3-ASR GitHub README 和 PyPI 后提出。
+
+**争议核心**：
+
+P205 的修复路径是：`import qwen_asr.core.transformers_backend` → 注册 `qwen3_asr` 类型 → `AutoModel.from_pretrained()` 能加载模型。
+
+但 Qwen 官方文档（[GitHub README](https://github.com/QwenLM/Qwen3-ASR)）唯一列出的加载方式是：
+
+```python
+from qwen_asr import Qwen3ForcedAligner
+
+model = Qwen3ForcedAligner.from_pretrained(
+    "Qwen/Qwen3-ForcedAligner-0.6B",
+    dtype=torch.bfloat16,
+    device_map="cuda:0",
+)
+
+results = model.align(audio="...", text="...", language="Chinese")
+```
+
+**不是** `AutoModel.from_pretrained()`。不是 transformers 的 Auto API。
+
+**为什么这是一条歧路**：
+
+即使 `import transformers_backend` 注册类型后 `AutoModel` 能加载模型权重，`AutoModel` 返回的是裸 `Qwen3ASRForConditionalGeneration` 实例——它没有 `model.align()` 方法。项目当前 `qwen_aligner.py` 的 `align()` 方法自己手写了前向传播和 token 解码逻辑（~100 行），等于**自己重写了 Qwen 官方已经封装好的功能**。
+
+两条路对比：
+
+| | P205 路径（当前） | 官方 API |
+|---|---|---|
+| 加载方式 | `AutoModel.from_pretrained()` + 手动 import backend | `Qwen3ForcedAligner.from_pretrained()` |
+| 对齐调用 | 项目手写的 `align()` 方法 | `model.align(audio, text, language)` |
+| 依赖 import hack | 需要 `import qwen_asr.core.transformers_backend` | 不需要 |
+| 与官方同步 | 官方 API 变了项目要手动追 | 自动跟随 qwen-asr 版本 |
+
+**乔布斯带联网查到的额外事实**：
+
+| # | 事实 | P204/P205 是否记录 |
+|---|------|-------------------|
+| 1 | `qwen-asr==0.0.6` 精确绑定 `transformers==4.57.6`（不是 >=，是 ==） | ❌ 未记录 |
+| 2 | `qwen-asr` 额外依赖 gradio、flask、nagisa、soynlp——桌面应用不需要 | ❌ 未记录 |
+| 3 | 官方推荐中国大陆用 ModelScope 下载，不是 hf-mirror | ❌ P204 写的是 hf-mirror |
+| 4 | 官方有 Docker 镜像，可绕开依赖地狱 | ❌ 未记录 |
+| 5 | `qwen3-asr-mlx` 不需要 transformers——与 qwen-asr 的唯一共公依赖是 tokenizers==0.23.0 | ❌ 未记录 |
+
+**tokenizers 精确交集**：
+
+```
+transformers==4.57.6 → tokenizers >=0.22.0, <=0.23.0
+qwen3-asr-mlx        → tokenizers >=0.23.0
+                        交集 = 0.23.0（唯一解）
+```
+
+**决定**：待定。两个选项：
+- **A**：改用官方 `Qwen3ForcedAligner.from_pretrained()` + `model.align()`，删除手写的 `align()` 逻辑。正确但需要改 `qwen_aligner.py`
+- **B**：保持 P205 方案（import backend + AutoModel + 手写 align）。能跑但从此与官方 API 分叉
+
+**已修** ❌（争议待决策）
+
+
+## P207 | 2026-06-09 | 🔴 blocking FA 模型（校对员）静默造假——对齐失败后做除法生成均匀假时间戳
+
+**来源**：2026-06-09 实测发现。用 Gradio 内置测试音频 `test_audio.wav`（1.068s）+ 文本 "hello world this is a test" 调 `QwenAligner.align()`。
+
+**现象**：
+
+日志输出：
+```
+WARNING: Qwen3-FA 对齐失败，降级到均匀分配: _forward_unimplemented() got an unexpected keyword argument 'input_ids'
+```
+
+返回结果：
+```
+hello  0.000s → 0.178s
+world  0.178s → 0.356s
+this   0.356s → 0.534s
+is     0.534s → 0.712s
+a      0.712s → 0.890s
+test   0.890s → 1.068s
+```
+
+**每个词精确地 0.178 秒。** 6 个词 × 0.178s = 1.068s。这是 1.068 ÷ 6，不是对齐。
+
+**根因**：
+
+`qwen_aligner.py` 的 `align()` 方法有两条代码路径：
+
+1. **第一条路（第 91-155 行）**：尝试真正干活。用 `AutoModel.from_pretrained()` 加载裸 `Qwen3ASRForConditionalGeneration` 实例，手写 forward pass 调 `self._model(**inputs)`。传了一个模型不认识的参数 `input_ids` → 模型拒收 → 抛异常。
+
+2. **第二条路（第 157-177 行）**：兜底方案。catch 异常 → 印一条 warning → `per_word = duration / len(words)` → 每个词一样长。
+
+**为什么这是严重问题**：
+
+- **不是 crash**。程序不崩、不报错。用户和上层代码完全不知道对齐失败了。
+- **不是降级**。均匀分配不是"不够好的对齐"，是**根本没有对齐**。每个词的时间戳是假数据。
+- **污染 L1 双信号交叉验证**。L1 需要两个独立信号——SenseVoice（声学角度）和 FA（语言学角度）——互相验证"这段音频是不是真有人在说话"。FA 在一切段上都返回"对齐成功"（因为它从不查字典，只做除法），双信号变成单信号。任何被 SenseVoice 漏掉的非人声段都会静默通过 L1。
+- **`is_qwen_aligner_available()` 说"可用"**。它只检查模型文件在不在硬盘上，不检查模型产出的是不是假数据。整条检测链路给了绿灯，但灯后面是悬崖。
+
+**验证数据**：
+
+| 指标 | 实际对齐 | FA 造假输出 |
+|------|---------|------------|
+| "hello" 时长 | 真实时长（不确定） | 0.178s（精确除法） |
+| "test" 时长 | 真实时长（不确定） | 0.178s（精确除法） |
+| 词间差异 | 有大有小 | 全部相同 |
+
+**解决方案**：
+
+换官方 API。`qwen-asr` 包已经装了，官方接口就在那里：
+
+```python
+from qwen_asr import Qwen3ForcedAligner
+
+model = Qwen3ForcedAligner.from_pretrained("Qwen/Qwen3-ForcedAligner-0.6B")
+results = model.align(audio="audio.wav", text="hello world", language="Chinese")
+```
+
+改 `qwen_aligner.py`：
+1. `__init__`：`AutoModel.from_pretrained()` → `Qwen3ForcedAligner.from_pretrained()`
+2. `align()`：删掉 100 行手写 forward pass + 除法 fallback，换成 `self._model.align(audio_path, text, language)`
+
+**影响范围**：一个文件（`qwen_aligner.py`），不改其他文件。API 签名不变，调用方无感知。
+
+**与 P206 的关系**：P206 记录了"两条路选哪条"的架构争议。P207 记录了**实测确认**——当前路径已证实产出假数据。P206 是理论争论，P207 是实证结论。
+
+**关联**：[[P206]]（架构争议）、task_plan.md P207（执行清单）、L1 双信号交叉验证（受污染方）
+
+**Jobs 解决方案（2026-06-09）**：
+
+核心思路：只做减法，不做加法。把冒牌货换成正品。Qwen 官方已经把路修好了——不需要自己铺路，只需要走上去。
+
+**已修** ✅（2026-06-09 TDD 修复。手写 forward pass + 三条造假 fallback → 官方 `Qwen3ForcedAligner.from_pretrained()` + `model.align()`。279→200 行，8 新增测试，419 全量零回归）
+
+**Jobs 后续审查发现（2026-06-09）**：
+
+> 造假停了，但质量控制还没开始。你们把冒牌货换成了正品，但还没设质检员。
+
+三个遗留问题 → [[P212]]、[[P213]]、[[P214]]
+
+---
+
+## P212 | 2026-06-09 | 🟡 FA 对齐精度无真实语音验证——Jobs 审查发现 #1
+
+**来源**：2026-06-09 Steve Jobs 审查 P207 修复。
+
+**问题**：P207 的反造假测试用 440Hz 正弦波做测试音频，验证了时间戳不再是均匀分配的。但**没有用真实人声录音验证对齐器的时间戳是否准确**。正弦波不是人说话——对齐器在正弦波上返回的"非均匀"时间戳仍然是垃圾数据，只是换了一种形状的垃圾。
+
+**Jobs 原话**：就像你问一个人"现在几点了"，他不再每次都回答"3点整"，而是真的看了看手表——但他戴的是坏表。
+
+**缺少的测试**：一段真实人声录音（有人说 "hello world this is a test of the alignment system"），人工标注每个词的起始时间。跑对齐器。比较偏差。如果偏差超过 200ms → 测试失败。
+
+**当前状态**：知道对齐器不再造假，不知道对齐器是否准确。
+
+**解决方案**：
+1. 录一段短音频（真人说 2-3 秒的话），用 Audacity 手动标注词边界（gold standard）
+2. 写测试：P207 对齐器输出 vs 人工标注，偏差 < 200ms
+3. 如果官方模型不准 → 记入问题库，至少知道准确度边界
+
+**关联**：[[P207]]（FA 官方 API 替换）、[[P213]]（词数漂移）、[[P214]]（静默降级）
+
+---
+
+## P213 | 2026-06-09 | 🟡 `apply_aligner_timestamps` 词数假设漂移——Jobs 审查发现 #2
+
+**来源**：2026-06-09 Steve Jobs 审查 P207 修复。
+
+**问题**：`apply_aligner_timestamps()` 第 268 行（旧行号）用 `len(txt.split())` 计算每段 segment 的词数，然后按这个词数去切分 `aligned_words` 列表。这假设 Python 的 `str.split()` 词数 = FA 模型输出的对齐词数。
+
+**风险**：官方 Qwen 模型有自己的 tokenizer。它可能把 "don't" 拆成 ["don", "'t"]，把中文句子拆成跟 `str.split()` 完全不同的粒度。一旦词数对不上，第二个 segment 开始所有的对齐时间戳全部漂移。
+
+**历史**：这个 bug 在旧的手写对齐器时代就一直存在，但因为旧对齐器的 forward pass 从来没成功过（始终走 fallback），所以从未被触发。P207 让对齐器第一次真正工作了——这个 bug 现在有机会造成实际损害。
+
+**Jobs 原话**：这不是你引入的 bug，是之前就有的。但之前那个手写对齐器根本不工作，所以这个 bug 从来没被触发过。现在对齐器真的在干活了——这个 bug 第一次有机会造成损害。
+
+**当前状态**：无保护。词数不匹配时静默漂移。
+
+**解决方案**：
+1. `apply_aligner_timestamps()` 末尾加断言/检查：`word_idx != total_words` → 打 WARNING 日志
+2. 或者：按文本相似度匹配而非按词数切分（更准但更复杂）
+
+**修复**：`apply_aligner_timestamps()` 改为按时间范围匹配（非词数切分），新增 `unmatched` 计数器，未匹配段打 WARNING `"P213: %d/%d 段未匹配到对齐词，保留原始时间戳"`。2026-06-10 TDD 修复。
+
+**已修** ✅
+
+**关联**：[[P207]]（FA 官方 API 替换）、[[P212]]（精度验证）、[[P214]]（静默降级）
+
+---
+
+## P214 | 2026-06-09 | 🟡 FA 对齐失败时静默降级——Jobs 审查发现 #3
+
+**来源**：2026-06-09 Steve Jobs 审查 P207 修复。
+
+**问题**：`transcriber_v2.py` 第 433-434 行，FA 对齐失败时：
+
+```python
+except Exception as e:
+    _log.warning("Qwen3-FA 对齐失败，保留原始时间戳: %s", e)
+```
+
+对齐失败 → 写一条 debug 日志 → 继续用 Whisper 的粗时间戳。用户拿到的字幕时间轴精度从「词级精确」降到了「句级近似」，但**用户完全不知道**。
+
+**Jobs 原话**：这是"静默降级"。比之前好（至少时间戳是真的 Whisper 时间戳，不是编的），但仍然是静默的。
+
+**对比旧行为**：旧代码对齐失败 → 静默返回假均匀时间戳。新代码对齐失败 → 静默返回 Whisper 粗时间戳。两者都是静默的，区别是新代码不造假。
+
+**当前状态**：用户无感知。Log 文件里有 warning，用户不会去看。
+
+**解决方案**：
+1. 最小方案：对齐失败时给 segments 打一个标记（如 `seg._fa_aligned = False`），L1/L2 过滤时可以据此调整策略
+2. 或者：在 `align()` 返回值中加质量标记字段（如 `{"word": ..., "start": ..., "end": ..., "_quality": "aligned"}` vs `"_quality": "degraded"`）
+3. 前端：未来 V3.09 可以在进度详情中显示"⚠ 词级对齐失败，使用粗时间戳"
+
+**关联**：[[P207]]（FA 官方 API 替换）、[[P212]]（精度验证）、[[P213]]（词数漂移）
+
+**改什么**：只改一个文件 `qwen_aligner.py`。其他所有文件不动（QwenAligner 对外接口保持不变）。
+
+**修复**：`transcribe()` 新增 `_fa_quality` 变量跟踪 FA 对齐状态（`"official"` / `"fallback"` / `"not_attempted"`），赋给每个 segment 的 `seg._fa_quality`。降级时打 WARNING `"⚠ 词级对齐未成功，字幕使用 Whisper 粗时间戳"`。2026-06-10 TDD 修复。
+
+**已修** ✅
+
+**第一步：换加载方式。** `__init__` 里 `AutoModel.from_pretrained()` → `Qwen3ForcedAligner.from_pretrained()`。`from qwen_asr import Qwen3ForcedAligner` 替换 `from transformers import AutoModel, AutoProcessor`。
+
+**第二步：换对齐方式。** `align()` 里删掉 100 行手写 forward pass（用 `<timestamp>` 标记包词、调 `self._model(**inputs)`、从 logits 猜时间戳），换成一行 `self._model.align(audio_path, text, language)`。
+
+**第三步：删掉除法 fallback。** 当前代码对齐失败后偷偷做 `duration / len(words)` 返回假数据，只印 warning 不报错。这个 fallback 必须删。宁可没数据（让 L1 正确收到"校对员未确认"），不用假数据（让 L1 以为校对员确认了所有段）。造假的结果是用假结果做真决策。
+
+**第四步：加薄薄的格式适配层。** 官方 `model.align()` 返回的字段名可能与现有格式有差异（比如 `"text"` vs `"word"`）。在 `align()` 内部统一转换为 `[{"word": str, "start": float, "end": float}]`。这不是 fallback——这是适配层，5 行代码。
+
+**第五步：验证。** 用同上测试音频 + "hello world this is a test" 再跑一遍。旧假结果：6 个词每个精确 0.178 秒。新真结果：6 个词时长不等。不一样长 = 对了。
+
+**不改的东西**：
+- transcriber_v2.py（并行/串行两处调用）→ 不改，QwenAligner 外壳不变
+- hallucination_filter.py（L1 双信号）→ 不改，只收到真数据而非假数据
+- `is_qwen_aligner_available()` 逻辑 → 检查方式从 AutoConfig 换成 `Qwen3ForcedAligner.from_pretrained()` 的文件检测
+- `apply_aligner_timestamps()` → 不改，输入格式不变
+- `extract_segment_time()` → 不改
+
+**风险提示**：改完后跑全量 419 测试确认零回归。预计 30 分钟。
+
+**已修** ❌
+
+**教训 · 三条规则（Jobs 2026-06-09）**：
+
+> P207 的根因不是一行代码写错了——是三个环节各漏了一道闸门：加模型时没看官方文档、加载后没做真活测试、失败后被兜底代码静默掩盖。以下三条规则防止下次重蹈覆辙。
+
+| # | 规则 | P207 怎么犯的 |
+|---|------|-------------|
+| 1 | **加新模型前，先去模型作者的 GitHub 仓库看 README**。找有没有官方 Python 包、有没有专门的加载方式。不要默认所有模型都用 AutoModel 加载。 | 看了 HuggingFace 页面（写的是 AutoModel），没看 Qwen GitHub（写的是 Qwen3ForcedAligner） |
+| 2 | **模型加载后做"真活测试"**。用一段已知的测试数据跑一遍，检查输出是不是真实的——不只是格式对不对，是结果本身有没有被偷偷替换成假数据（如除法均匀分配）。 | `is_qwen_aligner_available()` 只查文件在不在，不查结果真不真 |
+| 3 | **降级方案必须在用户界面上可见**。如果主方案失败、走了备用方案——这件事必须出现在用户能看见的地方。如果备用方案在伪造数据（如除法兜底），不允许存在——直接报错。 | warning 藏在 debug.log 深处，除法假数据静默返回 |
+
+**关联**：全局 CLAUDE.md「新 AI 模型引入规则」
+
+
+## P215 | 2026-06-09 | 🟡 `_quality: "aligned"` 名不副实——暗示质量已验证，实际只表达了数据来源（Jobs 审查发现 #4）
+
+**来源**：2026-06-09 Steve Jobs 审查 P207 修复后代码。
+
+**问题**：`qwen_aligner.py` 第 112 行，格式转换层给每个对齐词加了 `"_quality": "aligned"`。这个名字暗示"对齐结果经过了质量验证"——但实际上没有。官方 API 不返回置信度，代码没有做任何质量检查。`"aligned"` 只是在说"我们调了官方 API 拿到了输出"。
+
+用户（或下游的 L1 双信号安检）看到 `"aligned"` 会以为这个时间戳是经过确认的。但实际上你无法判断"模型精确找到了词的位置"和"模型在瞎猜，只是这次没做除法"。
+
+**解决方案**：改一个字。`"aligned"` → `"official"`。`"official"` 说的是数据来源——"这是官方 API 的输出"。坦诚，不假装有质量控制。同时给降级路径（FA 失败回退 Whisper 时间戳时）加 `"_quality": "fallback"` 标记，让下游能区分两种来源。
+
+**影响范围**：一行（`qwen_aligner.py:112`）。改名不影响任何下游代码——`_quality` 字段目前无消费方。
+
+**关联**：[[P207]]、[[P214]]
+
+**已修** ✅ `_quality` → `"official"`
+
+
+## P216 | 2026-06-09 | 🟡 FA 对齐成败用户无感知——成功/失败都只在内部日志里，进度消息和完成摘要不含此信息（Jobs 审查发现 #5）
+
+**来源**：2026-06-09 Steve Jobs 审查 P207 修复后代码。
+
+**问题**：FA 对齐成功 → `_log.info("对齐完成")`。FA 对齐失败 → `_log.warning("对齐失败")`。两者都只在内部日志里。用户通过进度条和任务完成摘要看不到 FA 是否成功。
+
+对齐精度是产品体验的一部分——FA 成功意味着字幕时间轴是词级精度的，FA 失败意味着回退到 Whisper 粗时间戳。用户应该知道这个差别。
+
+**涉及位置**：
+- `transcriber_v2.py:368` 并行路径 FA 失败
+- `transcriber_v2.py:434` 串行路径 FA 失败
+- `transcriber_v2.py:413` 并行路径 FA 成功
+- `transcriber_v2.py:430` 串行路径 FA 成功
+
+**解决方案**：
+- FA 成功时，通过进度消息追加"字幕已精细对齐"
+- FA 失败时，通过进度消息追加"对齐未成功，使用速记员原始时间戳"
+
+两行消息。不增加复杂度。
+
+**关联**：[[P207]]、[[P214]]、[[P215]]
+
+**已修** ✅ `_fa_holder["_quality"]` 标记 in transcriber_v2.py
+
+
+## P217 | 2026-06-09 | 🟢 两个 FA 可用性测试 mock 未适配新代码（测试适配）
+
+**来源**：P207 修复后 `test_p201_qwen_aligner_check.py` 和 `test_p207_fa_official_api.py` 各有一个测试失败。
+
+**问题**：`is_qwen_aligner_available()` 新增了 `_has_qwen_asr_package` 前置检查→测试的 mock 设置未适配新路径，导致断言失败。代码本身正确，只是测试的 mock 没跟上代码变更。
+
+**解决方案**：两个测试的 mock setup 更新以匹配新检查链。
+
+**关联**：[[P207]]
+
+**已修** ✅ mock qwen_asr module in test setup
+
+
+## P218 | 2026-06-09 | Web UI 环境检测 | 声音分类/交叉验证/说话人检测/对齐器四个模块显示"未安装"
+
+**问题**：Web UI 环境栏显示"声音分类模块未安装""交叉验证模块未安装""说话人检测模块未安装""Qwen 对齐器未安装"，四个红点。
+
+**原因**：uvicorn 后端进程是用系统 Python（`/opt/homebrew/Cellar/python@3.13/...`）启动的，系统 Python 里没有任何项目依赖包。所有包都在项目 venv（`v2/.venv/`）里，但启动时没激活 venv。`env_check.py` 的 `check_sensevoice()` / `check_qwen_asr()` / `check_resemblyzer()` / `check_qwen_aligner()` 都是 `import` 检测，import 失败就返回 `{"ready": False}`。
+
+**解决方案**：
+1. 杀旧进程，用 venv Python 重启 → 六个模块全绿
+2. 创建 `v2/run.sh` 启动脚本，写死 venv Python 路径，防止再走错门
+
+**已修** ✅
+
+**教训**：成熟项目应提供启动脚本锁定 Python 路径，避免"忘了激活 venv"这类低级错误。`pyproject.toml` 中缺少 `funasr` 依赖声明（venv 里手动装的），重建环境时可能漏装。
+
+
+## P219 | 2026-06-09 | codegraph 审计 | 6 个函数复杂度过高，需在 V3.08 拆分
+
+**来源**：`ln-021-codegraph` 全局审计发现。
+
+**问题**：以下 6 个函数复杂度过高，维护和理解困难：
+
+| # | 文件 | 函数 | 复杂度 | 说明 |
+|---|------|------|--------|------|
+| 1 | [transcriber_v2.py](v2/backend/transcriber_v2.py#L167) | `transcribe` | 41 | 🔴 最高。转录主入口，混合了模型加载、Whisper 转录、Qwen 交叉验证、SenseVoice 声音分类、FA 对齐、结果合并——一个函数干了 6 件事 |
+| 2 | [sensevoice_runner.py](v2/backend/core/sensevoice_runner.py#L142) | `run_sensevoice` | 22 | 声音分类执行器 |
+| 3 | [hallucination_filter.py](v2/backend/core/hallucination_filter.py#L287) | `_layer2_cross_validate` | 19 | L2 交叉验证核心 |
+| 4 | [qwen_asr_runner.py](v2/backend/core/qwen_asr_runner.py#L535) | `run_qwen_asr` | 19 | Qwen ASR 执行器 |
+| 5 | [orchestrator.py](v2/backend/translation/orchestrator.py#L665) | `translate_with_orchestrator` | 17 | 翻译调度器 |
+| 6 | [subtitle_style.py](v2/backend/subtitle_style.py#L13) | `build_ass_styled` | 16 | ASS 字幕样式构建 |
+
+**影响**：
+- 改一个功能容易不小心影响另一个（耦合太紧）
+- 新人看懂 `transcribe()` 需要读 200+ 行，心智负担大
+- 写单元测试困难——一个函数干太多事，mock 要设满
+
+**解决方案**：逐个拆分，每个函数只做一件事。`transcribe()` 优先级最高（复杂度 41，远超标号 10 的健康线）。搬家到 v3/ 之后执行，纯重构，不改行为，不增删功能。
+
+**关联**：[[P132]] V3.08 目录整理
+
+**已修** ❌
+
+---
+
+## P220 | 2026-06-09 | 🔴 FA 对齐器长音频 O(n²) 内存爆炸——Transformer 自注意力天花板
+
+**来源**：2026-06-09 P207 修复后首次实战测试。22 分钟英文 vlog，Whisper 转录 402 段，FA 对齐器用官方 API 加载成功，但在 `model.align()` 内部崩了。
+
+**现象**：
+```
+Qwen3-FA 并行对齐失败: Invalid buffer size: 18.82 GiB
+```
+
+**根因**：不是音频加载问题，不是内存泄漏。是 PyTorch 的 `scaled_dot_product_attention` 崩了。
+
+完整调用链：`Qwen3ForcedAligner.align()` → `self.model.thinker()` → transformer 自注意力层 → `torch.nn.functional.scaled_dot_product_attention` → 崩。
+
+FA 对齐器把整个 22 分钟音频（~68,000 个时间帧）+ 全部 15,655 个字符文本（~5,000 个 token）一次性塞进自注意力矩阵。73,000² = 53 亿个元素 × 4 字节 ≈ 21 GB——接近 18.82 GiB。
+
+这是 Transformer 注意力机制 O(n²) 的物理天花板——不是 bug，不是参数设错了。每个字在做决定的时候都要看一眼所有其他字和所有时间帧。这张交叉引用表的大小随输入长度呈平方增长。
+
+**为什么短音频不崩**：TDD 测试用 2.5 秒音频——约 130 个 token——130²=16,900 元素 = 几十 KB。随便跑。
+
+**为什么转录不崩**：转录是顺序的——听一句写一句，不需要回头看。对齐是交叉的——每个字 × 每个时间点。
+
+**解决方案（用户提出，2026-06-09）**：
+不按时间分段（SenseVoice 的 300 秒一刀切），按 Whisper 的句子分段。
+
+Whisper 已经给出了 402 个句子段落，每段带时间戳（如"第 10-15 秒，hello world this is a test"）。每段独立喂给 FA 对齐器——5 秒音频 + 一句话文字。每段的注意力矩阵只有几百格，跟 TDD 测试一样小。402 段逐句处理，内存不超 2GB。全部跑完拼回去。
+
+好处：句子边界和语言边界对齐，不会一个词被切成两半。每个 chunk 独立，以后还能并行。
+
+**已修** ✅（2026-06-09 TDD 修复。新增 `align_segments()` 函数，按 Whisper 句子逐段对齐。每段 ~5 秒，402 段内存 <2GB。`transcriber_v2.py` 并行+串行两条路径均已切换。421 全量零回归）
+
+**关联**：[[P207]]（FA 官方 API 替换）、[[P212]]（FA 精度验证）、[[P213]]（词数漂移）、[[P214]]（静默降级）
+
+---
+
+## P221 | 2026-06-09 | 🔴 Qwen ASR MLX 版被传了不认识的参数——线内联引入的新 bug
+
+**来源**：2026-06-09 P207 `_qwen_gen_kwargs` 函数内联时引入。
+
+**现象**（第三次测试，12:30）：
+```
+TypeError: Qwen3ASR.transcribe() got an unexpected keyword argument 'return_time_stamps'
+```
+5 个音频 chunk 全部因此跳过，精准模式退化为标准模式。
+
+**根因**：旧代码的处理方式是——只在非 MLX 环境下才传 `return_time_stamps`，MLX 环境下根本不提这个参数。因为千问 ASR 的苹果芯片专版（MLX 版）不认识 `return_time_stamps`——连 `False`（"不要时间戳"）都不认识。
+
+内联时写出了 `return_time_stamps=not _USE_MLX`。MLX 环境下 `_USE_MLX=True`，所以 `not True` = `False`——千问 MLX 版收到 `return_time_stamps=False`，说"我不知道这个参数"，拒收。
+
+旧代码：
+```python
+if not use_mlx:
+    kwargs["return_time_stamps"] = True    # 只有非 MLX 才加这个 key
+```
+
+新代码（有 bug）：
+```python
+return_time_stamps=not _USE_MLX   # MLX 时变成 return_time_stamps=False——MLX 不收
+```
+
+**为什么测试没发现**：422 个单元测试没有加载真实 MLX 模型——MLX 只在 Apple Silicon 上有，测试环境无法模拟。
+
+**为什么还没修**：发现 bug 后用户指令"不要做任何操作，不要影响当前任务"，修复未执行。
+
+**解决方案**：MLX 路径不传 `return_time_stamps`（根本不提），非 MLX 路径传 `return_time_stamps=True`。四处调用点的条件改为只传 `language`，仅在非 MLX 时加 `return_time_stamps`。
+
+**关联**：[[P207]]（FA 修复触发工具箱升级）、[[P220]]（FA 内存爆炸——同一次测试的另一个崩溃）
+
+**已修** ✅（2026-06-09 TDD 修复。4 个调用点改为条件展开：`**({"return_time_stamps": True} if not _USE_MLX else {})`，MLX 时不传参数。421 全量零回归）
+
+---
+
+## P222 | 2026-06-09 | 🔴 Qwen ASR v0.0.6 语言名校验——简写"en"不被接受
+
+**来源**：2026-06-09 第五次测试（14:38），P221 `return_time_stamps` 修复后发现的新问题。
+
+**现象**：
+```
+ValueError: Unsupported language: En. Supported: ['Chinese', 'English', ...]
+```
+
+**根因**：v0.0.6 的 `Qwen3ASRModel.transcribe()` 新增了语言名校验。我们传的是 ISO 简写 "en"，新版内部做首字母大写后变成 "En"，然后跟完整语言名列表比较——"En" ≠ "English"，报错。
+
+旧版 API 不校验语言名，传什么接受什么。新版要求完整语言名。
+
+**解决方案**：
+`qwen_aligner.py` 里已有 `_LANG_MAP` 做简写→完整名的映射（`"en": "English"`）。Qwen ASR 调用时复用这个映射。或者在 4 个调用点把 `language` 从简写转成完整名。
+
+**关联**：[[P207]]（FA 修复触发工具箱升级）、[[P221]]（return_time_stamps 错误——同一次升级的连锁反应）
+
+**已修** ✅（2026-06-09 TDD 修复。新增 `_resolve_language()` 函数 + `_LANG_NAME` 映射表，4 个调用点改为 `language=_resolve_language(language)`。"en"→"English"。421 全量零回归）
+
+---
+
+## P223 | 2026-06-09 | 🟢 FA 分段对齐并行化——自适应线程数
+
+**来源**：2026-06-09 P220（FA 分段对齐）Jobs 审查。当前串行处理 551 段耗时 105 秒，可并行加速。
+
+**背景**：Python 有 GIL——多线程在纯 CPU 计算上无法真正并行。但 FA 对齐的 GPU 计算阶段（MPS/CUDA）会释放 GIL，因此多线程可以并行等待 GPU，实现加速。
+
+**三种用户场景**：
+| 场景 | GPU | 推荐并行数 | 原因 |
+|------|-----|-----------|------|
+| Mac + MPS | 有 | 2-4 | GPU 排队是瓶颈，超 4 路无益 |
+| Windows + NVIDIA | 有 | 2-4 | 同上 |
+| Windows 纯 CPU | 无 | 1 | CPU 计算不释放 GIL，多线程全排队，无加速 |
+
+**方案**：
+1. 启动时检测是否有 GPU（`torch.cuda.is_available()` / `torch.backends.mps.is_available()`）
+2. 有 GPU → 用 `ThreadPoolExecutor(max_workers=4)` 并行
+3. 无 GPU → 串行（1 路）
+4. 预留环境变量覆盖（如 `FA_PARALLEL=2`），便于用户自行调优
+
+**优先级**：🟢 非阻塞。FA 对齐与 SenseVoice 并行运行，105 秒 vs 总耗时 12 分钟，不是瓶颈。Windows 真机测试（P209）时一并验证最佳并行数。
+
+**关联**：[[P220]]（FA 分段对齐）、[[P209]]（Windows 真机打包测试）
+
+**已修** ❌（V3.10 或更后）
+
+---
+
+## P224 | 2026-06-09 | 🔴 FA 分段对齐时间戳偏移丢失——所有字幕叠在 0 秒
+
+**来源**：2026-06-09 第六次测试视频回看发现。所有中文字幕堆叠在视频开头几秒，后面的画面无字幕。
+
+**现象**：SRT 文件中前十条字幕全部从 00:00:00 开始：
+```
+1  00:00:00,320  →  00:00:01,439
+2  00:00:00,160  →  00:00:02,000
+3  00:00:00,160  →  00:00:00,560
+...
+```
+
+**根因**：P220 的 `align_segments` 把 551 个 Whisper 句子段分别喂给 FA。FA 对每段独立工作——不知道这段在视频的哪个位置，只返回相对于片段起点的时间（0-5 秒）。`apply_aligner_timestamps` 把这些相对时间直接写进了字幕——忘了加上每段的原始起点偏移。
+
+FA 没有错——它本来就是这样设计的（无状态，每次独立调用）。错在程序没有把每段的原始起点时间（Whisper 给的 `seg.start`）加回去。
+
+**用户理解**：FA 每次被调用就像一个没有记忆的人——拿到一段音频，兢兢业业找到每个词在这段里的位置，然后清空大脑等下一段。它不知道"这段是从第 22 秒开始的"——它只知道"这段 5 秒的音频，第一个词在 0.3 秒"。551 段全被当成从 0 秒开始。
+
+**解决方案**：`align_segments` 返回对齐结果时，每个词的 `start/end` 加上该段的 `seg.start` 偏移。或修改 `apply_aligner_timestamps` 在处理时加上偏移。
+
+**关联**：[[P220]]（FA 分段对齐）、[[P207]]（FA 官方 API 替换）
+
+**已修** ✅（2026-06-09 TDD 修复。`align_segments()` 中对齐结果每个词的 start/end 加上 `seg.start` 偏移。421 全量零回归）
+
+---
+
+## P225 | 2026-06-09 | 🔴 千问 v0.0.6 PyTorch 路径返回列表但代码当单个对象取——输出全空
+
+**来源**：2026-06-09 investigate 诊断路2A（通用路+Mac MPS）空输出问题。
+
+**根因**：v0.0.6 的 `Qwen3ASRModel.transcribe()` 返回 `List[ASRTranscription]`（列表），但我们的代码在非 MLX 路径上直接对列表取 `.text`——列表没有 `.text` 属性。
+
+```python
+result = model.transcribe(...)   # → List[ASRTranscription]
+# 代码写的是:
+full_text = result.text if hasattr(result, 'text') else ""  # → ""
+# 应该写:
+full_text = result[0].text if result else ""
+```
+
+`hasattr(result, 'text')` 对列表返回 False → `full_text = ""` → 日志显示"无文字,跳过"。
+
+旧版 MLX 的 `transcribe()` 返回单个对象（有 `.text`），所以代码在 `_USE_MLX=True` 时正常工作。P207 升级到 v0.0.6 + MLX 包丢失后走了 PyTorch 路径——新旧 API 返回格式不兼容。
+
+**影响范围**：4 个调用点全部受影响，导致千问在非 MLX 路径上完全不工作：
+- producer loop 文本提取（行 283）
+- `_process_single_chunk` 串行路径（行 347）
+- `run_qwen_asr` 两处文本提取（行 509、558）
+- 时间戳访问 `result.time_stamps` 也同样受影响（行 358、576）
+
+**大白话解释**：旧版千问是"问一个人，得一个答案"。问它一段音频说了什么，它直接回答你——`.text` 就能拿到文字。新版千问（v0.0.6）是"问一群人，拿一个盒子"。它把答案装在盒子里还给你——你得打开盒子拿第一个——`[0].text`。我们的代码还在对着盒子问"你说了什么"——盒子不说话。所以千问跑完了，但我们拿不到文字，以为它什么都没说。
+
+**解决方案**：4 处调用点全部改为从列表中取第一个元素，或统一封装兼容新旧 API。
+
+**已修** ✅（2026-06-09 TDD 修复。全部非 MLX 分支改为 `result[0].text`/`result[0].time_stamps`/`result[0].language`。420 全量零回归。1 个 mock 测试需适配新版 API）
+
+**关联**：[[P207]]（FA 升级触发）、[[P221]]（return_time_stamps 错误）、[[P222]]（语言名错误）
+
+**已修** ❌
+
+---
+
+## P226 | 2026-06-09 | 🔴 千问 MLX 加速包丢失——`qwen3-asr-mlx` 从未列入依赖清单
+
+**来源**：2026-06-09 调查千问 ASR 空输出问题时发现。
+
+**现象**：`_USE_MLX = False`，千问走了 PyTorch+MPS 路径（慢且 P225 bug 导致空输出）。
+
+**根因**：`qwen3-asr-mlx` 从未被写进 `pyproject.toml`。该包是早期手动安装的，一直在系统里默默工作。P207 修复 FA 时安装了 `qwen-asr==0.0.6`，依赖树重新整理后该包被清掉。
+
+**可用版本**：`qwen3-asr-mlx 0.1.1`（在 PyPI 上）。
+
+**解决方案**：安装 `qwen3-asr-mlx==0.1.1`，写入 `pyproject.toml`。代码不需要改——第 33 行 `from qwen3_asr_mlx import Qwen3ASR` 会自动检测并设 `_USE_MLX = True`。
+
+**关联**：[[P207]]（FA 升级触发）、[[P225]]（同一次升级的连锁反应）
+
+**已修** ✅（2026-06-09 TDD 修复。qwen3-asr-mlx==0.1.1 已安装。写入 pyproject.toml。420 全量零回归。但触发了 [[P227]]）
+
+
+---
+
+## P227 | 2026-06-09 | 🔴 tokenizers 版本冲突——MLX 要 ≥0.23.0，FA 要 ≤0.23.0
+
+**来源**：2026-06-09 P226 修复（装 qwen3-asr-mlx）触发。第七次测试 FA 对齐被跳过。
+
+**现象**：`is_qwen_aligner_available()` 返回 False。FA 模型的 `AutoConfig.from_pretrained()` 抛出版本检查错误：`tokenizers>=0.22.0,<=0.23.0 is required, but found tokenizers==0.23.1`。该异常被 `except (ImportError, OSError)` 捕获，FA 静默跳过。
+
+**tokenizers 版本变迁**：
+
+| 时机 | 版本 | 原因 |
+|------|------|------|
+| 原始环境 | 0.23.1 | 项目初始安装 |
+| P207（装 qwen-asr 0.0.6） | 0.22.2 ↓ | qwen-asr 拉了兼容的旧版 |
+| P226（装 qwen3-asr-mlx 0.1.1） | 0.23.1 ↑ | MLX 要求 ≥0.23.0，pip 装了最新版 |
+
+**根因**：两个包对 tokenizers 的要求形成夹逼：
+- `qwen3-asr-mlx==0.1.1` → `tokenizers>=0.23.0`（写在 pip 元数据中，package label）
+- `transformers`（FA 模型运行时检查）→ `tokenizers>=0.22.0,<=0.23.0`（写在源代码中，not visible to pip）
+
+理论交集版本是 0.23.0，但 **tokenizers 0.23.0 从未在 PyPI 发布**（版本号从 0.22.2 直接跳到 0.23.1）。pip 看到 `≥0.23.0` 就装了 0.23.1，超过 FA 的 0.23.0 上限。
+
+**关键认知**：FA 的版本上限（≤0.23.0）是 transformers 在**运行时**抛出的检查，不是 pip 元数据中的声明。无论先装后装还是同时装，pip 都看不到这个限制——它只处理元数据中声明的依赖。
+
+**解决方案**：降级 `qwen3-asr-mlx` 到 0.1.0（其 tokenizers 要求仅为 `>=0.15.0`），锁 `tokenizers==0.22.2`。
+- MLX 0.1.0 ↔ 0.1.1 功能等价，API 相同（`Qwen3ASR.from_pretrained()` + `transcribe()`），仅依赖版本下限不同
+- tokenizers==0.22.2 同时满足：MLX 0.1.0（≥0.15.0 ✅）、FA/transformers（0.22.0~0.23.0 ✅）
+- 改动：pyproject.toml 改一行（`qwen3-asr-mlx==0.1.1` → `0.1.0`），加一行（`tokenizers==0.22.2`）
+
+**关联**：[[P207]]（qwen-asr 升级）、[[P226]]（MLX 安装）、V3.10（全版号锁定）
+
+**已修** ✅（2026-06-09 降级 MLX 0.1.1→0.1.0，锁 tokenizers 0.22.2。431 测试零回归。FA 可用性检测恢复。）
+
+## P228 | 2026-06-09 | 🔴 字幕时间戳漂移约1秒
+
+**来源**：V3.07 端到端实测。应用 P207/P220 FA 修复后首次完整跑通，用户观看最终视频发现字幕与语音不同步。
+
+**现象**：字幕有时提前约1秒出现（人还没说话字幕先出来），偶尔延迟。大部分偏差为提前。
+
+**根因**：`apply_aligner_timestamps()` 用 Python `str.split()` 数字数来把 FA 对齐词分配给段落。Python 拆词与 FA 内部分词粒度不一致（如 "we're" Python 计为1词，FA 可能拆为2词），515段累积词数漂移，段 N 可能拿到段 N-2 的时间戳。
+
+**解决方案**：改用时间范围匹配。不再数字数，直接筛选对齐词列表中时间戳落在每个段落的绝对时间范围内的词。
+
+**已修** ✅（2026-06-09 TDD 修复。`qwen_aligner.py:236-270` 重写。7 新增测试 + 442 全量零回归。）
+
+## P229 | 2026-06-09 | 🟡 背景音乐段存疑率过高（54% [?]）
+
+**来源**：V3.07 端到端实测。
+
+**现象**：最终输出 54% 字幕标记为存疑 [?]，但用户观看后发现这些段落的翻译大部分是对的。标记与实际质量不匹配。
+
+**根因**：L2 窗口比对用 0.35 统一阈值判断所有窗口。背景音乐干扰下 Qwen ASR 转写质量必然下降——不是 Whisper 错了，而是 Qwen 自己也听不清。L2 没有区分"Qwen 确认转写错误"与"Qwen 因音频条件限制无法确认"。
+
+**解决方案**：L1 在推翻 SV 判定时标记 `seg.bgm_override = True`。L2 检测到窗口内有 BGM 覆盖段时，将 GREEN/YELLOW 阈值从 0.35 降到 0.20。同时更新 L2 日志增加 `bgm` 字段。
+
+**已修** ✅（2026-06-09 TDD 修复。`hallucination_filter.py:164-166, 340-373`。4 新增测试 + 442 全量零回归。）
+
+## P230 | 2026-06-09 | 🟡 DeepSeek 翻译 2 段未被解析（489/491）
+
+**来源**：V3.07 端到端实测。上次测试（8b61066356）已观察到，本次深入分析根因。
+
+**现象**：DeepSeek 翻译了 491 段中的 489 段，2 段被标记为"翻译失败"后由免费引擎补全。
+
+**根因**：(A) 翻译解析正则只认 `[数字] 内容` 一种格式，LLM 偶尔的格式偏差（多空格、中文括号）导致匹配失败；(B) 短句中英文专有名词过多导致中文字符比例不足 10%，被误判为"未翻译"；(C) `reflection.py` 质量反思模块已编写但从未接入流程。
+
+**解决方案**：(A) 格式解析放宽——支持 `[50]` `[ 50 ]` `【50】` `50.` 四种格式；(B) 短句（<15字）中文比例降至 5%，长句保持 10%；(C) 失败段 ≤10 时用最简提示词单独重发给 LLM，重发失败再走免费引擎兜底。
+
+**已修** ✅（2026-06-09 TDD 修复。`orchestrator.py:455-470, 492-508, 789-806`。442 全量零回归。）
+
+---
+
+## UX 体验问题（Steve Jobs 审查 2026-06-09）
+
+以下问题从用户操作视角发现——代码逻辑正确但用户体验错误。
+
+## P231 | 2026-06-09 | 🔴 UX：进度条是假的（P0）
+
+**现象**：用户点"开始"后，界面显示"正在识别语音…"持续 25 分钟，进度从 10% 跳至 25% 后长时间不动。实际五个步骤（Whisper → Qwen → FA → SV → 过滤）全包在 "transcribe" 一个阶段里。
+
+**方案**：拆为四个子阶段，通过 WebSocket 推送真实进度——"正在将声音转成文字"→"正在核对文字准确度"→"正在给每个词标记时间"→"正在过滤不可靠的字幕"。改动 `worker.py` stderr_progress + `transcriber_v2.py` 增加 progress_callback。
+
+**已修** ❌
+
+## P232 | 2026-06-09 | 🔴 UX：警告信息制造焦虑（P0）
+
+**现象**：> "⚠ 音频质量较差（54% 字幕存疑），建议手动校对后使用"。用户直觉认为"一半都是错的，这工具不能用"。实际翻译大多正确，只是 BGM 导致 Qwen 无法确认。
+
+**方案**：重写警告文案——"字幕处理完成。您的视频全程有背景音乐，部分字幕的校对标记可能偏多。这不影响翻译质量——标记 [?] 的段落翻译大多数是准确的。" 改动 `showQmWarning()`（index.html:1276）。
+
+**已修** ❌
+
+## P233 | 2026-06-09 | 🟡 UX：设置面板在运行期间被锁死（P1）
+
+**现象**：用户点击"开始"后 30 分钟内，所有设置控件（输出方式、模型选择、翻译模式等）全灰不可操作。如果 2 分钟后发现选错输出模式，必须取消整个任务重来，代价 30 分钟。
+
+**方案**：允许修改"当前任务尚未用到的设置"；添加排队修改提示。改动 `lockUI()`（index.html:1151）。
+
+**已修** ❌
+
+## P234 | 2026-06-09 | 🟡 UX：模型和翻译故障对用户不可见（P1）
+
+**现象**：FA 加载失败、Qwen 降级、LLM 翻译切免费引擎——全部静默。用户只知道"字幕不太准"，不知道原因。后端日志写了一切，前端从不显示。
+
+**方案**：任务完成后推送处理摘要——每个子系统的可用状态和结果。如"Whisper ✅ Qwen ✅ FA ✅ | 翻译: DeepSeek (489/491) | 存疑: 54%（BGM导致，翻译可靠）"。后端汇总 JSON 通过 WebSocket 推送。
+
+**已修** ❌
+
+## P235 | 2026-06-09 | 🟡 UX：已完成任务阻塞新任务（P1）
+
+**现象**：处理完一个视频后想用不同设置重新处理，系统显示"检测到任务已完成"但开始按钮灰掉。用户必须手动清缓存才能重新开始。
+
+**方案**：已完成任务显示显式"重新处理"按钮，自动清除旧缓存并提交新任务。改动 `handleFoundJob()`（index.html:1069）。
+
+**已修** ❌
+
+## P236 | 2026-06-09 | 🔵 UX：下载按钮和输出文件不清晰（P2）
+
+**现象**：显示"下载视频"和"下载 SRT"两个按钮。非技术用户不知道 SRT 是什么。"封装字幕"模式下视频已含字幕，为什么还要下载 SRT？
+
+**方案**：根据输出模式调整按钮文案——烧录："下载视频（已烧录字幕）| 下载字幕文件（SRT 格式）"；封装："下载视频（可开关字幕）| 下载字幕文件"。改动 `renderCardDone()`（index.html:1260）。
+
+**已修** ❌
+
+## P237 | 2026-06-09 | 🔴 系统日志是"日记"不是"黑匣子"（P0）
+
+**来源**：V3.07 两次端到端实测对比。同一视频、同一代码，第一次 SenseVoice 正常，第二次 SenseVoice 全部 BrokenPipe 崩溃。日志只报告了"SV chunk 1/5 失败: BrokenPipeError"，但崩溃时系统内存、进程数、线程数、GPU 状态、FA 当时在做什么——全部未知。无法从日志定位根因。
+
+**现象**：当前日志格式为"开始做X"和"X做完了/失败了"。中间没有系统状态信息。出问题时只能看到"什么崩了"，看不到"崩的时候系统处于什么状态"。
+
+**根因**：日志设计是"事件记录"模式（日记），不是"状态快照"模式（黑匣子）。没有在每个关键步骤前后自动抓取系统参数（内存、进程数、线程数、GPU 显存）。
+
+**解决方案**：建立系统化日志框架——在公共模块中创建一个 `checkpoint(name, status)` 工具函数，在 10 个关键步骤的入口和出口各调用一次。自动记录：
+1. 步骤名 + 开始/结束/错误状态
+2. 时间戳 + 耗时
+3. 内存使用量（总内存、已用、剩余，通过 `psutil`）
+4. 当前 Python 进程数和线程数
+5. 成功/失败，失败时自动附完整堆栈
+
+实现成本：一个工具模块 ~80 行 + 10 个步骤各 1 行调用 ~10 行。总计约 90 行改动。价值：以后任何环节出问题，翻日志 30 秒定位，不需要猜测根因。
+
+**关联**：UX-4（P234，故障对用户不可见——前端也需要处理摘要）；SenseVoice BrokenPipe 问题（本次测试复现）
+
+**已修** ❌
+
+## P238 | 2026-06-09 | 🔴 SenseVoice 因 tqdm 进度条 BrokenPipe 全部崩溃
+
+**来源**：V3.07 第二次端到端实测（896557f4d8）。SV 5 个分块全部 BrokenPipe，标签分布为 {}。
+
+**现象**：SV 加载正常（7.9s），但 5 个分块全部 BrokenPipeError 崩溃，标签分布为空。FA 对齐等其他步骤正常。
+
+**完整堆栈跟踪（铁证）：**
+```
+sensevoice_runner.py:88 model.generate()
+  → funasr/auto/auto_model.py:477 generate() → self.inference()
+    → funasr/auto/auto_model.py:578 inference() → pbar.update()
+      → tqdm/std.py:1242 update() → self.refresh()
+        → tqdm/std.py:1347 refresh() → self.display()
+          → tqdm/std.py:1495 display() → self.sp()
+            → tqdm/std.py:459 print_status() → fp_write()
+              → tqdm/std.py:452 fp_write() → fp.write(str(s))
+                → BrokenPipeError: [Errno 32] Broken pipe
+```
+
+**根因：** funasr 库内置 tqdm 进度条，默认输出到 stderr。uvicorn --reload 模式下，服务重启时 stderr 管道可能半断开。tqdm 写进度条时发现管道断了 → BrokenPipeError。第一个 chunk 的写操作打断管道后，后续 4 个 chunk 全部复用同一个坏管道 → 全部崩溃。
+
+**修复方案：** 在 `AutoModel()` 构造时传入 `disable_pbar=True`。一行。SV 不需要进度条——它运行在后台 worker 中，没有人在看。
+
+```python
+# v2/backend/core/sensevoice_runner.py
+model = AutoModel(
+    model="iic/SenseVoiceSmall",
+    trust_remote_code=True,
+    device=device,
+    disable_pbar=True,    # 关闭 tqdm 进度条，避免 stderr BrokenPipe
+)
+```
+
+**源码验证：** `funasr/auto/auto_model.py` 中 `__init__` 将 `disable_pbar` 存入 `self.kwargs`，`inference()` 从 `self.kwargs.get("disable_pbar", False)` 读取。同一对象同一字典同一条路径，构造一处全局生效，无需在 `generate()` 中重复传入。
+
+**教训：** BrokenPipeError 在这个项目中多次出现（之前 --reload 也触发过），本质原因是后台 worker 的标准输出/标准错误管道在服务重启或代码变更后处于半连接状态。任何依赖 stderr 输出的第三方库都可能触发此问题。不要臆想病因——翻堆栈、找到实际崩的那一行、针对那一行修。
+
+**已修** ❌（方案已确定，等待修复）
+
+## P239 | 2026-06-09 | 🔴 worker stderr_progress 因 BrokenPipe 崩溃导致翻译阶段未执行
+
+**来源**：V3.07 第二次端到端实测（896557f4d8）。转录全部正常完成（返回 440 段），但在发送最后一条进度消息时 worker 崩溃，翻译和烧录阶段从未启动。无 SRT 输出文件。
+
+**完整堆栈：**
+```
+worker.py:350 stderr_progress("transcribe", 35, f"语音识别完成: 共 {total} 句")
+worker.py:626 _real_stdout.flush()
+BrokenPipeError: [Errno 32] Broken pipe
+```
+
+**根因：** `_real_stdout` 是 worker 子进程向 uvicorn 父进程报告进度的管道（模块级保存 `sys.stdout`）。任务运行期间我们创建了 `v2/docs/` 下的文件，uvicorn `--reload` 检测到文件变更后重启了父进程。父进程死时关闭了管道的读端，子进程（worker）在第 39 分钟发送最后一条进度时发现管道对面没人了 → BrokenPipeError。
+
+**教训：** uvicorn `--reload` 不是为长时间运行的任务设计的。它监控整个工作目录（包括 docs/ 等非代码文件），任何文件变更都会触发重启。`--reload` 模式下启动的任务没有可靠性保证——父进程随时可能被 reload 杀死，导致子进程管道断裂。生产环境去掉 `--reload` 后此问题不存在。
+
+**修复方案：** `stderr_progress` 中的 `_real_stdout.write()` 和 `_real_stdout.flush()` 用 try/except BrokenPipeError 包裹，进度汇报失败不应导致任务崩溃——静默跳过，翻译继续。
+
+**关联：** P238（同一次测试中 SV tqdm 也因管道断崩溃——同一根管道链上的两次断裂）
+
+**已修** ❌
+
+---
+
+## P240 | 2026-06-10 | 🔴 安全：llm_fallback_decision 路径穿越漏洞（C1）
+
+**来源**：`/review` 全项目审查。
+
+**问题**：`main.py:850-856` 的 `llm_fallback_decision()` 端点接收用户传入的 `job_id` 参数，直接拼接 `JOBS_DIR / job_id` 构建路径，没有做路径穿越验证。攻击者可传 `../../etc/passwd` 等 job_id，读取或操作任意文件。
+
+**对比**：同文件中的 `download_video`（L794）、`download_srt`（L812）、`cancel_job`（L837）三个端点已有 `.resolve()` + `.startswith()` 防护，唯独 `llm_fallback_decision` 和 `get_job` 遗漏了。
+
+**根因**：P189 修复路径穿越时漏了这两个端点。
+
+**修复方案**：加入与其他端点相同的 `.resolve()` + `.startswith(JOBS_DIR.resolve())` 校验。
+
+**修复**：抽象 `_validate_job_path(job_id)` 辅助函数，`llm_fallback_decision` 调用后校验。2026-06-10 TDD 修复。
+
+**已修** ✅
+
+---
+
+## P241 | 2026-06-10 | 🟡 翻译：P230 retry 硬编码"英文→中文"（H1）
+
+**来源**：`/review` 全项目审查。
+
+**问题**：`orchestrator.py:799` retry 逻辑中硬编码 `"将以下英文翻译成中文"`，当源语言不是英文时（如俄语、日语视频），retry prompt 与实际语种不匹配，翻译质量下降或 LLM 拒绝执行。
+
+**根因**：P230 修复 retry 时直接写死了语种，没有从上下文取实际 source/target language。
+
+**修复方案**：从 `_TARGET_LANGUAGE` 或传入参数中获取目标语言，构造正确的 retry prompt。
+
+**修复**：retry prompt 改为 `f"将以下内容翻译成{_TARGET_LANGUAGE}。只输出译文，不要解释。\n\n{texts[fi]}"`。2026-06-10 TDD 修复。
+
+**已修** ✅
+
+---
+
+## P242 | 2026-06-10 | 🟡 转录：transcribe_raw() MLX 后端崩溃（H2）
+
+**来源**：`/review` 全项目审查。
+
+**问题**：`qwen_asr_runner.py:502` 使用 `result[0]` 取 MLX 后端的转录结果，但 MLX 后端返回的是对象而非列表，导致 `TypeError`。当前 MLX 后端不可用时静默跳过，但一旦有人用 MLX 后端就会崩溃。
+
+**修复方案**：加 `isinstance(result, list)` 判断，MLX 后端返回对象时用 `result.text` 取值。
+
+**已修** ❌
+
+---
+
+## P243 | 2026-06-10 | 🟡 安全：/api/llm-models 自定义端点 SSRF（M2）
+
+**来源**：`/review` 安全专项审查。
+
+**问题**：`main.py` 的 `/api/llm-models` 端点允许用户传入自定义 API base URL，后端直接用 `httpx.get()` 请求该 URL。没有校验 URL scheme（允许 file://）或目标 IP（允许 127.0.0.1、内网地址），攻击者可利用此端点探测内网服务或读取本地文件。
+
+**修复方案**：校验 URL 必须为 https://（或 http://），解析后校验目标 IP 不在私有地址段（10.x、172.16-31.x、192.168.x、127.x）。
+
+**修复**：新增 `_verify_safe_url(url)` 辅助函数，scheme 校验 + `ipaddress` 模块拦截私有/环回/保留地址。`list_llm_models` 调用前校验。2026-06-10 TDD 修复。
+
+**已修** ✅
+
+---
+
+## P244 | 2026-06-10 | 🟡 安全：get_job 缺少路径穿越验证（M3）
+
+**来源**：`/review` 全项目审查。
+
+**问题**：`main.py:757-780` 的 `get_job()` 端点同样没有路径穿越校验。虽然只做读取操作（读 config.json），但攻击者可通过构造 job_id 读取任意目录下的 config.json 文件。
+
+**修复方案**：加入与其他端点相同的 `.resolve()` + `.startswith()` 校验。
+
+**修复**：`get_job` 调用 `_validate_job_path(job_id)` 校验后再读 meta.json。2026-06-10 TDD 修复。
+
+**已修** ✅
+
+---
+
+## P245 | 2026-06-10 | 🔵 并发：GLOBAL_HASH_INDEX 无锁保护（M1）
+
+**来源**：`/review` 并发专项审查。
+
+**问题**：`main.py` 中 `GLOBAL_HASH_INDEX`（dict）在 FastAPI 的异步端点中被多个协程同时读写（`create_job` 写入、`get_job` 读取），没有锁保护。虽然 CPython GIL 在单线程 asyncio 下不太会出问题，但 `dict.update()` + 后续的 `json.dump()` 写文件操作不是原子的，极端情况下可能写入不完整数据。
+
+**修复方案**：用 `asyncio.Lock` 包裹对 `GLOBAL_HASH_INDEX` 的写操作。
+
+**已修** ❌
+
+---
+
+## P246 | 2026-06-10 | 🟡 设计一致性：L4"重复模式"和"重复词"缺少 L2 GREEN 豁免
+
+**来源**：设计一致性走查。
+
+**问题**：`hallucination_filter.py` `_layer4_regex()` 中 L222 的"重复模式"和 L228 的"重复词"两条规则缺少 `l2_status != "GREEN"` 豁免检查。设计图 P166 要求：如果 L2 交叉验证确认了双模型一致（GREEN），关键词黑名单 / 重复模式 / 重复词都不应丢弃。关键词黑名单（L201）已有此检查，但重复模式和重复词漏掉了。
+
+**修复方案**：L222 和 L228 前各加 `getattr(seg, "l2_status", None) != "GREEN"` 条件。
+
+**修复**：L222（重复模式）和 L228（重复词）各加 `if getattr(seg, "l2_status", None) != "GREEN":` 守卫。2026-06-10 TDD 修复。
+
+**已修** ✅
+
+---
+
+## P247 | 2026-06-10 | 🔵 设计一致性：P1 ASR 分歧裁决未实现
+
+**来源**：设计一致性走查。
+
+**问题**：设计图 P1 包含"ASR 分歧裁决：L2 标记 [?] 的段，LLM 用全文语境判断"。代码中 `orchestrator.py` 的 P1 只做术语提取和摘要，没有实现 [?] 裁决逻辑。`uncertain` 标志已在 hallucination_filter 中设置，但翻译阶段无人消费。
+
+**定位**：功能尚未开发，非代码 bug。需新增 LLM 调用，读取全文 `uncertain=True` 的段，用上下文判断原文是否可信。
+
+**已修** ❌
+
+---
+
+## P248 | 2026-06-10 | 🟡 设计一致性：P3 反思仅在翻译失败时触发
+
+**来源**：设计一致性走查。
+
+**问题**：`worker.py:438` 的 P3 反思判断条件为 `api_keys and failed and translation_mode == "quality"`，即翻译全部成功时 P3 不运行。设计图说 P3 是 quality 模式通用审查（术语/语气/补漏/纠错），不应限定于有失败段。当前导致最需要 P3 的场景（翻译全成功但可能有术语不一致/语气问题）被跳过。
+
+**修复方案**：将 L438 条件改为 `if api_keys and translation_mode == "quality":`，去掉 `and failed` 约束。
+
+**修复**：worker.py L438 条件去掉 `and failed`。2026-06-10 TDD 修复。
+
+**已修** ✅
 

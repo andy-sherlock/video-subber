@@ -179,6 +179,35 @@ def main():
     # _real_stdout 已在模块顶部保存（V2.07 修复）。
     sys.stdout = sys.stderr
 
+    # P174: URL → transparent download before pipeline
+    source_url = config.get("source_url", "")
+    if source_url:
+        stderr_progress("download", 0, "正在下载视频…")
+        from backend.core.video_downloader import download_video, is_ytdlp_available
+        if not is_ytdlp_available():
+            msg = "yt-dlp 未安装，无法下载在线视频。请在终端运行: pip install yt-dlp"
+            _log.error(msg)
+            stderr_progress("error", -1, msg)
+            sys.exit(1)
+        def _dl_cb(msg):
+            stderr_progress("download", 1, msg)
+        dl_result = download_video(source_url, str(job_dir), progress_callback=_dl_cb)
+        if not dl_result:
+            msg = "视频下载失败，请检查链接是否有效、网络是否正常"
+            _log.error("视频下载失败: %s", source_url)
+            stderr_progress("error", -1, msg)
+            sys.exit(1)
+        dl_video_path, dl_audio_path = dl_result
+        video_path = dl_video_path
+        config["video_path"] = video_path
+        config["video_filename"] = Path(dl_video_path).name
+        if dl_audio_path:
+            config["dl_audio_path"] = dl_audio_path
+            _log.info("P198 分轨下载完成: video=%s, audio=%s", dl_video_path, dl_audio_path)
+        else:
+            _log.info("P174 视频下载完成（合并流）: %s", dl_video_path)
+        stderr_progress("download", 3, "视频下载完成")
+
     # Cache paths (versioned per SHA256)
     cache_base = job_dir / "cache"
     cache_base.mkdir(exist_ok=True)
@@ -272,7 +301,8 @@ def main():
             pass
         if stage in ("start", "extract_audio") and not Path(audio_path).exists():
             stderr_progress("extract", 2, "正在分析视频…")
-            extract_audio(video_path, audio_path)
+            _audio_source = config.get("dl_audio_path", video_path)
+            extract_audio(_audio_source, audio_path)
             ck.save("extract_audio", meta=config)
         stderr_progress("extract", 5, "视频分析完成")
 
@@ -405,7 +435,7 @@ def main():
             ck.save("translate", meta=config)
 
             # ── Phase 1C: reflection review (quality mode) ──
-            if api_keys and failed and translation_mode == "quality":
+            if api_keys and translation_mode == "quality":
                 _reflection_mode = config.get("reflection", False)
                 if _reflection_mode:
                     try:
@@ -491,15 +521,23 @@ def main():
                           video_width=video_width, video_height=video_height)
 
             # ── Step 5: Burn (90-100%) ──
-            stderr_progress("burn", 92, "正在合成最终视频…")
-            burn_subtitles(video_path, ass_path, video_out)
-            stderr_progress("burn", 98, "合成完成")
+            if Path(video_out).exists():
+                stderr_progress("burn", 98, "成品文件已存在，跳过合成")
+            else:
+                stderr_progress("burn", 92, "正在合成最终视频…")
+                burn_subtitles(video_path, ass_path, video_out,
+                               audio_path=config.get("dl_audio_path"))
+                stderr_progress("burn", 98, "合成完成")
 
         if mux_flag:
             # ── Step 5: Mux (90-100%) ──
-            stderr_progress("burn", 92, "正在封装字幕到视频…")
-            mux_subtitles(video_path, srt_path, video_out_mux)
-            stderr_progress("burn", 98, "封装完成")
+            if Path(video_out_mux).exists():
+                stderr_progress("burn", 98, "成品文件已存在，跳过封装")
+            else:
+                stderr_progress("burn", 92, "正在封装字幕到视频…")
+                mux_subtitles(video_path, srt_path, video_out_mux,
+                              audio_path=config.get("dl_audio_path"))
+                stderr_progress("burn", 98, "封装完成")
 
         ck.save("done", meta=config)
 
@@ -518,20 +556,17 @@ def main():
         if burn_flag and Path(video_out).exists():
             _dest_v = save_path / Path(video_out).name
             if _dest_v.exists():
-                _archived = save_path / f"{_video_stem}_{_ctx_suffix}_zh.mp4"
-                _dest_v.rename(_archived)
+                _dest_v.rename(_archive_path(save_path, _video_stem, _ctx_suffix, "_zh.mp4"))
             shutil.copy2(video_out, _dest_v)
         if mux_flag and Path(video_out_mux).exists():
             _dest_v = save_path / Path(video_out_mux).name
             if _dest_v.exists():
-                _archived = save_path / f"{_video_stem}_{_ctx_suffix}_zh_sub{_video_suffix}"
-                _dest_v.rename(_archived)
+                _dest_v.rename(_archive_path(save_path, _video_stem, _ctx_suffix, f"_zh_sub{_video_suffix}"))
             shutil.copy2(video_out_mux, _dest_v)
         if Path(srt_path).exists() and not burn_flag:
             _dest_s = save_path / Path(srt_path).name
             if _dest_s.exists():
-                _archived = save_path / f"{_video_stem}_{_ctx_suffix}.srt"
-                _dest_s.rename(_archived)
+                _dest_s.rename(_archive_path(save_path, _video_stem, _ctx_suffix, ".srt"))
             shutil.copy2(srt_path, _dest_s)
 
         sys.stdout = _real_stdout
@@ -552,8 +587,15 @@ def main():
     except Exception as e:
         sys.stdout = _real_stdout
         _dur_str = f"合计={time.time() - _t_start:.0f}s (异常退出)"
+        import traceback
+        logging.getLogger("worker").error("异常退出: %s\n%s", e, traceback.format_exc())
         logging.getLogger("worker").info("步骤耗时: %s", _dur_str)
         emit("error", message=_friendly_error(str(e)), failed_segments=[])
+
+
+def _archive_path(save_dir: Path, stem: str, ctx_suffix: str, ext: str) -> Path:
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    return save_dir / f"{stem}_{ctx_suffix}_{ts}{ext}"
 
 
 def _friendly_error(raw: str) -> str:
@@ -562,7 +604,8 @@ def _friendly_error(raw: str) -> str:
         return "视频中没有检测到语音。可能原因：视频为纯音乐、静音、或音频格式损坏。请确认视频有声音后重试。"
     if "No such file" in raw or "FileNotFound" in raw:
         return "缺少必要的模型文件。请检查网络连接，模型将在下次启动时自动下载。"
-    if "Memory" in raw or "memory" in raw:
+    _raw_lower = raw.lower()
+    if "memoryerror" in _raw_lower or "out of memory" in _raw_lower or "cannot allocate memory" in _raw_lower:
         return "内存不足，无法处理该视频。请尝试使用更小的模型（如 tiny 或 base）。"
     if "ReadTimeout" in raw or "Timeout" in raw or "timeout" in raw.lower():
         return "连接翻译服务器超时。请检查网络，或切换到其他翻译引擎后重试。"

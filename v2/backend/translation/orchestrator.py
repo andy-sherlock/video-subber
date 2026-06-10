@@ -87,10 +87,10 @@ def _build_llm_backends(api_keys: list[dict]) -> list[TranslationBackend]:
                     backends.append(CustomOpenAIBackend(
                         api_key=key, api_endpoint=api_endpoint, model=model
                     ))
-        except ImportError:
-            pass
-        except Exception:
-            pass
+        except ImportError as e:
+            _log.warning("LLM backend %s skipped: %s", platform, e)
+        except Exception as e:
+            _log.warning("LLM backend %s skipped: %s", platform, e)
     return backends
 
 
@@ -232,10 +232,88 @@ def extract_terminology(
     return terms
 
 
+def _extract_terminology_and_summary(
+    texts: list[str],
+    llm,
+) -> tuple[dict[str, str], str]:
+    """Single LLM call: extract terminology AND generate context summary.
+
+    Both tasks share the same input text — merging saves one network round-trip.
+    On partial failure: returns what it can, caller handles fallback.
+    """
+    sample = texts[:500]
+    joined = "\n".join(t for t in sample if t.strip())
+    if not joined:
+        return ({}, "")
+
+    prompt = (
+        "你是视频字幕预处理助手。完成以下两项任务，用 Markdown 标题分隔：\n\n"
+        "## 术语表\n"
+        "从以上字幕原文中提取所有专有名词（人名、地名、作品名、技术术语、组织名称等），"
+        "给出统一的中文翻译。\n"
+        "输出格式（每行一条）：原文 → 中文翻译\n"
+        "只输出术语表，不加任何解释。如果没有术语，输出「无」。\n\n"
+        "## 内容摘要\n"
+        "阅读以上字幕原文，写一份简短的翻译参考摘要（中文，100字内）。\n"
+        "包含：① 内容主题 ② 主要人物/角色 ③ 语气风格（正式/口语/搞笑等）\n"
+        "不要翻译原文，只写摘要。\n\n"
+        + joined
+    )
+
+    try:
+        if hasattr(llm, 'translate_raw'):
+            _t0 = time.monotonic()
+            result = llm.translate_raw(prompt, max_tokens=4096)
+            _dur = int((time.monotonic() - _t0) * 1000)
+            raw = result.translated[0] if result.translated else ""
+        else:
+            return ({}, "")
+    except Exception:
+        _log.warning("合并术语+摘要提取失败 (LLM: %s)",
+                      getattr(llm, 'name', 'unknown'))
+        return ({}, "")
+
+    if raw:
+        _log.debug("合并提取原始返回 (%d字, %dms): %s",
+                    len(raw), _dur, raw[:300])
+
+    # Parse: split by ## headings
+    terms_match = re.search(
+        r'##\s*术语表\s*\n(.*?)(?=##\s|\Z)', raw, re.DOTALL)
+    summary_match = re.search(
+        r'##\s*内容摘要\s*\n(.*?)(?=##\s|\Z)', raw, re.DOTALL)
+
+    terms_section = terms_match.group(1).strip() if terms_match else ""
+    summary_section = summary_match.group(1).strip() if summary_match else ""
+
+    # Parse terms using existing regex
+    terms = {}
+    for line in (terms_section or "").split("\n"):
+        line = line.strip()
+        if not line or line == "无":
+            continue
+        m = re.match(r'(.+?)\s*[-→>]+\s*(.+)', line)
+        if m:
+            orig = m.group(1).strip()
+            zh = m.group(2).strip()
+            if orig and zh:
+                terms[orig] = zh
+
+    if terms:
+        _log.info("合并提取: %d 条术语 + 摘要(%d字)", len(terms),
+                   len(summary_section))
+    elif summary_section:
+        _log.info("合并提取: 无术语 + 摘要(%d字)", len(summary_section))
+
+    return (terms, summary_section)
+
+
 # ── T3: Sliding window translation with context summary + seam review ──
 
+_TARGET_LANGUAGE = "简体中文"
+
 _SUBTITLE_PROMPT = (
-    "你是专业视频字幕翻译。翻译规则：\n"
+    f"你是专业视频字幕翻译，所有翻译的目标语言为{_TARGET_LANGUAGE}。翻译规则：\n"
     "- 阅读【内容摘要】，根据内容类型自动调整翻译策略：\n"
     "  脱口秀/搞笑 → 保留双关和幽默，直译不好笑时用意译\n"
     "  新闻/正式 → 保持准确性，语气正式但不僵硬\n"
@@ -245,9 +323,20 @@ _SUBTITLE_PROMPT = (
     "- 不加任何解释、注释或 markdown 标记\n\n"
 )
 
-_CHUNK_SIZE = 1200
 _OVERLAP_RATIO = 0.2
-_OVERLAP_SIZE = int(_CHUNK_SIZE * _OVERLAP_RATIO)
+
+
+def _compute_chunk_size(llm) -> int:
+    """Return chunk size (line count) based on the model's context window.
+
+    Formula: (max_input_tokens - 18000) // 8, clamped to [200, 3000].
+    18000 = 16000 output + 2000 prompt overhead.
+    8 = average tokens per indexed line.
+    """
+    ctx = getattr(llm, 'max_input_tokens', 32768) or 32768
+    raw = (ctx - 18000) // 8
+    return max(200, min(raw, 3000))
+
 _SEAM_CONTEXT = 50
 _INDEXED_LINE_RE = re.compile(r"\[(\d+)\]\s*(.+)")
 
@@ -364,17 +453,33 @@ def _review_seam(
 
 
 _TRANSLATION_CJK_MIN_RATIO = 0.1  # 10% CJK characters — below this, treat as untranslated
+_SHORT_LINE_MAX_CHARS = 15  # P230: lines shorter than this get relaxed CJK ratio
+_SHORT_LINE_CJK_MIN_RATIO = 0.05  # P230: 5% for short lines (often contain English names)
+
+# P230: multiple format patterns for loose matching
+_INDEXED_LINE_PATTERNS = [
+    re.compile(r"\[(\d+)\]\s*(.+)"),       # [50] content
+    re.compile(r"\[\s*(\d+)\s*\]\s*(.+)"), # [ 50 ] content (extra spaces)
+    re.compile(r"【(\d+)】\s*(.+)"),         # 【50】content (Chinese brackets)
+    re.compile(r"(\d+)[\.\)、\s]\s*(.+)"),  # 50. content or 50) content
+]
+
 
 
 def _is_valid_translation(zh: str) -> bool:
     """Return True if *zh* looks like a real Chinese translation (P156 gate).
 
-    A non-empty string whose CJK character ratio is >= 10% passes.
+    P230: Short lines (<15 chars) use relaxed 5% CJK ratio.
+    Longer lines use standard 10%.
     """
     if not zh or not zh.strip():
         return False
     cjk = sum(1 for c in zh if '一' <= c <= '鿿')
-    return cjk / max(len(zh), 1) >= _TRANSLATION_CJK_MIN_RATIO
+    total = max(len(zh), 1)
+    ratio = cjk / total
+    if total <= _SHORT_LINE_MAX_CHARS:
+        return ratio >= _SHORT_LINE_CJK_MIN_RATIO
+    return ratio >= _TRANSLATION_CJK_MIN_RATIO
 
 
 def _translate_one_chunk(
@@ -405,16 +510,21 @@ def _translate_one_chunk(
         line = line.strip()
         if not line:
             continue
-        m = _INDEXED_LINE_RE.search(line)
-        if m:
-            idx = int(m.group(1))
-            zh = m.group(2).strip()
-            if zh:
-                if not _is_valid_translation(zh):
-                    _log.warning("翻译内容校验失败 (CJK<%.0f%%): idx=%d text=%r",
-                                 _TRANSLATION_CJK_MIN_RATIO * 100, idx, zh[:60])
-                    continue
-                chunk_result[idx] = zh
+        # P230: try multiple relaxed patterns in order
+        idx = None
+        zh = None
+        for pat in _INDEXED_LINE_PATTERNS:
+            m = pat.search(line)
+            if m:
+                idx = int(m.group(1))
+                zh = m.group(2).strip()
+                break
+        if idx is not None and zh:
+            if not _is_valid_translation(zh):
+                _log.warning("翻译内容校验失败 (CJK): idx=%d text=%r",
+                             idx, zh[:60])
+                continue
+            chunk_result[idx] = zh
 
     return ci, chunk_result, result.tokens_used
 
@@ -457,13 +567,15 @@ def _translate_whole_with_markers(
         return translated, None, {}
 
     # Build chunks with overlap
-    step = _CHUNK_SIZE - _OVERLAP_SIZE
+    chunk_size = _compute_chunk_size(llm)
+    overlap_size = int(chunk_size * _OVERLAP_RATIO)
+    step = chunk_size - overlap_size
     chunks = []
     for s in range(0, len(non_empty), step):
-        chunk = non_empty[s:s + _CHUNK_SIZE]
+        chunk = non_empty[s:s + chunk_size]
         if chunk:
             chunks.append(chunk)
-        if s + _CHUNK_SIZE >= len(non_empty):
+        if s + chunk_size >= len(non_empty):
             break
 
     total_chunks = len(chunks)
@@ -621,15 +733,26 @@ def translate_with_orchestrator(
                 _llm_idx = llm_backends.index(llm) + 1
                 try:
                     last_llm = llm
-                    # T5: terminology extraction
+                    # T5+T3 merged: terminology + context summary in one call
                     if progress_callback:
-                        progress_callback(0, f"正在用 {getattr(llm, 'name', 'LLM')} 提取术语…")
-                    terminology = extract_terminology(texts, llm)
+                        progress_callback(0, f"正在用 {getattr(llm, 'name', 'LLM')} 分析内容…")
+                    terminology, context_summary = _extract_terminology_and_summary(texts, llm)
+                    # Fallback: if either part missing, call old function individually
+                    if not terminology:
+                        if progress_callback:
+                            progress_callback(1, f"正在用 {getattr(llm, 'name', 'LLM')} 提取术语…")
+                        terminology = extract_terminology(texts, llm)
+                    if not context_summary:
+                        if progress_callback:
+                            progress_callback(2, "正在分析内容…")
+                        context_summary = _generate_context_summary(texts, llm, terminology)
 
-                    # T3: context summary
-                    if progress_callback:
-                        progress_callback(2, "正在分析内容…")
-                    context_summary = _generate_context_summary(texts, llm, terminology)
+                    # P165: P1 smoke test — summary must contain CJK
+                    if context_summary and not _is_valid_translation(context_summary):
+                        _log.warning("P165 内容闸: %s 摘要无中文 (CJK<%.0f%%), 判定不可靠, 跳过 → %r",
+                                     _llm_name, _TRANSLATION_CJK_MIN_RATIO * 100,
+                                     context_summary[:80])
+                        continue
 
                     # T3: sliding window translation
                     translated, token_usage, sub_splits = _translate_whole_with_markers(
@@ -664,6 +787,24 @@ def translate_with_orchestrator(
                 failed_indices = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
                 _log.warning("LLM 降级链结束: %s 成功, 总耗时 %dms",
                              getattr(last_llm, 'name', 'LLM'), _chain_dur)
+
+            # P230: retry individual failed segments with minimal prompt
+            # (no format to get wrong). Only when ≤10 segments failed.
+            if failed_indices and last_llm and len(failed_indices) <= 10:
+                _log.info("P230 单独重试 %d 条遗漏字幕 (LLM: %s)",
+                          len(failed_indices), getattr(last_llm, 'name', 'LLM'))
+                for fi in list(failed_indices):
+                    try:
+                        simple_prompt = (
+                            f"将以下内容翻译成{_TARGET_LANGUAGE}。只输出译文，不要解释。\n\n{texts[fi]}"
+                        )
+                        retry = last_llm.translate_raw(simple_prompt, max_tokens=512)
+                        retry_text = (retry.translated[0] if retry.translated else "").strip()
+                        if retry_text and _is_valid_translation(retry_text):
+                            translated[fi] = retry_text
+                            failed_indices.remove(fi)
+                    except Exception:
+                        pass  # fall through to free backend retry below
 
             # Fill gaps with free backends
             if failed_indices and ordered_backends:

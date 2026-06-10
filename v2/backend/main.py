@@ -30,6 +30,40 @@ LOG_DIR = Path.home() / ".video-subber" / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 JOBS = {}
 
+
+def _validate_job_path(job_id: str):
+    """Return resolved job directory Path if safe, else None (P240/P244)."""
+    job_dir = JOBS_DIR / job_id
+    resolved = job_dir.resolve()
+    if not str(resolved).startswith(str(JOBS_DIR.resolve())):
+        return None
+    return resolved
+
+
+def _verify_safe_url(url_str: str) -> bool:
+    """Return True if URL is http(s) and not targeting private networks (P243)."""
+    from urllib.parse import urlparse
+    import ipaddress
+    import socket
+    parsed = urlparse(url_str)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    hostname = parsed.hostname or ""
+    try:
+        addr = ipaddress.ip_address(hostname)
+        if addr.is_private or addr.is_loopback or addr.is_reserved:
+            return False
+    except ValueError:
+        try:
+            resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+            for _, _, _, _, sockaddr in resolved:
+                addr = ipaddress.ip_address(sockaddr[0])
+                if addr.is_private or addr.is_loopback or addr.is_reserved:
+                    return False
+        except (socket.gaierror, OSError):
+            pass
+    return True
+
 # ── v2.04: Memory-resident hash index (built at startup, O(1) lookup forever) ──
 # v2.09: key changed from file_hash → task_key (file_hash + config_hash)
 GLOBAL_HASH_INDEX = {}   # task_key → {job_id, status, config, file_hash}
@@ -353,6 +387,7 @@ def get_backends():
 
 _LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 _FREE_MODEL_CACHE: dict[str, float] = {}  # {model_id: fetched_at_timestamp}
+from backend.model_cache import _MODEL_CONTEXT_CACHE  # P186: shared module, no circular dependency
 _PRICING_LOCK = threading.Lock()
 _FETCH_IN_PROGRESS = False
 
@@ -405,6 +440,7 @@ def _fetch_community_pricing():
             data = _json.loads(resp.read().decode())
         now = time.time()
         free = {}
+        contexts = {}
         for mid, info in data.items():
             if not isinstance(info, dict):
                 continue
@@ -412,9 +448,14 @@ def _fetch_community_pricing():
             oc = info.get("output_cost_per_token", -1)
             if ic == 0 and oc == 0:
                 free[mid] = now
+            mit = info.get("max_input_tokens")
+            if isinstance(mit, (int, float)) and mit > 0:
+                contexts[mid] = int(mit)
         with _PRICING_LOCK:
             _FREE_MODEL_CACHE.clear()
             _FREE_MODEL_CACHE.update(free)
+            _MODEL_CONTEXT_CACHE.clear()
+            _MODEL_CONTEXT_CACHE.update(contexts)
     except Exception:
         pass  # silent fallback — no free labels shown
     finally:
@@ -472,7 +513,8 @@ def list_llm_models(payload: dict):
         }.get(platform, endpoint)
         if not _chat:
             return {"models": [], "error": "no_endpoint"}
-        # 用户可能贴 /v1 也可能贴 /v1/chat/completions，统一处理
+        if not _verify_safe_url(_chat):
+            return {"models": [], "error": "unsafe_endpoint"}
         _clean = _chat.rstrip("/")
         if _clean.endswith("/chat/completions"):
             url = _clean[:-len("/chat/completions")] + "/models"
@@ -578,37 +620,56 @@ async def create_job(request: Request):
         cfg.pop("tier", None)
         cfg.pop("local_path", None)
         local_path = body.get("local_path", "")
+        source_url = body.get("url", "").strip()
 
-        if not local_path or not _os_module.path.isfile(local_path):
-            return JSONResponse(
-                {"error": f"找不到文件：{local_path or '(空路径)'}"},
-                status_code=400,
-            )
+        if source_url:
+            # P188: reject non-http/https URLs
+            if not source_url.startswith(("http://", "https://")):
+                return JSONResponse(
+                    {"error": "仅支持 http/https 链接"},
+                    status_code=400,
+                )
+            # P174: URL mode — worker subprocess handles download
+            cfg["source_url"] = source_url
+            url_fname = source_url.split("/")[-1].split("?")[0]
+            cfg["video_filename"] = url_fname or "download.mp4"
 
-        filename = Path(local_path).name
-        cfg["video_filename"] = filename
-        cfg["source_dir"] = str(Path(local_path).parent)
+            jid = uuid.uuid4().hex[:10]
+            job_dir = JOBS_DIR / jid
+            job_dir.mkdir(parents=True)
 
-        jid = uuid.uuid4().hex[:10]
-        job_dir = JOBS_DIR / jid
-        job_dir.mkdir(parents=True)
+            file_hash = hashlib.sha256(source_url.encode()).hexdigest()
+            video_path = ""
+        else:
+            if not local_path or not _os_module.path.isfile(local_path):
+                return JSONResponse(
+                    {"error": f"找不到文件：{local_path or '(空路径)'}"},
+                    status_code=400,
+                )
 
-        # 流式读取计算 SHA256（不复制文件，直接引用原始路径）
-        hasher = hashlib.sha256()
-        try:
-            with open(local_path, "rb") as src:
-                while True:
-                    chunk = src.read(8 * 1024 * 1024)
-                    if not chunk:
-                        break
-                    hasher.update(chunk)
-            file_hash = hasher.hexdigest()
-        except Exception:
-            _shutil.rmtree(job_dir, ignore_errors=True)
-            return JSONResponse({"error": "读取本地文件失败，请检查文件是否可访问"}, status_code=500)
+            filename = Path(local_path).name
+            cfg["video_filename"] = filename
+            cfg["source_dir"] = str(Path(local_path).parent)
 
-        # 本地路径模式：直接使用原始文件路径，不复制到 jobs 目录
-        video_path = local_path
+            jid = uuid.uuid4().hex[:10]
+            job_dir = JOBS_DIR / jid
+            job_dir.mkdir(parents=True)
+
+            # 流式读取计算 SHA256（不复制文件，直接引用原始路径）
+            hasher = hashlib.sha256()
+            try:
+                with open(local_path, "rb") as src:
+                    while True:
+                        chunk = src.read(8 * 1024 * 1024)
+                        if not chunk:
+                            break
+                        hasher.update(chunk)
+                file_hash = hasher.hexdigest()
+            except Exception:
+                _shutil.rmtree(job_dir, ignore_errors=True)
+                return JSONResponse({"error": "读取本地文件失败，请检查文件是否可访问"}, status_code=500)
+
+            video_path = local_path
 
     # ── 模式 2：文件上传（multipart/form-data）──
     else:
@@ -732,8 +793,10 @@ def get_active_jobs():
 def get_job(job_id: str):
     j = JOBS.get(job_id)
     if not j:
-        # Fallback: check disk for meta.json (backend restarted, JOBS dict empty)
-        meta_path = JOBS_DIR / job_id / "meta.json"
+        safe_dir = _validate_job_path(job_id)
+        if not safe_dir:
+            return JSONResponse({"error": "无效的任务编号"}, status_code=400)
+        meta_path = safe_dir / "meta.json"
         if meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -764,6 +827,9 @@ def download_video(job_id: str):
         if Path(path).exists():
             return FileResponse(path, filename=Path(path).name)
     job_dir = JOBS_DIR / job_id
+    # P189: prevent path traversal via .resolve() guard
+    if job_dir.resolve() != job_dir or not str(job_dir.resolve()).startswith(str(JOBS_DIR.resolve())):
+        return JSONResponse({"error": "无效的任务编号"}, status_code=400)
     if job_dir.exists():
         for pattern in ["*_zh.mp4", "*_zh_sub.*"]:
             for f in job_dir.glob(pattern):
@@ -779,6 +845,9 @@ def download_srt(job_id: str):
         if Path(path).exists():
             return FileResponse(path, filename=Path(path).name)
     job_dir = JOBS_DIR / job_id
+    # P189: prevent path traversal via .resolve() guard
+    if job_dir.resolve() != job_dir or not str(job_dir.resolve()).startswith(str(JOBS_DIR.resolve())):
+        return JSONResponse({"error": "无效的任务编号"}, status_code=400)
     if job_dir.exists():
         for f in job_dir.glob("*.srt"):
             return FileResponse(str(f), filename=f.name)
@@ -798,12 +867,17 @@ def cancel_job(job_id: str):
         j["status"] = "cancelled"
     _cleanup_hash_index(job_id)
 
-    # 仅删除 input 视频，保留 cache/ 下的中间产物（audio.wav, transcript.json 等）。
-    # 用户重新上传同一视频时可复用缓存，不需要从零跑流水线。
+    # 删除 input 视频 + meta.json。保留 cache/ 下的中间产物（audio.wav, transcript.json 等）
+    # ——同一视频+相同设置重新上传时可复用缓存。meta.json 必须删，否则 startup 扫描复用索引。
     job_dir = JOBS_DIR / job_id
+    # P189: prevent path traversal via .resolve() guard
+    if job_dir.resolve() != job_dir or not str(job_dir.resolve()).startswith(str(JOBS_DIR.resolve())):
+        return JSONResponse({"error": "无效的任务编号"}, status_code=400)
     if job_dir.exists():
         for input_file in job_dir.glob("input.*"):
             input_file.unlink(missing_ok=True)
+        meta_path = job_dir / "meta.json"
+        meta_path.unlink(missing_ok=True)
 
     return {"ok": True}
 
@@ -813,8 +887,11 @@ def cancel_job(job_id: str):
 @app.post("/api/jobs/{job_id}/llm-fallback")
 def llm_fallback_decision(job_id: str, payload: dict):
     """Worker polls this file after emitting 'llm_failed' message."""
+    safe_dir = _validate_job_path(job_id)
+    if not safe_dir:
+        return JSONResponse({"error": "无效的任务编号"}, status_code=400)
     decision = payload.get("decision", "keep_failed")
-    decision_file = JOBS_DIR / job_id / "llm_fallback.json"
+    decision_file = safe_dir / "llm_fallback.json"
     decision_file.write_text(json.dumps({"decision": decision}, ensure_ascii=False))
     return {"ok": True}
 

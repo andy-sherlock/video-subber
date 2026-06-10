@@ -1,12 +1,11 @@
 """Five-layer hallucination filter (three hard, two soft).
 
-Processing order: L1 → L4 → L5 → L2 → L3
+Processing order: L1 → L2 → L4 → L5 → L3
 Hard filters discard; soft filters only mark uncertain.
 """
 import logging
 import re
 from collections import Counter
-from difflib import SequenceMatcher
 
 _log = logging.getLogger("hallucination_filter")
 
@@ -18,7 +17,8 @@ class LightweightStemmer:
     Each language gets a different key because word morphology differs:
 
       zh — no stemming; extract individual characters
-      en — strip -ing/-ed/-es/-s/-tion/-ment/-ness/-ly
+      en — strip common suffixes (-ing/-ed/-es/-s/-tion/-ment/-ness/-ly
+            -able/-ible/-ful/-ous/-ive/-ize/-ise/-ity/-al)
       ru — manual Snowball-esque suffix list (case/tense/aspect)
       ja/ko — filter grammatical particles, keep content words
     """
@@ -38,14 +38,15 @@ class LightweightStemmer:
             stems = []
             for w in words:
                 if len(w) >= 4:
-                    if w.endswith('tion') or w.endswith('ment') or w.endswith('ness'):
+                    if w.endswith('tion') or w.endswith('ment') or w.endswith('ness') or w.endswith('able') or w.endswith('ible'):
                         w = w[:-4]
-                    elif w.endswith('ing'):
+                    elif w.endswith('ful') or w.endswith('ous') or w.endswith('ive') or w.endswith('ize') or w.endswith('ise') or w.endswith('ity') or w.endswith('ing'):
                         w = w[:-3]
-                        # double-consonant reduction: running → runn → run
-                        if len(w) >= 3 and w[-1] == w[-2]:
+                        if w.endswith('i') and len(w) > 2:
+                            pass
+                        elif len(w) >= 3 and w[-1] == w[-2]:
                             w = w[:-1]
-                    elif w.endswith('ed') or w.endswith('er') or w.endswith('ly'):
+                    elif w.endswith('ed') or w.endswith('er') or w.endswith('ly') or w.endswith('al'):
                         w = w[:-2]
                     elif w.endswith('es'):
                         w = w[:-2]
@@ -119,19 +120,20 @@ _SPEECH_RATE_THRESHOLDS = {
 
 _RE_BRACKET = re.compile(r"^\s*[\[\(（【].+[\]\)）】]\s*$")
 _RE_REPEATED_PATTERN = re.compile(r"^(.{1,4})\1{2,}$")
-_RE_REPEATED_WORDS = re.compile(r"^((\S+)\s+)\2{2,}\2*$")
+_RE_REPEATED_WORDS = re.compile(r"^(\S+)(\s+\1)+$")
 
 
 def _layer1_dual_signal(seg, aligner_result=None) -> bool:
     """L1: SenseVoice + Qwen3-FA dual-signal cross-verification (Phase 1D).
 
-    Four-way decision matrix:
+    Four-way decision matrix (requires both signals):
       SenseVoice non-human + no alignment → discard (both confirm)
       SenseVoice non-human + has alignment → keep (SV likely wrong)
       SenseVoice human   + no alignment → keep + mark [?] (possible hallucination)
       SenseVoice human   + has alignment → normal pass (both confirm)
 
-    Falls back to single-signal (SenseVoice-only) when aligner_result is None.
+    P183: When aligner_result is None or empty, falls back to single-signal
+    — trusts SenseVoice alone for non-Speech tags (no alignment data to cross-check).
     """
     tag = getattr(seg, "sensevoice_tag", None)
 
@@ -142,39 +144,36 @@ def _layer1_dual_signal(seg, aligner_result=None) -> bool:
     is_nonhuman = (tag != "Speech")
     has_alignment = _segment_has_alignment(seg, aligner_result)
 
-    if aligner_result is not None and len(aligner_result) > 0:
-        # ── Dual-signal path (only when we have actual alignment data) ──
-        if is_nonhuman and not has_alignment:
-            # Both signals agree: not human speech, no aligned words → discard
-            seg.filtered = True
-            seg.filter_reason = "layer1_dual_confirm_nonhuman"
-            _log.info("L1 双确认丢弃: start=%.2f tag=%s text=%r",
-                      seg.start, tag, seg.text[:50])
-            return True
-        elif is_nonhuman and has_alignment:
-            # SenseVoice says non-human but aligner found words → SV likely wrong
-            seg.sensevoice_tag = None  # Clear the wrong tag
-            _log.info("L1 SV误判清除: start=%.2f tag=%s (对齐器找到了词)",
-                      seg.start, tag)
-            return False
-        elif not is_nonhuman and not has_alignment:
-            # SV says human but aligner found nothing → possible hallucination
-            seg.uncertain = True
-            _log.info("L1 疑似幻觉 [?]: start=%.2f tag=%s text=%r",
-                      seg.start, tag, seg.text[:50])
-            return False
-        else:
-            # Both signals agree: human speech confirmed by alignment → pass
-            return False
-    else:
-        # ── Single-signal fallback (original behavior) ──
+    if not (aligner_result is not None and len(aligner_result) > 0):
+        # P183: single-signal fallback — when FA is unavailable, trust SV alone
         if is_nonhuman:
             seg.filtered = True
-            seg.filter_reason = "layer1_sensevoice"
-            _log.info("L1 丢弃: start=%.2f tag=%s text=%r", seg.start, tag, seg.text[:50])
+            seg.filter_reason = "layer1_sv_only_nonhuman"
+            _log.info("L1 单信号丢弃: start=%.2f tag=%s text=%r",
+                      seg.start, tag, seg.text[:50])
             return True
+        return False
 
-    return False
+    # ── Dual-signal path (only when we have actual alignment data) ──
+    if is_nonhuman and not has_alignment:
+        seg.filtered = True
+        seg.filter_reason = "layer1_dual_confirm_nonhuman"
+        _log.info("L1 双确认丢弃: start=%.2f tag=%s text=%r",
+                  seg.start, tag, seg.text[:50])
+        return True
+    elif is_nonhuman and has_alignment:
+        seg.sensevoice_tag = None
+        seg.bgm_override = True  # P229: signal L2 to use lower threshold
+        _log.info("L1 SV误判清除: start=%.2f tag=%s (对齐器找到了词)",
+                  seg.start, tag)
+        return False
+    elif not is_nonhuman and not has_alignment:
+        seg.uncertain = True
+        _log.info("L1 疑似幻觉 [?]: start=%.2f tag=%s text=%r",
+                  seg.start, tag, seg.text[:50])
+        return False
+    else:
+        return False
 
 
 def _segment_has_alignment(seg, aligner_result) -> bool:
@@ -199,12 +198,13 @@ def _layer4_regex(seg) -> bool:
         return True
 
     tl = t.lower()
-    for kw in HALLUCINATION_KEYWORDS:
-        if kw.lower() in tl:
-            seg.filtered = True
-            seg.filter_reason = "layer4_regex"
-            _log.info("L4 关键词: start=%.2f kw=%r text=%r", seg.start, kw, t[:50])
-            return True
+    if getattr(seg, "l2_status", None) != "GREEN":
+        for kw in HALLUCINATION_KEYWORDS:
+            if kw.lower() in tl:
+                seg.filtered = True
+                seg.filter_reason = "layer4_regex"
+                _log.info("L4 关键词: start=%.2f kw=%r text=%r", seg.start, kw, t[:50])
+                return True
 
     if all(not c.isalnum() and c not in "你我他她它的了是有不在" for c in tl):
         seg.filtered = True
@@ -219,17 +219,19 @@ def _layer4_regex(seg) -> bool:
         return True
 
     t_nospace = t.replace(" ", "")
-    if len(t_nospace) >= 3 and _RE_REPEATED_PATTERN.match(t_nospace):
-        seg.filtered = True
-        seg.filter_reason = "layer4_regex"
-        _log.info("L4 重复模式: start=%.2f text=%r", seg.start, t[:50])
-        return True
+    if getattr(seg, "l2_status", None) != "GREEN":
+        if len(t_nospace) >= 3 and _RE_REPEATED_PATTERN.match(t_nospace):
+            seg.filtered = True
+            seg.filter_reason = "layer4_regex"
+            _log.info("L4 重复模式: start=%.2f text=%r", seg.start, t[:50])
+            return True
 
-    if _RE_REPEATED_WORDS.match(t):
-        seg.filtered = True
-        seg.filter_reason = "layer4_regex"
-        _log.info("L4 重复词: start=%.2f text=%r", seg.start, t[:50])
-        return True
+    if getattr(seg, "l2_status", None) != "GREEN":
+        if _RE_REPEATED_WORDS.match(t):
+            seg.filtered = True
+            seg.filter_reason = "layer4_regex"
+            _log.info("L4 重复词: start=%.2f text=%r", seg.start, t[:50])
+            return True
 
     half = len(t) // 2
     if half >= 5:
@@ -289,12 +291,8 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
                            custom_thresholds: dict = None):
     """P160: 30s-window stem-overlap cross-validation (B+A architecture).
 
-    Replaces the old per-segment SequenceMatcher approach.  Two passes:
-
-      1. Dual-confirm — SenseVoice + qwen_text: non-human without Qwen
-         output is auto-flagged.
-      2. Windowing — chop audio into 30s windows, stem words, compare
-         stem sets.  Windows above threshold → GREEN, below → YELLOW.
+    Chop audio into 30s windows, stem words from Whisper and Qwen,
+    compare stem sets.  Windows above threshold → GREEN, below → YELLOW.
 
     Returns (annotated_segments, window_stats).  Caller replaces segments
     with the returned list.
@@ -311,20 +309,7 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
         thresholds.update(custom_thresholds)
     current_threshold = thresholds.get(language, 0.30)
 
-    # ── Pass 1: dual-confirm ──
-    for seg in segments:
-        sv_tag = getattr(seg, "sensevoice_tag", None)
-        qwen_text = (getattr(seg, "qwen_text", None) or "").strip()
-
-        if sv_tag and sv_tag != "Speech" and not qwen_text:
-            # Both agree: non-human and Qwen silent → hallucination
-            seg.filtered = True
-            seg.filter_reason = "layer2_sensevoice_qwen_agree"
-        elif sv_tag and sv_tag != "Speech" and qwen_text:
-            # Disagreement: SV says non-human, Qwen heard speech → suspicious
-            seg.uncertain = True
-
-    # ── Pass 2: window stemming ──
+    # ── Window stemming ──
     WINDOW_SIZE = 30
     total_duration_s = max(getattr(s, "end", 0) for s in segments)
     if total_duration_s <= 0:
@@ -356,44 +341,77 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
             qwen_windows[win] += " " + (getattr(seg, "qwen_text", None) or "")
 
     # ── Stem + score each window ──
+    MIN_STEMS = 5  # P171: fewer stems → LOW_DATA (not enough evidence)
+    _BGM_THRESHOLD = 0.20  # P229: relaxed threshold for BGM-override windows
     window_stats = {}
     for idx in range(num_windows):
         w_text = whisper_windows[idx].strip()
         q_text = qwen_windows[idx].strip()
 
         if not w_text and not q_text:
-            window_stats[idx] = {"status": "EMPTY", "score": 1.0}
+            window_stats[idx] = {"status": "EMPTY", "score": 1.0,
+                                 "w_count": 0, "q_count": 0, "shared": 0}
             continue
 
-        # No Qwen text in this window → nothing to cross-validate
         if not q_text:
-            window_stats[idx] = {"status": "NO_QWEN", "score": 1.0}
+            window_stats[idx] = {"status": "NO_QWEN", "score": 1.0,
+                                 "w_count": 0, "q_count": 0, "shared": 0}
             continue
 
         w_stems = LightweightStemmer.clean_and_stem(w_text, language)
         q_stems = LightweightStemmer.clean_and_stem(q_text, language)
 
         shared = w_stems & q_stems
-        score = len(shared) / len(w_stems) if w_stems else 0.0
+        score = len(shared) / max(len(w_stems), len(q_stems)) if (w_stems or q_stems) else 0.0
 
-        if score >= current_threshold:
-            window_stats[idx] = {"status": "GREEN", "score": score}
+        # P229: if any segment in this window was SV-overridden by L1
+        # (BGM override), use lower threshold — Qwen ASR is less reliable
+        # in background music, so we tolerate lower stem overlap.
+        win_has_bgm = any(
+            getattr(seg, "bgm_override", False)
+            for seg in segments
+            if not seg.filtered and _find_best_window(seg.start, seg.end) == idx
+        )
+        effective_threshold = _BGM_THRESHOLD if win_has_bgm else current_threshold
+
+        ws_entry = {"score": score, "w_count": len(w_stems),
+                    "q_count": len(q_stems), "shared": len(shared),
+                    "bgm": win_has_bgm}
+
+        if len(w_stems) < MIN_STEMS:
+            ws_entry["status"] = "LOW_DATA"
+        elif score >= effective_threshold:
+            ws_entry["status"] = "GREEN"
         else:
-            window_stats[idx] = {"status": "YELLOW", "score": score}
+            ws_entry["status"] = "YELLOW"
 
-    # ── Annotate surviving segments ──
+        window_stats[idx] = ws_entry
+
+    # ── P149 calibration diagnostics ──
+    for idx in sorted(window_stats):
+        ws = window_stats[idx]
+        t0, t1 = idx * WINDOW_SIZE, (idx + 1) * WINDOW_SIZE
+        _log.debug("L2 窗口[%d] %d-%ds | w=%d q=%d shared=%d score=%.3f → %s",
+                   idx, t0, t1, ws["w_count"], ws["q_count"],
+                   ws["shared"], ws["score"], ws["status"])
+
+    # ── Annotate surviving segments with l2_status ──
     for seg in segments:
         if seg.filtered:
             continue
         win = _find_best_window(seg.start, seg.end)
         ws = window_stats.get(win)
-        if ws and ws["status"] == "YELLOW":
-            seg.uncertain = True
+        if ws:
+            seg.l2_status = ws["status"]
+            if ws["status"] in ("YELLOW", "LOW_DATA"):
+                seg.uncertain = True
+        else:
+            seg.l2_status = "NO_DATA"
 
-    _log.info("L2 窗口比对完成: %d 窗口, 阈值=%.2f, %s",
-              num_windows, current_threshold,
+    _log.info("L2 窗口比对完成: %d 窗口, 阈值=%.2f, 最低词干=%d, %s",
+              num_windows, current_threshold, MIN_STEMS,
               {s: sum(1 for v in window_stats.values() if v["status"] == s)
-               for s in ("GREEN", "YELLOW", "EMPTY", "NO_QWEN")})
+               for s in ("GREEN", "YELLOW", "LOW_DATA", "EMPTY", "NO_QWEN")})
 
     return segments, window_stats
 
@@ -423,14 +441,14 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
 
 def filter_hallucinations(segments: list, source_lang: str = "auto",
                           aligner_result=None) -> list:
-    """Five-layer hallucination filter (Phase 1D: dual-signal L1).
+    """Five-layer hallucination filter. Order: L1→L2→L4→L5→L3.
 
     Args:
         segments: List of Segment objects.
         source_lang: Detected source language for L3 speech-rate thresholds.
         aligner_result: Optional Qwen3-FA alignment data (list of aligned word
             dicts). When provided, L1 uses dual-signal (SenseVoice + Qwen3-FA).
-            When None, L1 falls back to single-signal (SenseVoice only).
+            When None, L1 skips entirely.
 
     Returns:
         Only segments with filtered=False, re-numbered.
@@ -450,18 +468,17 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
         if not seg.filtered:
             _layer1_dual_signal(seg, aligner_result)
 
-    for seg in segments:
-        if not seg.filtered:
-            _layer4_regex(seg)
-
     surviving = [s for s in segments if not s.filtered]
-    surviving = _layer5_dedup(surviving)
-
-    # P160: L2 now operates on all surviving segments at once
-    # (30s-window stemming needs the full picture, not one at a time)
     qwen_reliable = _qwen_is_reliable(surviving)
     if qwen_reliable:
         surviving, _ignore_stats = _layer2_cross_validate(surviving, source_lang)
+
+    for seg in surviving:
+        if not seg.filtered:
+            _layer4_regex(seg)
+
+    surviving = [s for s in surviving if not s.filtered]
+    surviving = _layer5_dedup(surviving)
 
     for seg in surviving:
         if not seg.filtered:

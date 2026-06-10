@@ -4,19 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "video-subber-web"
-version = "3.06"
+version = "3.07"
 description = "视频中文字幕生成 — Web 版"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.34",
-    "python-multipart>=0.0.20",
-    "faster-whisper>=1.0",
-    "deep-translator>=1.11",
-    "resemblyzer>=0.1",
-    "librosa>=0.10",
-    "cryptography>=44.0",
-    "websockets>=14.0",
+    "fastapi==0.136.3",
+    "uvicorn[standard]==0.47.0",
+    "python-multipart==0.0.29",
+    "faster-whisper==1.2.1",
+    "deep-translator==1.11.4",
+    "resemblyzer==0.1.4",
+    "librosa==0.11.0",
+    "cryptography==48.0.0",
+    "websockets==16.0",
+    "qwen-asr==0.0.6",
+    "qwen3-asr-mlx==0.1.0",
+    "transformers==4.57.6",
+    "tokenizers==0.22.2",
+    "yt-dlp==2026.3.17",
 ]
 
 [tool.setuptools.packages.find]

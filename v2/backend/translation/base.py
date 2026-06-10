@@ -59,6 +59,27 @@ class LLMBackend(TranslationBackend):
     def requires_api_key(self) -> bool:
         return True
 
+    @property
+    def max_input_tokens(self) -> int:
+        """Return model context window from LiteLLM cache, or default 32K."""
+        model = getattr(self, '_model', None) or ""
+        try:
+            from backend.model_cache import _MODEL_CONTEXT_CACHE
+        except ImportError:
+            return 32768
+        if not _MODEL_CONTEXT_CACHE:
+            return 32768
+        # Exact match first
+        if model in _MODEL_CONTEXT_CACHE:
+            val = _MODEL_CONTEXT_CACHE[model]
+            if val > 0:
+                return val
+        # Suffix match: e.g. "gpt-4o" matches "openai/gpt-4o"
+        for key, val in _MODEL_CONTEXT_CACHE.items():
+            if val > 0 and key.endswith("/" + model):
+                return val
+        return 32768
+
     # ── 子类必须重写 ──────────────────────────────────────
 
     @property

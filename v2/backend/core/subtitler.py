@@ -156,11 +156,13 @@ def _find_ffmpeg() -> str:
     return shutil.which("ffmpeg") or "ffmpeg"
 
 
-def mux_subtitles(video_path: str, srt_path: str, output_path: str) -> None:
+def mux_subtitles(video_path: str, srt_path: str, output_path: str,
+                   audio_path: str | None = None) -> None:
     """Embed SRT as a soft subtitle track into video container.
 
     Video and audio streams are copied without re-encoding.
     MP4/M4V/MOV uses mov_text codec, other containers use srt codec.
+    When audio_path is provided, audio comes from that separate file.
     """
     ffmpeg = _find_ffmpeg()
     if not (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
@@ -169,29 +171,43 @@ def mux_subtitles(video_path: str, srt_path: str, output_path: str) -> None:
     ext = os.path.splitext(output_path)[1].lower()
     codec = "mov_text" if ext in (".mp4", ".m4v", ".mov") else "srt"
 
-    cmd = [
-        ffmpeg, "-y",
-        "-i", video_path,
-        "-i", srt_path,
-        "-c", "copy",
-        "-c:s", codec,
-        "-map", "0:v", "-map", "0:a?", "-map", "1:s",
-        output_path,
-    ]
+    if audio_path:
+        cmd = [
+            ffmpeg, "-y",
+            "-i", video_path,
+            "-i", audio_path,
+            "-i", srt_path,
+            "-c", "copy",
+            "-c:s", codec,
+            "-map", "0:v", "-map", "1:a", "-map", "2:s",
+            output_path,
+        ]
+    else:
+        cmd = [
+            ffmpeg, "-y",
+            "-i", video_path,
+            "-i", srt_path,
+            "-c", "copy",
+            "-c:s", codec,
+            "-map", "0:v", "-map", "0:a?", "-map", "1:s",
+            output_path,
+        ]
     r = subprocess.run(cmd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     if r.returncode != 0 or not Path(output_path).exists():
         raise RuntimeError(f"字幕封装失败: {r.stderr[-800:]}")
 
 
-def burn_subtitles(video_path: str, ass_path: str, output_path: str) -> None:
-    """Burn ASS subtitles into video via ffmpeg (requires libass)."""
+def burn_subtitles(video_path: str, ass_path: str, output_path: str,
+                   audio_path: str | None = None) -> None:
+    """Burn ASS subtitles into video via ffmpeg (requires libass).
+
+    When audio_path is provided, audio comes from that separate file
+    instead of the video file (split-download mode).
+    """
     import tempfile, shutil as _shutil
     ffmpeg = _find_ffmpeg()
 
-    # ffmpeg -vf ass= filter treats ( ) , : as special syntax chars.
-    # Copy ASS to a temp path with a safe ASCII name to avoid filter parse errors
-    # on filenames like "(Av436571688,P1).ass" or paths with Chinese/spaces.
     tmp_ass = None
     try:
         fd, tmp_ass = tempfile.mkstemp(suffix=".ass")
@@ -202,8 +218,14 @@ def burn_subtitles(video_path: str, ass_path: str, output_path: str) -> None:
         if sys.platform == "win32":
             filter_path = tmp_ass.replace("\\", "/").replace(":", "\\:")
 
-        cmd = [ffmpeg, "-i", video_path, "-vf", f"ass={filter_path}",
-               "-c:a", "copy", output_path, "-y"]
+        if audio_path:
+            cmd = [ffmpeg, "-i", video_path, "-i", audio_path,
+                   "-vf", f"ass={filter_path}",
+                   "-map", "0:v", "-map", "1:a", "-c:a", "copy",
+                   output_path, "-y"]
+        else:
+            cmd = [ffmpeg, "-i", video_path, "-vf", f"ass={filter_path}",
+                   "-c:a", "copy", output_path, "-y"]
         r = subprocess.run(cmd, capture_output=True, text=True,
                            encoding="utf-8", errors="replace")
         if r.returncode != 0 or not Path(output_path).exists():

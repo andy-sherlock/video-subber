@@ -104,6 +104,15 @@ def check_qwen_asr() -> dict:
         return {"ready": False}
 
 
+def check_qwen_aligner() -> dict:
+    """Check if Qwen3-ForcedAligner model is available locally."""
+    try:
+        from backend.core.qwen_aligner import is_qwen_aligner_available
+        return {"ready": is_qwen_aligner_available()}
+    except ImportError:
+        return {"ready": False}
+
+
 def check_all() -> dict:
     return {
         "ffmpeg": check_ffmpeg(),
@@ -111,4 +120,5 @@ def check_all() -> dict:
         "resemblyzer": check_resemblyzer(),
         "sensevoice": check_sensevoice(),
         "qwen_asr": check_qwen_asr(),
+        "qwen_aligner": check_qwen_aligner(),
     }

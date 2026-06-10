@@ -62,11 +62,12 @@ class TestQwenHealthCheck(unittest.TestCase):
         """P160: all segments in one window, Qwen text is completely different → YELLOW."""
         from backend.core.hallucination_filter import filter_hallucinations
 
+        qwen_texts = ["天地人年月日", "春夏秋冬花", "东西南北中", "金木水火土", "风雨雷电云"]
         segs = []
         for i in range(5):
-            segs.append(DummySeg("你我他是谁", start=float(i),
+            segs.append(DummySeg(f"你我他是谁第{i}段", start=float(i),
                                  end=float(i) + 1.0, sensevoice_tag="Speech",
-                                 qwen_text="天地人年月日"))
+                                 qwen_text=qwen_texts[i]))
         result = filter_hallucinations(segs, source_lang="zh")
 
         flagged = [s for s in result if s.uncertain]

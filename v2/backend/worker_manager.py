@@ -93,7 +93,7 @@ class WorkerManager:
         if proc.returncode != 0 and last_msg_type not in ("done", "error"):
             error_msg = {
                 "type": "error",
-                "message": "处理过程异常中断。可能原因：内存不足。建议选择更小的模型（如 small 或 base）后重试。",
+                "message": f"处理过程异常中断（退出码 {proc.returncode}），请查看 debug.log 日志排查具体原因。",
             }
             # Disk-first: persist error to meta.json regardless of server state
             job_dir = self._job_dirs.get(job_id)
