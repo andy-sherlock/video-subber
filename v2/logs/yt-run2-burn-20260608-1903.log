@@ -1,0 +1,127 @@
+19:03:11 Worker started — 用户日志: /Users/andy/.video-subber/logs/77ea576a5c/user.log  调试日志: /Users/andy/.video-subber/logs/77ea576a5c/debug.log
+19:03:11 版本: 3.06
+19:03:11 yt-dlp 未安装，无法下载视频: https://www.youtube.com/watch?v=uwVI6zCzctI
+19:15:24 Worker started — 用户日志: /Users/andy/.video-subber/logs/77ea576a5c/user.log  调试日志: /Users/andy/.video-subber/logs/77ea576a5c/debug.log
+19:15:24 版本: 3.06
+19:15:52 P174 视频下载完成: https://www.youtube.com/watch?v=uwVI6zCzctI → /Users/andy/.video-subber/jobs/77ea576a5c/LONDON VLOG： Exploring the City, Markets, & Hidden Gems.mp4
+19:15:52 新缓存: hash=37830198802c dir=/Users/andy/.video-subber/jobs/77ea576a5c/cache/37830198802c
+19:15:54 步骤耗时: 合计=30s (异常退出)
+19:19:58 Worker started — 用户日志: /Users/andy/.video-subber/logs/77ea576a5c/user.log  调试日志: /Users/andy/.video-subber/logs/77ea576a5c/debug.log
+19:19:58 版本: 3.06
+19:20:00 P174 视频下载完成: https://www.youtube.com/watch?v=uwVI6zCzctI → /Users/andy/.video-subber/jobs/77ea576a5c/LONDON VLOG： Exploring the City, Markets, & Hidden Gems.mp4
+19:20:00 transcribe() 开始: audio=/Users/andy/.video-subber/jobs/77ea576a5c/cache/37830198802c/audio.wav model=large-v3 lang=auto
+19:20:00 加载 Whisper large-v3 模型…
+19:20:07 检测语言: en (概率 0.99)
+19:20:07 硬件检测: platform=mac_apple_silicon gpu=True gpu_type=mlx ram=34.4GB tier=precise
+19:26:13 Qwen->Whisper 使用相似度匹配 (qwen=83 whisper=104)
+19:26:13 Qwen3-ASR chunk 1/1 完成 (segs 0–0, 0.0s–300.2s)
+19:32:52 Qwen->Whisper 使用相似度匹配 (qwen=106 whisper=78)
+19:32:52 Qwen3-ASR chunk 1/1 完成 (segs 0–0, 300.3s–626.3s)
+19:39:03 Qwen->Whisper 使用相似度匹配 (qwen=83 whisper=115)
+19:39:03 Qwen3-ASR chunk 1/1 完成 (segs 0–0, 626.5s–928.3s)
+19:48:31 Qwen->Whisper 使用相似度匹配 (qwen=78 whisper=111)
+19:48:31 Qwen3-ASR chunk 1/1 完成 (segs 0–0, 928.3s–1229.5s)
+19:51:42 千ASR 消费者线程已结束
+19:51:42 Whisper 模型已释放
+19:51:42 Whisper 转录: 464 段, 语言=en (概率 0.99)
+19:51:42 并行模式：SenseVoice + Qwen3-FA 同时启动
+19:51:45 SenseVoice 音频 1355s > 20min，启用分段处理
+19:51:45 SenseVoice 分段处理: 5 chunks (464 segments)
+19:51:45 加载 SenseVoice 模型 (device=cpu) ...
+19:51:46 download models from model hub: ms
+19:51:47 trust_remote_code: True
+19:51:47 Loading pretrained params from /Users/andy/.cache/modelscope/hub/models/iic/SenseVoiceSmall/model.pt
+19:51:47 ckpt: /Users/andy/.cache/modelscope/hub/models/iic/SenseVoiceSmall/model.pt
+19:51:48 scope_map: ['module.', 'None']
+19:51:48 excludes: None
+19:51:48 Loading ckpt: /Users/andy/.cache/modelscope/hub/models/iic/SenseVoiceSmall/model.pt, status: <All keys matched successfully>
+19:51:48 SenseVoice 模型加载完成 (2.9s)
+19:52:06 SenseVoice chunk 1/5 完成 (0.0s–298.2s)
+19:52:23 SenseVoice chunk 2/5 完成 (298.2s–591.2s)
+19:52:41 SenseVoice chunk 3/5 完成 (595.2s–894.7s)
+19:53:00 SenseVoice chunk 4/5 完成 (904.2s–1204.1s)
+19:53:06 SenseVoice chunk 5/5 完成 (1204.7s–1354.8s)
+19:53:06 SenseVoice 模型已释放
+19:53:06 SenseVoice 分段处理完成, 标签分布: {'BGM': 3, 'Speech': 2}
+19:53:06 L2 窗口比对完成: 46 窗口, 阈值=0.35, 最低词干=5, {'GREEN': 40, 'YELLOW': 1, 'LOW_DATA': 0, 'EMPTY': 1, 'NO_QWEN': 4}
+19:53:06 L5 去重: start=1100.46 text='Modern.'
+19:53:06 L5 去重: start=1101.30 text='Modern.'
+19:53:06 L5 去重: start=1102.40 text='Modern.'
+19:53:06 L5 去重: start=1107.22 text='Modern.'
+19:53:06 L5 去重: start=1107.92 text='Modern.'
+19:53:06 L5 去重: start=1108.24 text='Modern.'
+19:53:06 L5 去重: start=1109.88 text='Modern.'
+19:53:06 L5 去重: start=1110.36 text='Modern.'
+19:53:06 L5 去重: start=1192.10 text='Oh my god!'
+19:53:06 L5 去重: start=1193.64 text='Oh my god!'
+19:53:06 L5 去重: start=1196.40 text='Oh my god!'
+19:53:06 L5 去重: start=1197.40 text='Oh my god!'
+19:53:06 L5 去重: start=1206.62 text='It looks so good.'
+19:53:06 L5 去重: start=1247.80 text="It's getting whipped."
+19:53:06 L3 语速异常: start=22.82 cps=36.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=50.10 cps=29.2 threshold=25 lang=en
+19:53:06 L3 语速异常: start=56.82 cps=27.7 threshold=25 lang=en
+19:53:06 L3 语速异常: start=58.02 cps=32.7 threshold=25 lang=en
+19:53:06 L3 语速异常: start=60.00 cps=50.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=79.06 cps=31.8 threshold=25 lang=en
+19:53:06 L3 语速异常: start=107.40 cps=29.3 threshold=25 lang=en
+19:53:06 L3 语速异常: start=199.86 cps=26.7 threshold=25 lang=en
+19:53:06 L3 语速异常: start=300.34 cps=27.4 threshold=25 lang=en
+19:53:06 L3 语速异常: start=311.30 cps=50.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=371.30 cps=34.6 threshold=25 lang=en
+19:53:06 L3 语速异常: start=574.94 cps=46.8 threshold=25 lang=en
+19:53:06 L3 语速异常: start=651.68 cps=29.5 threshold=25 lang=en
+19:53:06 L3 语速异常: start=665.88 cps=26.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=676.64 cps=33.8 threshold=25 lang=en
+19:53:06 L3 语速异常: start=710.94 cps=38.9 threshold=25 lang=en
+19:53:06 L3 语速异常: start=775.58 cps=30.8 threshold=25 lang=en
+19:53:06 L3 语速异常: start=796.80 cps=28.3 threshold=25 lang=en
+19:53:06 L3 语速异常: start=809.80 cps=28.3 threshold=25 lang=en
+19:53:06 L3 语速异常: start=904.22 cps=26.7 threshold=25 lang=en
+19:53:06 L3 语速异常: start=991.86 cps=26.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1024.94 cps=27.9 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1028.14 cps=25.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1035.78 cps=29.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1046.90 cps=32.8 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1069.70 cps=26.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1078.26 cps=44.4 threshold=25 lang=en
+19:53:06 L3 不可能时长: start=1110.38 dur=0.020 len=13
+19:53:06 L3 语速异常: start=1110.64 cps=27.9 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1116.92 cps=50.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1130.28 cps=30.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1153.62 cps=25.5 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1168.26 cps=27.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1170.74 cps=28.7 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1179.06 cps=34.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1179.50 cps=35.7 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1200.84 cps=27.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1206.08 cps=31.5 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1225.88 cps=26.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1227.84 cps=25.6 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1230.96 cps=29.6 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1232.00 cps=27.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1235.20 cps=25.6 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1238.32 cps=32.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1246.88 cps=32.8 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1249.30 cps=25.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1272.84 cps=31.2 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1276.50 cps=38.5 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1283.66 cps=43.8 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1284.40 cps=32.1 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1293.48 cps=27.4 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1295.82 cps=26.0 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1304.34 cps=31.5 threshold=25 lang=en
+19:53:06 L3 语速异常: start=1308.90 cps=28.8 threshold=25 lang=en
+19:53:06 说话人检测开始（自适阈值）
+19:53:13 说话人检测完成: 122 处变化 (阈值=0.652, 间隙比=25.7, 组间差=0.199)
+19:53:13 transcribe() 结束: 返回 336 段
+19:53:13 LLM 降级链启动: 1 个后端 (DeepSeek(deepseek-chat))
+19:53:17 合并提取: 33 条术语 + 摘要(102字)
+19:53:17 翻译步骤开始 (LLM: DeepSeek(deepseek-chat), 文本336段, 术语33条, 摘要'① 内容主题：泰勒在伦敦旅行，记录与朋友劳伦一起游览景点、品尝美食、逛市场的日常。  
+② 主要人物...')
+19:53:17 翻译策略已启用（内容摘要 102 字）
+19:53:43 翻译步骤结束 (LLM: DeepSeek(deepseek-chat)): 335/336 条成功
+19:53:43 LLM DeepSeek(deepseek-chat) 翻译成功 (335/336 条, 耗时 30486ms), 降级链结束
+19:53:43 LLM 降级链结束: DeepSeek(deepseek-chat) 成功, 总耗时 30486ms
+19:53:44 LLM 上下文感知翻译完成: 336 条 (DeepSeek(deepseek-chat))
+19:54:58 步骤耗时: 合计=2100s

@@ -1,0 +1,353 @@
+2026-06-08 14:37:09 [INFO] worker: Worker started — 用户日志: /Users/andy/.video-subber/logs/b9b1831633/user.log  调试日志: /Users/andy/.video-subber/logs/b9b1831633/debug.log
+2026-06-08 14:37:09 [INFO] worker: 版本: 3.06
+2026-06-08 14:37:41 [INFO] worker: P174 视频下载完成: https://www.youtube.com/watch?v=uwVI6zCzctI → /Users/andy/.video-subber/jobs/b9b1831633/LONDON VLOG： Exploring the City, Markets, & Hidden Gems.mp4
+2026-06-08 14:37:41 [INFO] checkpoint: 新缓存: hash=37830198802c dir=/Users/andy/.video-subber/jobs/b9b1831633/cache/37830198802c
+2026-06-08 14:37:42 [INFO] transcriber: transcribe() 开始: audio=/Users/andy/.video-subber/jobs/b9b1831633/cache/37830198802c/audio.wav model=medium lang=auto
+2026-06-08 14:37:42 [INFO] transcriber: 加载 Whisper medium 模型…
+2026-06-08 14:37:48 [INFO] transcriber: 检测语言: en (概率 1.00)
+2026-06-08 14:37:48 [INFO] hardware_detector: 硬件检测: platform=mac_apple_silicon gpu=True gpu_type=mlx ram=34.4GB tier=precise
+2026-06-08 14:40:25 [INFO] qwen_asr_runner: Qwen->Whisper 使用相似度匹配 (qwen=87 whisper=46)
+2026-06-08 14:40:25 [INFO] qwen_asr_runner: Qwen3-ASR chunk 1/1 完成 (segs 0–0, 0.0s–300.4s)
+2026-06-08 14:42:45 [INFO] qwen_asr_runner: Qwen->Whisper 使用相似度匹配 (qwen=114 whisper=43)
+2026-06-08 14:42:45 [INFO] qwen_asr_runner: Qwen3-ASR chunk 1/1 完成 (segs 0–0, 301.2s–626.5s)
+2026-06-08 14:44:57 [INFO] qwen_asr_runner: Qwen->Whisper 使用相似度匹配 (qwen=93 whisper=49)
+2026-06-08 14:44:57 [INFO] qwen_asr_runner: Qwen3-ASR chunk 1/1 完成 (segs 0–0, 628.0s–931.9s)
+2026-06-08 14:46:28 [INFO] qwen_asr_runner: Qwen->Whisper 使用相似度匹配 (qwen=70 whisper=45)
+2026-06-08 14:46:28 [INFO] qwen_asr_runner: Qwen3-ASR chunk 1/1 完成 (segs 0–0, 932.9s–1233.2s)
+2026-06-08 14:46:46 [INFO] qwen_asr_runner: Qwen->Whisper 使用相似度匹配 (qwen=45 whisper=25)
+2026-06-08 14:46:46 [INFO] qwen_asr_runner: Qwen3-ASR chunk 1/1 完成 (segs 0–0, 1233.3s–1354.5s)
+2026-06-08 14:46:46 [INFO] transcriber: 千ASR 消费者线程已结束
+2026-06-08 14:46:46 [INFO] transcriber: Whisper 模型已释放
+2026-06-08 14:46:46 [INFO] transcriber: Whisper 转录: 208 段, 语言=en (概率 1.00)
+2026-06-08 14:46:46 [INFO] transcriber: 并行模式：SenseVoice + Qwen3-FA 同时启动
+2026-06-08 14:46:48 [DEBUG] root: New registry table added: preprocessor_classes
+2026-06-08 14:46:48 [DEBUG] root: New registry table added: prompt_classes
+2026-06-08 14:46:48 [DEBUG] root: Key Conformer already exists in model_classes, re-register
+2026-06-08 14:46:48 [DEBUG] root: Key ParaformerSANMDecoder already exists in decoder_classes, re-register
+2026-06-08 14:46:48 [DEBUG] root: Key ParaformerSANMDecoderExport already exists in decoder_classes, re-register
+2026-06-08 14:46:48 [DEBUG] root: Key ParaformerSANMDecoderOnlineExport already exists in decoder_classes, re-register
+2026-06-08 14:46:48 [DEBUG] root: Key ParaformerSANDecoder already exists in decoder_classes, re-register
+2026-06-08 14:46:48 [DEBUG] root: Key ParaformerDecoderSANExport already exists in decoder_classes, re-register
+2026-06-08 14:46:49 [DEBUG] root: New registry table added: adaptor_classes
+2026-06-08 14:46:49 [DEBUG] root: Key Linear already exists in adaptor_classes, re-register
+2026-06-08 14:46:49 [DEBUG] root: Key TransformerDecoder already exists in decoder_classes, re-register
+2026-06-08 14:46:49 [DEBUG] root: Key LightweightConvolutionTransformerDecoder already exists in decoder_classes, re-register
+2026-06-08 14:46:49 [DEBUG] root: Key LightweightConvolution2DTransformerDecoder already exists in decoder_classes, re-register
+2026-06-08 14:46:49 [DEBUG] root: Key DynamicConvolutionTransformerDecoder already exists in decoder_classes, re-register
+2026-06-08 14:46:49 [DEBUG] root: Key DynamicConvolution2DTransformerDecoder already exists in decoder_classes, re-register
+2026-06-08 14:46:49 [DEBUG] root: New registry table added: lid_predictor_classes
+2026-06-08 14:46:49 [INFO] backend.core.sensevoice_runner: SenseVoice 音频 1354s > 20min，启用分段处理
+2026-06-08 14:46:49 [INFO] backend.core.sensevoice_runner: SenseVoice 分段处理: 5 chunks (208 segments)
+2026-06-08 14:46:49 [INFO] backend.core.sensevoice_runner: 加载 SenseVoice 模型 (device=cpu) ...
+2026-06-08 14:46:50 [INFO] root: download models from model hub: ms
+2026-06-08 14:46:50 [DEBUG] filelock: Attempting to acquire lock 13049194416 on /Users/andy/.cache/modelscope/hub/.lock/iic___SenseVoiceSmall
+2026-06-08 14:46:50 [DEBUG] filelock: Lock 13049194416 acquired on /Users/andy/.cache/modelscope/hub/.lock/iic___SenseVoiceSmall
+2026-06-08 14:46:52 [DEBUG] filelock: Attempting to release lock 13049194416 on /Users/andy/.cache/modelscope/hub/.lock/iic___SenseVoiceSmall
+2026-06-08 14:46:52 [DEBUG] filelock: Lock 13049194416 released on /Users/andy/.cache/modelscope/hub/.lock/iic___SenseVoiceSmall
+2026-06-08 14:46:52 [WARNING] root: trust_remote_code: True
+2026-06-08 14:46:52 [INFO] root: Loading pretrained params from /Users/andy/.cache/modelscope/hub/models/iic/SenseVoiceSmall/model.pt
+2026-06-08 14:46:52 [INFO] root: ckpt: /Users/andy/.cache/modelscope/hub/models/iic/SenseVoiceSmall/model.pt
+2026-06-08 14:46:55 [INFO] root: scope_map: ['module.', 'None']
+2026-06-08 14:46:55 [INFO] root: excludes: None
+2026-06-08 14:46:55 [INFO] root: Loading ckpt: /Users/andy/.cache/modelscope/hub/models/iic/SenseVoiceSmall/model.pt, status: <All keys matched successfully>
+2026-06-08 14:46:56 [INFO] backend.core.sensevoice_runner: SenseVoice 模型加载完成 (6.7s)
+2026-06-08 14:47:12 [INFO] backend.core.sensevoice_runner: SenseVoice chunk 1/5 完成 (0.0s–293.2s)
+2026-06-08 14:47:30 [INFO] backend.core.sensevoice_runner: SenseVoice chunk 2/5 完成 (293.2s–591.6s)
+2026-06-08 14:47:48 [INFO] backend.core.sensevoice_runner: SenseVoice chunk 3/5 完成 (595.1s–894.8s)
+2026-06-08 14:48:06 [INFO] backend.core.sensevoice_runner: SenseVoice chunk 4/5 完成 (894.8s–1189.5s)
+2026-06-08 14:48:13 [INFO] backend.core.sensevoice_runner: SenseVoice chunk 5/5 完成 (1198.2s–1354.5s)
+2026-06-08 14:48:13 [INFO] backend.core.sensevoice_runner: SenseVoice 模型已释放
+2026-06-08 14:48:13 [INFO] backend.core.sensevoice_runner: SenseVoice 分段处理完成, 标签分布: {'BGM': 4, 'Speech': 1}
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=0.00 tag=BGM text="Hey Taylor, what time is it? Oh gosh, I don't know"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=22.28 tag=BGM text="Let's pack. I don't think this will take me too lo"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=31.82 tag=BGM text='I'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=32.96 tag=BGM text='Cannot forget my passport this time. I forgot it l'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=37.66 tag=BGM text='I got in somehow some way. They let me they were r'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=43.06 tag=BGM text="But I don't think I can fly across international w"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=48.38 tag=BGM text="Yeah, this is probably my coolest one. It's not ac"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=53.44 tag=BGM text='You can go into like this like a research base and'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=58.06 tag=BGM text="That's probably my coolest one here Egypt. That's "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=63.46 tag=BGM text='sticker my student visa for Spain'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=65.88 tag=BGM text='anyways'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=68.84 tag=BGM text='pretentious'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=72.92 tag=BGM text="You know every time I come to JFK Airport, I'm alw"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=90.44 tag=BGM text='I'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=97.88 tag=BGM text="Don't wait, I shouldn't be holding this with so mu"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=107.38 tag=BGM text="We're just gonna call this one a scratch. Let's ju"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=110.40 tag=BGM text="I didn't get the first coffee I saw and the tube a"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=115.62 tag=BGM text="I'm pretty excited about it some early reflections"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=122.12 tag=BGM text="Intimidating and it's a muscle. It's one I haven't"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=131.76 tag=BGM text="It's so pretty Lauren again"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=150.78 tag=BGM text='I'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=151.18 tag=BGM text="Think it's a lot of way with milk English breakfas"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=157.44 tag=BGM text='Slay'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=157.84 tag=BGM text='Look at that goop. Look at that goop'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=161.34 tag=BGM text="Okay, so Lauren literally just said I can't see an"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=170.44 tag=BGM text='Queens rose garden'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=171.74 tag=BGM text='Right, yes'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=174.84 tag=BGM text='The pretty gate'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=179.62 tag=BGM text="All right, well it's supposed to be Rose Garden I "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=191.80 tag=BGM text="Okay now that I've been here for a day Marla bone "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=197.90 tag=BGM text='This is exactly the vibe. I was hoping for I love '
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=201.74 tag=BGM text="And have my coffee shops and I've already done som"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=205.34 tag=BGM text="We're gonna go to Portobello Road, which I have be"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=211.16 tag=BGM text='I was here last in 2019. I want to say'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=225.56 tag=BGM text='Okay, here we are at the nodding hill'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=227.68 tag=BGM text='Travel bookstore'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=231.20 tag=BGM text='So pretty'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=236.12 tag=BGM text='Portobello Road in London United Kingdom'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=239.36 tag=BGM text='Double fisting currently and I must say these thes'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=247.08 tag=BGM text='Just more wears color in her wardrobe, which I lik'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=250.90 tag=BGM text='Yeah'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=256.70 tag=BGM text='Still I live within the memory'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=262.78 tag=BGM text="It's funny, oh my god"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=267.46 tag=BGM text='Oh, yeah, also Lauren with the coolest cargo pants'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=284.88 tag=BGM text='Want to join me classic British candy, can you exp'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=293.16 tag=BGM text='Animal has like a bunch of different like flavors '
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=301.16 tag=BGM text="Okay, and we're in M&S which is they are departmen"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=303.96 tag=BGM text='Yeah, Lauren said I have to start with this before'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=307.58 tag=BGM text="Because it ruined it. Oh, it's a pig"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=311.06 tag=BGM text='Yes'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=317.00 tag=BGM text='So good'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=319.18 tag=BGM text='Right. Yeah, I mean business right now'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=321.80 tag=BGM text="This this is probably the best thing I've ever had"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=335.86 tag=BGM text='And basically'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=337.14 tag=BGM text="The garlic people know that about me I'm not kissi"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=369.42 tag=BGM text='Oh'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=372.90 tag=BGM text='Yeah, oh I want to watch that anyways double-decke'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=378.74 tag=BGM text="It's 12 or 4 a.m. She's so early. Actually, it's s"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=383.64 tag=BGM text="Also, there's like a handprint behind you it's lik"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=388.76 tag=BGM text='Not what I was thinking I had a'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=391.76 tag=BGM text='authentic'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=393.06 tag=BGM text='Logger from Camden. Yeah, you did it which was goo'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=397.14 tag=BGM text="Yeah, I did dirty dog. Okay, let's take it down"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=407.94 tag=BGM text='Morning Lauren and I are trying this coffee shop c'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=429.76 tag=BGM text="So we're going to have a Sunday roast I even say o"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=440.36 tag=BGM text='Name a more London shop and what that this was'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=443.24 tag=BGM text="You can't you can't don't even try maybe here. The"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=453.04 tag=BGM text="We're getting closer to our destination for dinner"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=460.36 tag=BGM text='The restaurant place'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=468.14 tag=BGM text="We're feasting and Lauren has been trying to me fi"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=473.04 tag=BGM text='Yeah, and then the bread pudding to the bread sauc'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=478.02 tag=BGM text="Oh, yeah, she is. Wow. Let's take a second. Let's "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=483.98 tag=BGM text='Lord and I are now going to I shit you not a desse'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=512.62 tag=BGM text='You'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=513.10 tag=BGM text='Forget that all the buildings here are you know, a'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=518.40 tag=BGM text="It's kind of crazy. Wow. It's absolutely stunning "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=522.92 tag=BGM text='Partial clouds today. But anyway, Lauren went on a'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=527.00 tag=BGM text="And so I'm just out and about getting my coffee. W"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=532.48 tag=BGM text='This is just the most charming street ever. I love'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=540.22 tag=BGM text="I'm going into there's always people in there. I a"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=560.20 tag=BGM text='Wow, absolutely stunning whether I just took so ma'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=563.22 tag=BGM text='Anyway, something I think about that street like M'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=569.44 tag=BGM text="But somehow it still doesn't feel like a really to"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=573.52 tag=BGM text="It's like very tastefully done even though it has "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=576.58 tag=BGM text='Typical shops that you see in the very gentrified '
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=582.60 tag=BGM text='If they check on more and she looks amazing as alw'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=587.60 tag=BGM text="Hey, Taylor, what time is it? Oh gosh, I don't kno"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=595.10 tag=BGM text='Needless to say, Lauren and I are in Westminster t'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=623.32 tag=BGM text="It's a wee bit windy, but uh, pretty cool"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=628.04 tag=BGM text='I see it'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=634.00 tag=BGM text="We're here in Camden and we're gonna go to Camden "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=639.62 tag=BGM text='But how cool it kind of looks like Portobello Road'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=647.40 tag=BGM text='Lauren, maybe we should get some. You actually loo'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=662.12 tag=BGM text='For showing this to me, I love it'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=666.02 tag=BGM text="Yeah, I haven't even eaten yet and I just love the"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=676.14 tag=BGM text='Yeah, can I do a little bit of both, please? Thank'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=686.68 tag=BGM text="What's your reaction? It's a beef Yorkshire puddin"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=694.58 tag=BGM text='slay'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=697.60 tag=BGM text="I'm extra happy because Lauren and I just went to "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=701.60 tag=BGM text="I got this scarf because I'm so obsessed with Laur"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=707.12 tag=BGM text='So I got this and a couple other things. Lauren al'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=713.80 tag=BGM text="Yeah, she got stuff not black. Like it's really im"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=719.26 tag=BGM text='Camden Market if you come to London, highly recomm'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=726.08 tag=BGM text='Another part of Camden Market it goes on way furth'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=732.48 tag=BGM text='And Lauren and I are sharing 10 of the little Dutc'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=737.40 tag=BGM text='All right, nice vlogging skills Taylor really show'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=752.06 tag=BGM text='Lauren and I are back out'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=754.88 tag=BGM text='Outfit change a little bit'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=757.20 tag=BGM text="That just changed the scarf. Oh pretty anyway, we'"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=763.62 tag=BGM text="You'll see but it's supposed to be awesome. Lauren"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=771.70 tag=BGM text='Quick pit stop back at M&S to stock up on candy'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=774.46 tag=BGM text="even though we're on our way to dinner because by "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=778.58 tag=BGM text='Like because I wanted more of these which is proba'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=783.40 tag=BGM text="I'm bringing some home to friends as well"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=786.74 tag=BGM text='Sue me'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=788.64 tag=BGM text='Do you want a little a quick look at what I got? Y'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=792.48 tag=BGM text='Okay, raspberry and milk flavored foam sweets. Per'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=796.84 tag=BGM text='These are small mini versions. Red and black gums '
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=803.62 tag=BGM text='This one is milk chocolate with honeycomb and then'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=808.34 tag=BGM text="So it's marshmallow on the inside. Could not be ha"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=827.24 tag=BGM text="Thank you for showing me this. We haven't even eat"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=839.00 tag=BGM text='Hold up the bad boys'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=848.58 tag=BGM text='All right, here we are in the basement'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=850.60 tag=BGM text="This is the floor below where we were and there's "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=856.24 tag=BGM text='Distillery and some sushi. It is so cool. Yeah, pr'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=863.56 tag=BGM text="This isn't like faint enthusiasm for the video eit"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=870.60 tag=BGM text="Where there's even more of a seating. It's so cool"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=875.40 tag=BGM text='How is it not so crowded like now?'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=886.20 tag=BGM text='Another day'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=887.48 tag=BGM text='Another sunny day. Anyway, this is one of the thin'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=890.04 tag=BGM text="It's a bunch of old Carhartt jackets upcycled and "
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=894.80 tag=BGM text='You tell me'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=900.66 tag=BGM text='Laura and I are back together once again'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=906.24 tag=BGM text="We've kind of been doing a couple more mornings wh"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=911.34 tag=BGM text="I'm waiting time back in New York. Now. We're goin"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=916.78 tag=BGM text='I was like, uh, what would you call it a hot spot '
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=923.14 tag=BGM text='Oh really'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=925.34 tag=BGM text="Can't wait to see anyway, so we're going there. Yo"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=932.90 tag=BGM text="London's hottest tea place"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=942.78 tag=BGM text='Chair of hair'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=946.06 tag=BGM text='This place is I think supposed to like trigger you'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=951.20 tag=BGM text='Oh indeed and it is'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=953.14 tag=BGM text='So we got here ten minutes early and he just said '
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=959.94 tag=BGM text="So it's good that we got here early"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=964.70 tag=BGM text='There she is'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=984.02 tag=BGM text="So I'm getting Taylor to try a white tea, which is"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=988.14 tag=BGM text="It's kind of like black tea, but it's in the proce"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=992.98 tag=BGM text='And caffeinated'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1004.14 tag=BGM text="Lauren says it's really cool. Oh my god"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1013.14 tag=BGM text='Oh'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1023.92 tag=BGM text='Out and about now Lauren had to run to a meeting s'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1028.10 tag=BGM text="I'm gonna walk over to Covent Garden. Apparently t"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1035.10 tag=BGM text="Let's do it. So lucky with the weather again"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1043.92 tag=BGM text='Actually going back there tonight for dinner, so I'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1048.46 tag=BGM text="We're going to Covent Garden. I think it's ish thi"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1052.66 tag=BGM text='Kind of figuring it out'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1059.80 tag=BGM text="Lauren told me to come to Neil's yard. It's so cut"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1065.30 tag=BGM text="It's kind of like a back alley with a bunch of lit"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1068.52 tag=BGM text='So cute, I love stuff like this Lauren has the bes'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1077.90 tag=BGM text='So blog back out and about Lauren and I are going '
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1087.40 tag=BGM text='Indian restaurants here like has a little bit of a'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1110.22 tag=BGM text='I'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1110.70 tag=BGM text="Feel like I've just filmed all of London at this p"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1118.48 tag=BGM text="There's too much to see oh"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1124.74 tag=BGM text='You guys know how I feel about all'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1128.80 tag=BGM text="My god, I love him. Let's go play with him"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1140.64 tag=BGM text='Lauren and I are here at burrow market'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1145.56 tag=BGM text='Another iconic iconic market. Okay, check this out'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1149.20 tag=BGM text='Like a train like all the trains'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1153.76 tag=BGM text="There's one very specific thing we're gonna get"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1156.46 tag=BGM text='Oh'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1160.54 tag=BGM text='My god'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1163.20 tag=BGM text='Bro market chocolate covered strawberries with mel'
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1169.38 tag=BGM text="It's very good. All right guys, we absolutely down"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1174.50 tag=BGM text="Oh, he got the painkillers. We're sharing it"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1179.78 tag=BGM text="Rummy in your stomach. Yes, Lauren. It's around me"
+2026-06-08 14:48:13 [INFO] hallucination_filter: L1 单信号丢弃: start=1189.02 tag=BGM text='Oh'
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[0] 0-30s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[1] 30-60s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[2] 60-90s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[3] 90-120s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[4] 120-150s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[5] 150-180s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[6] 180-210s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[7] 210-240s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[8] 240-270s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[9] 270-300s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[10] 300-330s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[11] 330-360s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[12] 360-390s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[13] 390-420s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[14] 420-450s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[15] 450-480s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[16] 480-510s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[17] 510-540s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[18] 540-570s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[19] 570-600s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[20] 600-630s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[21] 630-660s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[22] 660-690s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[23] 690-720s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[24] 720-750s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[25] 750-780s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[26] 780-810s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[27] 810-840s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[28] 840-870s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[29] 870-900s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[30] 900-930s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[31] 930-960s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[32] 960-990s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[33] 990-1020s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[34] 1020-1050s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[35] 1050-1080s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[36] 1080-1110s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[37] 1110-1140s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[38] 1140-1170s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[39] 1170-1200s | w=0 q=0 shared=0 score=1.000 → EMPTY
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[40] 1200-1230s | w=62 q=48 shared=42 score=0.677 → GREEN
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[41] 1230-1260s | w=57 q=26 shared=20 score=0.351 → GREEN
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[42] 1260-1290s | w=56 q=18 shared=17 score=0.304 → YELLOW
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[43] 1290-1320s | w=38 q=25 shared=24 score=0.632 → GREEN
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[44] 1320-1350s | w=24 q=24 shared=20 score=0.833 → GREEN
+2026-06-08 14:48:13 [DEBUG] hallucination_filter: L2 窗口[45] 1350-1380s | w=3 q=3 shared=3 score=1.000 → LOW_DATA
+2026-06-08 14:48:13 [INFO] hallucination_filter: L2 窗口比对完成: 46 窗口, 阈值=0.35, 最低词干=5, {'GREEN': 4, 'YELLOW': 1, 'LOW_DATA': 1, 'EMPTY': 40, 'NO_QWEN': 0}
+2026-06-08 14:48:13 [INFO] hallucination_filter: L3 语速异常: start=1238.38 cps=25.6 threshold=25 lang=en
+2026-06-08 14:48:13 [INFO] transcriber: 说话人检测开始（自适阈值）
+2026-06-08 14:48:15 [INFO] transcriber: 说话人检测完成: 13 处变化 (阈值=0.712, 间隙比=5.4, 组间差=0.206)
+2026-06-08 14:48:15 [INFO] transcriber: transcribe() 结束: 返回 31 段
+2026-06-08 14:48:15 [WARNING] backend.translation.orchestrator: LLM 降级链启动: 1 个后端 (自定义(agnes-2.0-flash))
+2026-06-08 14:48:20 [DEBUG] backend.translation: LLM translate_raw 成功 (自定义(agnes-2.0-flash)): 4560ms, 返回215字, 内容前300字: ## 术语表
+Turkish delight → 土耳其软糖
+Narnia → 纳尼亚
+Lauren → 劳伦
+Taylor → 泰勒
+Emily → 艾米丽
+Mariko → 真理子
+British strawberries → 英国草莓
+Hermione → 赫敏
+
+## 内容摘要
+内容主题：博主在英国的最后夜晚，为劳伦制作草莓蛋白霜甜点及浪漫晚餐。主要人物：博主、劳伦、泰勒、艾米丽、真理子。语气风格：轻松、甜蜜、生活化。
+2026-06-08 14:48:20 [DEBUG] backend.translation.orchestrator: 合并提取原始返回 (215字, 4561ms): ## 术语表
+Turkish delight → 土耳其软糖
+Narnia → 纳尼亚
+Lauren → 劳伦
+Taylor → 泰勒
+Emily → 艾米丽
+Mariko → 真理子
+British strawberries → 英国草莓
+Hermione → 赫敏
+
+## 内容摘要
+内容主题：博主在英国的最后夜晚，为劳伦制作草莓蛋白霜甜点及浪漫晚餐。主要人物：博主、劳伦、泰勒、艾米丽、真理子。语气风格：轻松、甜蜜、生活化。
+2026-06-08 14:48:20 [INFO] backend.translation.orchestrator: 合并提取: 8 条术语 + 摘要(71字)
+2026-06-08 14:48:20 [WARNING] backend.translation.orchestrator: 翻译步骤开始 (LLM: 自定义(agnes-2.0-flash), 文本31段, 术语8条, 摘要'内容主题：博主在英国的最后夜晚，为劳伦制作草莓蛋白霜甜点及浪漫晚餐。主要人物：博主、劳伦、泰勒、艾米...')
+2026-06-08 14:48:20 [INFO] backend.translation.orchestrator: 翻译策略已启用（内容摘要 71 字）
+2026-06-08 14:48:25 [DEBUG] backend.translation: LLM translate_raw 成功 (自定义(agnes-2.0-flash)): 5839ms, 返回709字, 内容前300字: [0] 好了，我们有两个土耳其软糖。劳伦和我有同样的想法，其实自从看了《纳尼亚》后我就一直想尝尝这个
+[1] 你知道那个小片段吗？看起来太棒了，但我完全不知道它是什么味道
+[2] 串在棍子上的生活
+[3] 我在这儿最后的夜晚
+[4] 我在外面散步，买些东西准备给劳伦一个惊喜，顺便买些她
+[5] 最近几天提过她很喜欢的小惊喜。泰勒，我们在干嘛？
+[6] 我们在打发重奶油，因为我们要制造一堆混乱
+[7] 我们要做的就是这个。里面有草莓、蛋白霜和
+[8] 搅打过的奶油，劳伦说这就是我们的
+[9] 做法。正在打发，正在打发
+[10] 劳伦为我们做了一顿可爱的小浪漫晚餐，艾米丽和真理子也在。看起来糟透了
+2026-06-08 14:48:25 [DEBUG] backend.translation.orchestrator: chunk 1/1: 原始返回 709 字，内容前 500 字: [0] 好了，我们有两个土耳其软糖。劳伦和我有同样的想法，其实自从看了《纳尼亚》后我就一直想尝尝这个
+[1] 你知道那个小片段吗？看起来太棒了，但我完全不知道它是什么味道
+[2] 串在棍子上的生活
+[3] 我在这儿最后的夜晚
+[4] 我在外面散步，买些东西准备给劳伦一个惊喜，顺便买些她
+[5] 最近几天提过她很喜欢的小惊喜。泰勒，我们在干嘛？
+[6] 我们在打发重奶油，因为我们要制造一堆混乱
+[7] 我们要做的就是这个。里面有草莓、蛋白霜和
+[8] 搅打过的奶油，劳伦说这就是我们的
+[9] 做法。正在打发，正在打发
+[10] 劳伦为我们做了一顿可爱的小浪漫晚餐，艾米丽和真理子也在。看起来糟透了。不，其实看起来棒极了
+[11] 三文鱼碗。里面有三文鱼和
+[12] 对，还有米饭、酱油，以及一点醋和蜂蜜，用来做寿司饭
+[13] 是辣味蛋黄酱，太美味了，还有一点点三文鱼
+[14] 嗯，谢谢劳伦
+[15] 你最好的东西真的得走了。对不起
+[16] 好了，这是最后一餐甜点。叫“吃掉的混乱”。干得好。对吗？是的
+[17] 好的，所以是蛋白霜
+[18] 草莓和奶油，就像你们看到的那样我们打发的
+[19
+2026-06-08 14:48:25 [WARNING] backend.translation.orchestrator: 翻译步骤结束 (LLM: 自定义(agnes-2.0-flash)): 31/31 条成功
+2026-06-08 14:48:25 [WARNING] backend.translation.orchestrator: LLM 自定义(agnes-2.0-flash) 翻译成功 (31/31 条, 耗时 10409ms), 降级链结束
+2026-06-08 14:48:25 [WARNING] backend.translation.orchestrator: LLM 降级链结束: 自定义(agnes-2.0-flash) 成功, 总耗时 10409ms
+2026-06-08 14:48:25 [INFO] backend.translation.orchestrator: LLM 上下文感知翻译完成: 31 条 (自定义(agnes-2.0-flash))
+2026-06-08 14:48:44 [WARNING] backend.translation: LLM translate_raw 调用失败 (自定义(agnes-2.0-flash)): Remote end closed connection without response (耗时 18502ms)
+2026-06-08 14:48:44 [INFO] worker: 步骤耗时: 合计=695s

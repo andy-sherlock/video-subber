@@ -4,6 +4,44 @@
 
 ---
 
+## 🔧 下一批修复（15 个 · V3.08 统一处理）
+
+### 1-6：代码 Bug
+
+| # | 编号 | 定位 | 问题 | 有方案 |
+|---|------|------|------|--------|
+| 1 | P181 | `frontend/index.html` | handleFoundJob 跳过 connectCard | ❌ |
+| 2 | P225 | `qwen_asr_runner.py:283` | PyTorch 路径 result[0].text 当单对象取 | ❌ |
+| 3 | P242 | `transcriber_v2.py` | transcribe_raw() MLX 后端崩溃 | ❌ |
+| 4 | P245 | `main.py:69` | GLOBAL_HASH_INDEX 无锁 | ❌ |
+| 5 | P250 | `hallucination_filter.py:419` | L3 语速单位用错 → 203 假 [?] | ✅ |
+| 6 | P251 | `qwen_asr_runner.py:85` | align_by_similarity 堵死 L2 → 12 NO_QWEN | ✅ |
+
+### 7-10：架构债 / 设计缺陷
+
+| # | 编号 | 定位 | 问题 | 有方案 |
+|---|------|------|------|--------|
+| 7 | P191 | `transcriber_v2.py` | transcribe() 圈复杂度 41 | ❌ |
+| 8 | P219 | 6 文件 | 6 个函数复杂度过高（codegraph 审计） | ❌ |
+| 9 | P253 | `orchestrator.py:329` | 滑窗阈值用上下文上限 → 长视频翻译质量降 | ✅ |
+| 10 | P254 | `transcriber_v2.py` | 按源语言智能路由主引擎（Qwen3 vs Whisper） | ✅ |
+
+### 11-15：设计 / 流程未实现
+
+| # | 编号 | 定位 | 问题 |
+|---|------|------|------|
+| 11 | P196 | `CLAUDE.md` | Bug 修复流水线缺双签审查 |
+| 12 | P223 | `qwen_aligner.py` | FA 分段对齐并行化 |
+| 13 | P247 | `orchestrator.py` | P1 ASR 分歧裁决未实现（🟡 MEDIUM，描述已修正为主引擎版本） |
+| 14 | P252 | `CLAUDE.md` | 走查 2.0 已写入未激活 |
+| 15 | P237 | `worker.py` | 系统日志是"日记"不是"黑匣子"（P0） |
+
+> **已关闭（换 MLX ASR 库自然解决 · 2026-06-11）**：P179（L2 Whisper 逐字时间戳）· P212（FA 真声验证）· P149/P171（L2 门槛校准）。换库后千问自带词级时间戳→L2 归窗精确化→三个问题同时消失。
+>
+> **其他 14 个未修问题**（UX 7 个 → V3.09 PySide6 / 功能缺失 3 个 / 环境打包 3 个 / 外部限制 1 个）不在本批次，各自跟版本走。
+
+---
+
 ## P001 | 2026-05-19 | 环境搭建 | pip install 不可达 pypi.org
 
 **问题**：`pip install` / `uv pip install` 报 SSL EOF，pypi.org 不可达。
@@ -2543,7 +2581,7 @@ if len(parts) != len(non_empty):
 **问题**：V3 的活跃代码在 `v2/` 目录下开发，V3.01 快照也存放在 `v2/v3.01/`。用户指出 V2 和 V3 应该是同级文件夹，当前结构不直观
 **原因**：V2→V3 升级时没有新建 `v3/` 目录，直接在 `v2/` 里继续开发并改版本号。`v2/` 从"V2 版本代码"变成了"活跃代码目录"，但文件夹名仍叫 v2，造成语义混乱
 **解决方案**：**推迟到 V3 Phase 2（PySide6 桌面应用重写前端）时一并整理**。届时需要：① 将 `v2/` 重命名或迁移为 `v3/` ② 将 v2.XX 快照移到与 v3/ 同级 ③ 更新 CLAUDE.md 和所有路径引用。当前阶段（Phase 1B 多模型转录）不动目录结构，避免引入不必要的变更风险
-**已修** ❌（计划推迟到 Phase 2）
+**⏸ 未修**（计划推迟到 Phase 2）
 
 ---
 
@@ -2559,7 +2597,7 @@ HF_ENDPOINT=https://hf-mirror.com
 ```
 hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自动走镜像，无需代理。做模型下载按钮时一并处理。
 
-**已修** ❌
+**⏸ 未修**
 
 ---
 
@@ -2576,7 +2614,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 - 三种模型都加到 `/api/models/status` 返回列表 + 前端圆点下载 UI
 - Whisper 的进度条是模拟的，新模型下载建议也沿用模拟进度——能告诉用户"在动"就行
 
-**已修** ❌（待做模型下载功能时统一处理）
+**⏸ 未修**（待做模型下载功能时统一处理）
 
 ---
 
@@ -2588,7 +2626,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 
 **解决方案**：打包 EXE/DMG 时把 resemblyzer 的模型文件预置到安装包内。用户安装即用，不触发网络下载。
 
-**已修** ❌（V4 打包阶段处理）
+**⏸ 未修**（V4 打包阶段处理）
 
 ---
 
@@ -2781,8 +2819,8 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 ## P149 | 2026-06-05 | Phase 1D 过滤 | L2 逐字符相似度对两 ASR 输出天然爱误判
 **问题**：即便千问没崩，L2 也会过度盖问号。本次 41 段（20%）qwen_text 是真内容、没崩，只因和 Whisper 断句/用词/标点不同，相似度仍 <0.3 → 照样盖 [?]。
 **原因**：两个 ASR 模型对同一句的切分天然不同，逐字符 `SequenceMatcher` 相似度本就偏低，正确句子也常 <0.3。0.3 阈值 + 逐字符比对的设计本身偏激进。
-**解决方案**：三个候选——A 降低阈值 0.3→0.2（一行数字，英语风险低，俄语可接受）；B 改词级比对（俄语词形变换不友好）；C 先不动等端到端数据。brainstorming 审议结论：**降级到 V3.07**（P148 止血后，这是扫尾灰。先端到端验证 P147/P148，用真实 SRT 数 [?] 决定要不要修+怎么修）。语义比对是更优雅的长期方向（用户提出：比句义、不比字面），也留到 V3.07 一并评估。
-**已修** ❌（降级到 V3.07，数据驱动再决定）
+**解决方案**：V3.07 已将 L2 从逐字符 `SequenceMatcher` 比对替换为 30 秒窗口 `LightweightStemmer` 词干比对。不再逐句比对相似度，而是把两个模型在 30 秒内的所有文字聚合后提词根比对共享率。断句差异不再影响结果。
+**✅ 已修**（V3.07 L2 重构为词干窗口比对）
 
 ## P150 | 2026-06-05 | 转录 | condition_on_previous_text 从 v1.1 的 False 回归成 v2/ 的 True
 **问题**：`transcriber_v2.py:188` 现为 `condition_on_previous_text=True`。而 v1.1（P013）当年"外部建议采纳"明确改成 False，防止 Whisper 片头幻觉传播到后续段。v2/v3 重写时翻回了 True。
@@ -2794,7 +2832,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 **问题**：想用千问 context（喂背景/人名/术语纠偏）提准确率，但本地 `qwen3_asr_mlx` 0.1.1 的 `transcribe()` 没这个参数，`build_prompt` 只能塞语言。
 **原因**：context 是千问模型本身的能力，官方开源版（transformers/vllm）和云端 Flash 都支持，但你装的这个社区 MLX 小包没实现。
 **解决方案**：用户决策——**延期到 V3 后期，Windows 系统实测。** Mac MLX 版缺 context 是平台限制，非 bug。Windows 用户用的官方 transformers 版理论上支持 context，届时实测验证。不需在 Mac 上换包。
-**已修** ❌（延期到 V3 Windows 实测。2026-06-05 核查确认：第三方 MLX 包限制，非本项目代码问题。Mac 路径无法修复，等 Windows PyTorch 路径实测后再评估是否需要自行封装）
+**⏸ 未修**（延期到 V3 Windows 实测。2026-06-05 核查确认：第三方 MLX 包限制，非本项目代码问题。Mac 路径无法修复，等 Windows PyTorch 路径实测后再评估是否需要自行封装）
 
 ## P152 | 2026-06-05 | 转录调度 | Whisper 和千问没真正并行，修复方案：错开流水线
 
@@ -2938,7 +2976,7 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 
 **归属**：V3.09（PySide6 前端重写时一并实现）
 
-**已修** ❌
+**⏸ 未修**
 
 ## P160 | 2026-06-05 | 千问对齐 | 千问产 2062 短句 vs Whisper 266 段 → 量级差触相似度匹配 → 映射率仅 35%
 
@@ -2961,56 +2999,12 @@ hf-mirror.com 是 HuggingFace 国内镜像站，设置后所有下载请求自�
 
 **已修** ✅（2026-06-07 TDD 通过，SequenceMatcher→LightweightStemmer）
 
-### ✅ P160 终版解决方案（2026-06-05 Steve Jobs 审查锁定）
+### 未解决部分
 
-经过多轮讨论（Steve Jobs + brainstorming），确定交叉验证架构全面重构方案。
+P160 原包含一个「终版架构（三层防线流水线）」设计方案（SenseVoice→重复检测→千问 B+A），该方案为架构愿景，未实施。
 
-**核心洞察**：
-1. 千问说话风格随参数变化（旧参数=整句但易坍缩，新参数=短句但正常）。不能强迫它"像Whisper一样说话"
-2. 俄语词尾变形导致逐字母比对失效。同一个意思六种写法
-3. SenseVoice 和千问是两个独立的幻觉防御层，应该分工而非混用
-
-**终版架构（三层防线流水线）**：
-
-```
-音频
-  ↓
-SenseVoice 先扫全音频 → 画地图（人声/音乐/呼吸/静音）
-  ↓
-Whisper + 千问各自转录
-  ↓
-第一层防线 — SenseVoice：
-  非人声区域 Whisper 写了字 → 直接标红（不需千问确认）
-  ↓
-第二层防线 — 重复检测 + 语速异常：
-  连续相同文字 / 物理不可能的速度 → 直接丢弃
-  ↓
-第三层防线 — 千问 B+A 交叉验证（仅对人声区域）：
-  a) 时间对齐：同30秒窗口的千问和Whisper配成一对
-  b) 词干比对（非逐字母）：裁掉词尾变形，比骨头
-  c) B做主力——48个窗口逐个判断"一致/不一致"
-  d) A做统计——汇总一致率（如93%）
-  e) 仅对不一致的窗口做LLM翻译确认
-```
-
-**改动规模（预估，Phase 2执行）**：
-- `hallucination_filter.py`：L2 交叉验证从逐字母改为词干+窗口比对（~150行重写）
-- 新增语言词干提取器（俄语 Snowball/英语 Porter/日语助词过滤/中文无需）
-- SenseVoice 结果传入交叉验证流程（已有数据，接线即可）
-- 对不一致窗口的 LLM 翻译确认（新增 ~3 次 LLM 调用/video）
-
-**每种语言配不同钥匙**：
-| 语言 | 比对方式 |
-|------|---------|
-| 中文 | 无需裁。汉字本身不变形，直接逐字比 |
-| 英语 | Porter Stemmer 裁词尾（running→run, walked→walk） |
-| 俄语 | Snowball Stemmer 裁变格变位 |
-| 日语 | 滤助词（は/が/を/に/の），留实词 |
-| 韩语 | 滤助词（은/는/이/가/을/를） |
-
-**不做的**：按段号逐字母比对（旧方案，仅35%映射率）、翻译后全文对比（太贵）、Word差异对比（无意义）。
-
-**已修** ❌（方案锁定，待 Phase 2 执行）
+其中核心痛点——逐段映射导致 L2 数据被截流——已由 **P251**（砍掉 `align_by_similarity`）跟踪。
+剩余的三层防线架构设计留待 V4 或后续大版本统一规划。
 
 ## P161 | 2026-06-05 | 接线冲突 | transcriber_v2.py 提前删段 → 新 L2 双重确认被架空
 
@@ -3199,7 +3193,7 @@ _SUBTITLE_PROMPT = (
 4. L2 输出两维：内容一致性 + 时间有效性（人声区内字数 ÷ 总字数）
 5. 不依赖 Qwen FA——Whisper 自己的逐字时间戳 Mac 上就有
 
-**归属**：V3.07
+**❌ 已关闭（2026-06-11 换库自然解决）**。换 MLX ASR 库（gabrimatic→moona3k）后千问自带词级时间戳，L2 归窗从相似度猜窗口变为精确时间归窗（`win = int(seg["start"] // 30)`），不再需要 Whisper 逐字时间戳来补充时间维度。详见 `MLX-ASR-换库方案.md`。关联关闭：[[P149]]、[[P171]]、[[P212]]
 
 ---
 
@@ -3237,7 +3231,7 @@ _SUBTITLE_PROMPT = (
 2. 或：`handleFoundJob` 的 else 分支加判断 `if(!activeJobs[d.job_id] || !activeJobs[d.job_id].ws)` → 强制重连
 3. 或：统一清理函数——`removeCard` 已正确清理，error/interrupted 分支改用 `removeCard`
 
-**已修** ❌（待 V3.07 后期或 V3.08 修复）
+**⏸ 未修**（待 V3.07 后期或 V3.08 修复）
 
 ---
 
@@ -3366,7 +3360,7 @@ finally:
 
 **解决方案**：留到 V3.08 架构整理时拆分——将 SenseVoice 线程启动、FA 线程启动、生产者-消费者队列管理、说话人检测各提取为独立函数，`transcribe()` 只做编排（目标复杂度 ≤15）。
 
-**已修** ❌（架构债，不阻塞当前版本。Steve Jobs 审查：V3.08 第一天做，不要发布前拆最复杂函数）
+**⏸ 未修**（架构债，不阻塞当前版本。Steve Jobs 审查：V3.08 第一天做，不要发布前拆最复杂函数）
 **V3.08 待办**：拆分成 5-6 个独立函数，目标复杂度 ≤15
 
 ---
@@ -3495,13 +3489,13 @@ finally:
 
 ### 当前状态
 
-- [ ] 两个方案待定，尚未决策。下次对话继续讨论，可从本条目直接加载上下文。
-- [ ] 选定方案后需同步更新 `CLAUDE.md` Bug 修复流水线和 Obsidian 工作流
-- [ ] 开发线 HEAL 阶段的审查步骤也需同步更新
+**决定**：2026-06-11 采用方案A（Steve Jobs 推荐）。CLAUDE.md 已同步更新四处：
+- Bug 修复流水线：①②③④ 改为双签审查
+- 开发线 HEAL 阶段：同步双签
+- 开发线 HARDEN 阶段：走查改为五问
+- 管道文件规则：Bug 修复流水线表格同步
 
-**决定** ⏸ 待定
-
-**已修** ❌
+**✅ 已修**
 
 ---
 
@@ -3795,7 +3789,7 @@ HuggingFace 自动下载模型文件（~1.84GB）到 HF_HOME 缓存
 3. FA 模型文件 ~1.84GB，需提前下载或通过镜像加速（国内用 hf-mirror.com）
 4. `env_check.py` 的 `check_qwen_aligner()` 目前只查 `transformers.AutoConfig.from_pretrained(local_files_only=True)`——这意味着模型必须先手动下载到缓存，否则始终返回"不可用"。需要在首次启动时自动触发下载或给明确指引
 
-**已修** ❌（FA 模型尚未下载，`qwen-asr` 包尚未安装，`qwen_aligner.py` 的加载路径待验证/修改）
+**✅ 已修**（`qwen_aligner.py` 已 `import qwen_asr`，`is_qwen_aligner_available()` 已修正为两步检测，AutoConfig 可正确识别 `qwen3_asr` 类型）
 
 ---
 
@@ -3885,7 +3879,7 @@ qwen3-asr-mlx        → tokenizers >=0.23.0
 - **A**：改用官方 `Qwen3ForcedAligner.from_pretrained()` + `model.align()`，删除手写的 `align()` 逻辑。正确但需要改 `qwen_aligner.py`
 - **B**：保持 P205 方案（import backend + AutoModel + 手写 align）。能跑但从此与官方 API 分叉
 
-**已修** ❌（争议待决策）
+**✅ 已修**（`qwen_aligner.py:57` 已改用 `Qwen3ForcedAligner.from_pretrained()` + 官方 `model.align()` API，不再手写 forward pass。AutoModel 路径已废弃）
 
 
 ## P207 | 2026-06-09 | 🔴 blocking FA 模型（校对员）静默造假——对齐失败后做除法生成均匀假时间戳
@@ -3988,6 +3982,8 @@ results = model.align(audio="audio.wav", text="hello world", language="Chinese")
 
 **关联**：[[P207]]（FA 官方 API 替换）、[[P213]]（词数漂移）、[[P214]]（静默降级）
 
+**❌ 已关闭（2026-06-11 换库自然解决）**。换 MLX ASR 库后外部 FA 调用（`QwenAligner` + `align_segments`）被删除——千问内部 FA 已出词级时间戳，L1 直接用 Qwen segments 做双信号验证。FA 准确性验证并入启动健康检查（心机音频一次性跑三个模型）。详见 `MLX-ASR-换库方案.md` §七「删减清单」。关联关闭：[[P179]]
+
 ---
 
 ## P213 | 2026-06-09 | 🟡 `apply_aligner_timestamps` 词数假设漂移——Jobs 审查发现 #2
@@ -4067,7 +4063,7 @@ except Exception as e:
 
 **风险提示**：改完后跑全量 419 测试确认零回归。预计 30 分钟。
 
-**已修** ❌
+**⏸ 未修**
 
 **教训 · 三条规则（Jobs 2026-06-09）**：
 
@@ -4176,7 +4172,7 @@ except Exception as e:
 
 **关联**：[[P132]] V3.08 目录整理
 
-**已修** ❌
+**⏸ 未修**
 
 ---
 
@@ -4296,7 +4292,7 @@ ValueError: Unsupported language: En. Supported: ['Chinese', 'English', ...]
 
 **关联**：[[P220]]（FA 分段对齐）、[[P209]]（Windows 真机打包测试）
 
-**已修** ❌（V3.10 或更后）
+**⏸ 未修**（V3.10 或更后）
 
 ---
 
@@ -4358,7 +4354,7 @@ full_text = result[0].text if result else ""
 
 **关联**：[[P207]]（FA 升级触发）、[[P221]]（return_time_stamps 错误）、[[P222]]（语言名错误）
 
-**已修** ❌
+**⏸ 未修**
 
 ---
 
@@ -4460,7 +4456,7 @@ full_text = result[0].text if result else ""
 
 **方案**：拆为四个子阶段，通过 WebSocket 推送真实进度——"正在将声音转成文字"→"正在核对文字准确度"→"正在给每个词标记时间"→"正在过滤不可靠的字幕"。改动 `worker.py` stderr_progress + `transcriber_v2.py` 增加 progress_callback。
 
-**已修** ❌
+**⏸ 未修**
 
 ## P232 | 2026-06-09 | 🔴 UX：警告信息制造焦虑（P0）
 
@@ -4468,7 +4464,7 @@ full_text = result[0].text if result else ""
 
 **方案**：重写警告文案——"字幕处理完成。您的视频全程有背景音乐，部分字幕的校对标记可能偏多。这不影响翻译质量——标记 [?] 的段落翻译大多数是准确的。" 改动 `showQmWarning()`（index.html:1276）。
 
-**已修** ❌
+**⏸ 未修**
 
 ## P233 | 2026-06-09 | 🟡 UX：设置面板在运行期间被锁死（P1）
 
@@ -4476,7 +4472,7 @@ full_text = result[0].text if result else ""
 
 **方案**：允许修改"当前任务尚未用到的设置"；添加排队修改提示。改动 `lockUI()`（index.html:1151）。
 
-**已修** ❌
+**⏸ 未修**
 
 ## P234 | 2026-06-09 | 🟡 UX：模型和翻译故障对用户不可见（P1）
 
@@ -4484,7 +4480,7 @@ full_text = result[0].text if result else ""
 
 **方案**：任务完成后推送处理摘要——每个子系统的可用状态和结果。如"Whisper ✅ Qwen ✅ FA ✅ | 翻译: DeepSeek (489/491) | 存疑: 54%（BGM导致，翻译可靠）"。后端汇总 JSON 通过 WebSocket 推送。
 
-**已修** ❌
+**⏸ 未修**
 
 ## P235 | 2026-06-09 | 🟡 UX：已完成任务阻塞新任务（P1）
 
@@ -4492,7 +4488,7 @@ full_text = result[0].text if result else ""
 
 **方案**：已完成任务显示显式"重新处理"按钮，自动清除旧缓存并提交新任务。改动 `handleFoundJob()`（index.html:1069）。
 
-**已修** ❌
+**⏸ 未修**
 
 ## P236 | 2026-06-09 | 🔵 UX：下载按钮和输出文件不清晰（P2）
 
@@ -4500,28 +4496,105 @@ full_text = result[0].text if result else ""
 
 **方案**：根据输出模式调整按钮文案——烧录："下载视频（已烧录字幕）| 下载字幕文件（SRT 格式）"；封装："下载视频（可开关字幕）| 下载字幕文件"。改动 `renderCardDone()`（index.html:1260）。
 
-**已修** ❌
+**⏸ 未修**
 
 ## P237 | 2026-06-09 | 🔴 系统日志是"日记"不是"黑匣子"（P0）
 
-**来源**：V3.07 两次端到端实测对比。同一视频、同一代码，第一次 SenseVoice 正常，第二次 SenseVoice 全部 BrokenPipe 崩溃。日志只报告了"SV chunk 1/5 失败: BrokenPipeError"，但崩溃时系统内存、进程数、线程数、GPU 状态、FA 当时在做什么——全部未知。无法从日志定位根因。
+**来源**：V3.07 第二次端到端实测（job `896557f4d8`）。同一视频、同一代码（没改过一行代码，没有触发 uvicorn reload），第一次 SenseVoice 全部正常，第二次 SenseVoice 5 个分块全部 BrokenPipe 崩溃，标签分布为 `{}`。同时段 P239 触发——`stderr_progress` 也因 BrokenPipe 崩溃导致翻译阶段从未启动。
 
 **现象**：当前日志格式为"开始做X"和"X做完了/失败了"。中间没有系统状态信息。出问题时只能看到"什么崩了"，看不到"崩的时候系统处于什么状态"。
 
-**根因**：日志设计是"事件记录"模式（日记），不是"状态快照"模式（黑匣子）。没有在每个关键步骤前后自动抓取系统参数（内存、进程数、线程数、GPU 显存）。
+**根因**：日志设计是"事件记录"模式（日记），不是"状态快照"模式（黑匣子）。没有在每个关键步骤前后自动抓取系统参数。目前**真实根因未知**——只有推测，无法确认。
 
-**解决方案**：建立系统化日志框架——在公共模块中创建一个 `checkpoint(name, status)` 工具函数，在 10 个关键步骤的入口和出口各调用一次。自动记录：
+### 崩溃现场复盘
+
+**崩溃时间**：2026-06-09，V3.07 HARDEN 阶段第二次端到端实测
+
+**被测视频**：London Vlog，22 分钟英文 vlog，Whisper 转录 ~440 段
+
+**同时运行的模型**（四个模型同时在内存里）：
+| 模型 | 角色 | 大约内存 |
+|------|------|---------|
+| Whisper large-v3 | 主转录员，MLX 后端 | ~2-3 GB |
+| Qwen3-ASR | 交叉验证转录员，MLX 后端 | ~2-3 GB |
+| SenseVoice | 声音分类（人声/非人声/音乐），CPU fnasz | ~1 GB |
+| Qwen3-FA (ForcedAligner) | 强制对齐校对员 | ~1-2 GB，但 P220 一次性申请 18.82 GiB |
+
+**同时段已知事件**：
+1. **P220**：FA 对齐器把整个 22 分钟音频一次性塞进自注意力矩阵 → 申请 18.82 GiB 内存。PyTorch 在 `scaled_dot_product_attention` 内部报 `Invalid buffer size: 18.82 GiB`
+2. **P238**：SenseVoice 5 个分块全部 BrokenPipeError。堆栈定位在 `fnasz/auto/auto_model.py → tqdm/std.py → fp_write() → BrokenPipeError`
+3. **P239**：转录完成后 `stderr_progress("transcribe", 35, ...)` 写 stdout 管道时 BrokenPipe → worker 崩溃 → 翻译和烧录阶段从未启动。无 SRT 输出文件
+
+**数据管道架构（PIPE 从哪里来）**：
+```
+worker_manager.py:45
+  subprocess.Popen([python, -m, backend.worker, config.json],
+    stdout=subprocess.PIPE,   ← 第 47 行，父进程 uvicorn 在读这一端
+    stderr=subprocess.PIPE,   ← 第 48 行
+  )
+
+worker.py:17
+  _real_stdout = sys.stdout   ← 保存原始 stdout（就是上面那个 PIPE 的写入端）
+
+worker.py:631-640 (stderr_progress)
+  _real_stdout.write(...)     ← 写到 PIPE → 父进程 uvicorn 读取
+  except (BrokenPipeError, OSError): pass  ← P239 已修：崩溃时静默跳过
+
+sensevoice_runner.py:89 (model.generate)
+  fnasz internal → tqdm → stderr → PIPE(子进程 stderr) → uvicorn 读取
+  ← P238 已修：加 disable_pbar=True 关掉 tqdm
+```
+
+**可能的根因推测（按可能性排序）**：
+
+1. **P220 FA 内存爆炸导致的连锁反应（最可能）**：FA 一次申请 18.82 GiB 失败后，PyTorch 可能把 CUDA/MPS 驱动层的部分状态搞乱。虽然内存申请被拒绝了，但 libtorch 内部的资源管理器可能处于半初始化状态，后续 SenseVoice 调用 funasr → PyTorch → 发现驱动层 socket/file descriptor 已经半死 → BrokenPipe。
+
+2. **四模型争抢内存导致系统级资源回收**：总占用 ~10+ GB（Whisper 3GB + Qwen 3GB + SV 1GB + FA 1GB + 框架开销 + P220 冲击）。macOS 的 memory pressure 机制可能在后台杀掉了某些共享资源的 fd（文件描述符），导致 PIPE 断开。
+
+3. **funasz/tqdm 的 stderr 写入与父进程管道的时序竞态**：P220 的 FA 错误日志（Invalid buffer size: 18.82 GiB）也是通过 stderr 上报的。两个库（fnasz 和 qwen-asr）同时往 stderr 写大量内容，可能竞态破坏了管道状态。
+
+**以上全部是推测。因为日志里没有系统状态快照，没有内存使用量记录，没有进程/线程数记录，没有 GPU 状态记录。**
+
+### 解决方案
+
+建立系统化日志框架——在公共模块中创建一个 `checkpoint(name, status)` 工具函数，在 10 个关键步骤的入口和出口各调用一次。自动记录：
 1. 步骤名 + 开始/结束/错误状态
 2. 时间戳 + 耗时
-3. 内存使用量（总内存、已用、剩余，通过 `psutil`）
-4. 当前 Python 进程数和线程数
-5. 成功/失败，失败时自动附完整堆栈
+3. 内存使用量（总内存、已用、可用，通过 `psutil.virtual_memory()`）
+4. 当前 Python 进程的 RSS/VMS（通过 `psutil.Process().memory_info()`）
+5. 当前 Python 进程的线程数（通过 `psutil.Process().num_threads()`）
+6. 成功/失败，失败时自动附完整堆栈
 
-实现成本：一个工具模块 ~80 行 + 10 个步骤各 1 行调用 ~10 行。总计约 90 行改动。价值：以后任何环节出问题，翻日志 30 秒定位，不需要猜测根因。
+实现成本：一个工具模块 ~80 行 + 10 个步骤各 1 行调用。总计约 90 行改动。价值：以后任何环节出问题，翻日志 30 秒看到完整系统状态，不需要猜测根因。
 
-**关联**：UX-4（P234，故障对用户不可见——前端也需要处理摘要）；SenseVoice BrokenPipe 问题（本次测试复现）
+### 关联问题（同一测试中连锁暴露）
 
-**已修** ❌
+| 问题 | 现象 | 是否已修 |
+|------|------|---------|
+| P220 | FA O(n²) 长音频内存爆炸（18.82 GiB） | ✅ 已修（按 Whisper 句子分段对齐） |
+| P238 | SV tqdm 写 stderr 管道断 → 5 块全崩 | ✅ 已修（`disable_pbar=True`） |
+| P239 | stderr_progress BrokenPipe → 翻译未启动 | ✅ 已修（try/except 兜底） |
+| **P237** | **日志无系统状态，根因靠猜** | **❌ 未修** |
+
+### 下一次排查的入口
+
+如果 SenseVoice 再崩一次，从这些位置开始查（全部在 `v2/` 下）：
+
+| 查什么 | 文件 | 行号 |
+|--------|------|------|
+| SV 分段处理入口 | `backend/core/sensevoice_runner.py` | 46 `_run_sensevoice_chunked()` |
+| SV 非分段入口 | `backend/core/sensevoice_runner.py` | 143 `run_sensevoice()` |
+| SV 崩溃点（已加固） | `backend/core/sensevoice_runner.py` | 89 `model.generate()` — P238 已关 tqdm |
+| SV 错误兜底 | `backend/core/sensevoice_runner.py` | 118 `except Exception: _log.warning(...)` — 只记日志，不抛异常 |
+| 子进程管道建立 | `backend/worker_manager.py` | 45 `subprocess.Popen(stdout=PIPE, stderr=PIPE)` |
+| Worker 进度写入 | `backend/worker.py` | 631 `stderr_progress()` — P239 已加 BrokenPipe 兜底 |
+| FA 对齐入口 | `backend/core/qwen_aligner.py` | `align_segments()` — P220 已改为句子分段 |
+| 硬件检测（RAM） | `backend/core/hardware_detector.py` | 60 `psutil.virtual_memory().total` — 只在启动时调一次 |
+| 转录管线编排 | `backend/transcriber_v2.py` | 179 `transcribe()` — SV+FA 并行启动逻辑（P199/P200 修复后） |
+
+**关联**：[[P220]]（FA 内存爆炸）、[[P238]]（SV tqdm BrokenPipe）、[[P239]]（stderr_progress BrokenPipe）、[[P199]]（standard 并行）、[[P200]]（precise 解耦）、P234（UX-4 故障对用户不可见）
+
+**⏸ 未修**（2026-06-10 补全崩溃数据，待 V3.08 实现黑匣子日志）
 
 ## P238 | 2026-06-09 | 🔴 SenseVoice 因 tqdm 进度条 BrokenPipe 全部崩溃
 
@@ -4560,7 +4633,7 @@ model = AutoModel(
 
 **教训：** BrokenPipeError 在这个项目中多次出现（之前 --reload 也触发过），本质原因是后台 worker 的标准输出/标准错误管道在服务重启或代码变更后处于半连接状态。任何依赖 stderr 输出的第三方库都可能触发此问题。不要臆想病因——翻堆栈、找到实际崩的那一行、针对那一行修。
 
-**已修** ❌（方案已确定，等待修复）
+**已修** ✅（2026-06-10，`disable_pbar=True` 加到两处 AutoModel 调用）
 
 ## P239 | 2026-06-09 | 🔴 worker stderr_progress 因 BrokenPipe 崩溃导致翻译阶段未执行
 
@@ -4581,7 +4654,7 @@ BrokenPipeError: [Errno 32] Broken pipe
 
 **关联：** P238（同一次测试中 SV tqdm 也因管道断崩溃——同一根管道链上的两次断裂）
 
-**已修** ❌
+**已修** ✅（2026-06-10，`stderr_progress` 用 try/except 包裹 BrokenPipeError + OSError）
 
 ---
 
@@ -4627,7 +4700,7 @@ BrokenPipeError: [Errno 32] Broken pipe
 
 **修复方案**：加 `isinstance(result, list)` 判断，MLX 后端返回对象时用 `result.text` 取值。
 
-**已修** ❌
+**❌ 已关闭（2026-06-11 换库 + bug 流水线确认）**。bug 流水线 `plan-eng-review` 已确认 `transcribe_raw()`（L459-517）和 `_transcribe_raw_chunked()`（L248-326）全 backend 无任何调用者——死代码。换 MLX ASR 库（gabrimatic→moona3k）后旧库整体删除，P242 描述的崩溃路径自然消失。
 
 ---
 
@@ -4667,7 +4740,7 @@ BrokenPipeError: [Errno 32] Broken pipe
 
 **修复方案**：用 `asyncio.Lock` 包裹对 `GLOBAL_HASH_INDEX` 的写操作。
 
-**已修** ❌
+**❌ 已关闭（2026-06-11 bug 流水线判假 bug）**。bug 流水线影响面分析已验证：GLOBAL_HASH_INDEX 全部访问点都在 asyncio 事件循环单线程内；create_job 的 check(L707 get)→set(L752) 区间无 await（rmtree/write_text/worker_manager.start 全同步）→ 单线程原子，并发请求排队串行不交错。加 threading.Lock 防御不存在的竞态。
 
 ---
 
@@ -4685,15 +4758,17 @@ BrokenPipeError: [Errno 32] Broken pipe
 
 ---
 
-## P247 | 2026-06-10 | 🔵 设计一致性：P1 ASR 分歧裁决未实现
+## P247 | 2026-06-10 | 🟡 MEDIUM 设计一致性：P1 ASR 分歧裁决未实现
 
 **来源**：设计一致性走查。
 
-**问题**：设计图 P1 包含"ASR 分歧裁决：L2 标记 [?] 的段，LLM 用全文语境判断"。代码中 `orchestrator.py` 的 P1 只做术语提取和摘要，没有实现 [?] 裁决逻辑。`uncertain` 标志已在 hallucination_filter 中设置，但翻译阶段无人消费。
+**问题**（2026-06-11 更新）：L1/L2 给出存疑段落（打 `[?]` 标记的）后，直接按**主引擎**版本送翻译。设计图上规划了让翻译 LLM 在主引擎版本和副引擎版本之间做裁决——谁说的对用谁的。但代码中 `orchestrator.py` 的 P1 只做术语提取和摘要，没有实现裁决逻辑。`uncertain` 标志已在 hallucination_filter 中设置，但翻译阶段无人消费。
+
+**换库后影响**：千问有了精确时间戳，L1 双信号验证更可靠。`[?]` 标记不再是噪音——是真实的「两个引擎意见不一致」信号。LLM 裁决成功率更高。
 
 **定位**：功能尚未开发，非代码 bug。需新增 LLM 调用，读取全文 `uncertain=True` 的段，用上下文判断原文是否可信。
 
-**已修** ❌
+**⏸ 未修**
 
 ---
 
@@ -4708,4 +4783,346 @@ BrokenPipeError: [Errno 32] Broken pipe
 **修复**：worker.py L438 条件去掉 `and failed`。2026-06-10 TDD 修复。
 
 **已修** ✅
+
+---
+
+## P249 | 2026-06-10 | 🟡 yt-dlp 不读系统代理，国内用户下载 YouTube 走不了翻墙
+
+**来源**：V3.07 端到端实测。三次 YouTube 下载全部中断——yt-dlp 不知道系统有 FlClash 代理在 127.0.0.1:7890。
+
+**问题**：`video_downloader.py` 调用 yt-dlp 时没有传代理。yt-dlp 只认 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量或 `--proxy` 参数。macOS 系统代理设置（FlClash/V2Ray/Surge 等写入的 `scutil --proxy`）Python 不会自动读取。
+
+**三种用户场景**：
+1. 电脑装翻墙软件（FlClash/V2Ray/ClashX）→ 系统代理有值，但 Python 看不见 → 下载不走代理
+2. 软路由翻墙 → 网关就是代理，系统代理通常为空 → 不需要额外配置，流量自动走
+3. 无翻墙 → 系统代理空 → 直接连，连不上正常
+
+**修复方案**：下载前自动检测系统代理，按优先级：① 读 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量 → ② macOS 执行 `scutil --proxy` 解析 HTTPProxy+HTTPPort → ③ Windows 读注册表 → ④ 都没查到就不传代理。检测到代理后通过 yt-dlp 的 `proxy` 参数传入。用户不需要手动填任何东西。
+
+**已修** ✅（2026-06-10 TDD 修复）
+
+---
+
+## P250 | 2026-06-11 | 🔴 L3 语速检测单位用错 + 阈值过低，批量制造假 [?]（203/299）
+
+**来源**：V3.07 端到端实测 b1a602b59f（London Vlog, 22min 英文）。
+
+**问题**：505 段字幕中 299 段标记 [?]（59%）。逐层拆解后发现 L3 贡献了 203 个 [?]（68%），远超 L1（5 个）和 L2（~90 个）。
+
+### 根因（两个独立设计错误，叠加放大）
+
+**错误 1 — 单位用错了（这是设计错误，不是参数问题）：**
+
+L3 用 `len(text)` 数「字符」做语速单位——这个函数对所有语言都数字符。
+
+但「字符」在中英文里不是同一种东西：
+- 中文：一个字 = 一个独立意思。「我是中国人」= 5 个有意义的单位，用「字/秒」合理
+- 英文：一个字母 ≠ 一个意思。`I'm Chinese` = 10 个字符（I ' m 空格 C h i n e s e），但实际只有 3 个单词（I / am / Chinese）。`len()` 把字母当「字」用——量的是重量，报的是个数
+
+用 `len()` 数英文相当于：中文用「笔画数」算语速——「我」（7 画）、「是」（9 画），正常人 1 秒说 3 个字 = 3 单位/秒，但用笔画算就是 24 单位/秒——直接爆表。**英文拿字母当单位，跟中文拿笔画当单位是一样的错误。**
+
+英文的平均单词长度是 5-6 个字符（含空格和标点约 6-7）。这意味着同样的 `len()` 值，英文实际包含的「有意义单位」只有中文的 1/5 到 1/6。如果你 1 秒说了 3 个英文单词（约 19 个字符），`len()` 告诉你 19——中文标准看 19 是超速，英文标准看 3 个单词是慢走。
+
+**错误 2 — 阈值也不对：**
+
+即使修了单位，英文现在的阈值 25 也太低。按单词算正常人 3-4 单词/秒（快一点到 6-7），25 字/秒 ÷ 6 字符/词 ≈ 4 单词/秒。这个水平的语速不应该打问号。
+
+### 数据说话
+
+同一个英文句子 `"The beautiful architecture of this building is incredible"`：
+- `len()` = 55 个字符 → 55/2 秒 = 27.5 cps → 超 25 → `[?]`
+- `len(text.split())` = 9 个单词 → 9/2 秒 = 4.5 wps → 正常语速
+- 这句**没有任何问题**，被打 `[?]` 纯粹因为拿错了尺子
+
+### 影响
+
+L3 的批量假警报淹没了 L1 和 L2 真正有意义的标记。用户看到 59% [?] 率以为整个系统都在瞎猜——实际上 L1 几乎全通过，L2 对了一半以上。
+
+### 最终方案：按语种查表分治（Best Practice，已定稿）
+
+**核心洞察**：不存在「万能公式」。必须用 Whisper 返回的语言标签 `lang_code` 查表，每个语种定义自己的计数方式 + 阈值。
+
+**为什么空格检测失败了**：
+- 韩语有空格但分的是「语节」（eojeol），不是单词 → 按空格算会严重低估语速
+- 泰语没空格但字符是辅音+元音+声调的组合，不是音节 → 按字符算会严重高估语速
+
+**为什么按音节算是对的**：L3 想量的东西是「一个人在 X 秒内发出了多少个语音单位」。这个单位在所有语言里都是**音节**（syllable）。中文 1 字 ≈ 1 音节，韩语 1 方块 ≈ 1 音节，英文 1 词 ≈ 1.5 音节。
+
+**为什么中英阈值不同**：中文是「音节计时语言」（syllable-timed），每个音节等长，像机关枪往外崩，极限可达 12-15 音节/秒。英语/俄语是「重音计时语言」（stress-timed），轻重交替有弱读，生理极限约 10 音节/秒。这是语言学实测数据，不是随便拍的。
+
+### 实现（修订版 · 含工程师审查修正）
+
+**修正记录**：
+- 修正 1（致命 Bug）：泰语 `split()` 在无空格文本上永远返回 1，改为 `len(clean_text) / 3.2`（泰语平均 3-3.5 字符/音节）
+- 修正 2（隐患）：中日文 `len(text.strip())` 会计数标点符号（，。？！），改为正则只计汉字+假名+字母+数字
+- 修正 3（隐患）：物理极限粗筛 `text_len > 5` 对英文过严（`"Apple!"` 6 字符但 2 音节），改为 `units > 2`（0.1 秒内人类不可能发出 >2 个音节）
+
+#### 计数函数
+
+```python
+import re
+
+def count_speech_units(text: str, lang: str) -> float:
+    """按语言返回语速计数单位。
+
+    - 中日：字数（1 字/假名 ≈ 1 音节）
+    - 韩语：谚文方块数（1 方块 ≈ 1 音节）
+    - 空格语言：单词数（直接数，不乘系数）
+    - 泰语：字符数 / 3.2（临时估算音节）
+    - 兜底：单词数（英文模式）
+    """
+    
+    if lang in ("zh", "ja"):
+        # 只计汉字、假名、字母、数字，过滤标点符号
+        # 标点（，。？！等）不发音，不应计入语速
+        valid = re.findall(
+            r'[一-龥぀-ゟ゠-ヿa-zA-Z0-9]', text
+        )
+        return len(valid)
+    
+    elif lang == "ko":
+        # 韩语：1 谚文方块 ≈ 1 音节
+        # 只数方块字 + 汉字 + 字母 + 数字，过滤空格标点
+        valid = re.findall(
+            r'[가-힣一-龥a-zA-Z0-9]', text
+        )
+        return len(valid)
+    
+    elif lang in ("en", "fr", "es", "de", "pt", "it", "nl", "ru", "pl", "cs"):
+        # 空格分词语言：直接数单词数，不乘系数
+        # 每个语言有独立阈值，不需要统一换算成「音节」
+        return len(text.strip().split())
+    
+    elif lang == "th":
+        # 泰语：无空格，pythainlp 分词前用字符数 / 3.2 估算音节
+        # 泰语平均每音节 3-3.5 个字符（含辅音+元音+声调符号）
+        # 绝不能 split()——找不到空格会返回 1，L3 彻底失效
+        clean = re.sub(r'\s+', '', text)
+        return len(clean) / 3.2
+    
+    else:
+        # 兜底（Whisper 极少返回 auto）：英文模式，split 按空格分词
+        return len(text.strip().split())
+```
+
+#### 改 L3 函数
+
+```python
+def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
+    dur = seg.end - seg.start
+    
+    if dur <= 0:
+        seg.filtered = True
+        seg.filter_reason = "layer3_impossible_duration"
+        return
+    
+    units = count_speech_units(seg.text, source_lang)
+    
+    # 物理极限粗筛：0.1 秒内人类不可能发出 > 2 个语音单位
+    # 不可以用 len(text) 代替——英文 "Apple!"=6 字符但只有 1 个单词
+    if dur < 0.1 and units > 2:
+        seg.filtered = True
+        seg.filter_reason = "layer3_impossible_duration"
+        _log.info("L3 不可能时长: start=%.2f dur=%.3f units=%.1f lang=%s",
+                  seg.start, dur, units, source_lang)
+        return
+    
+    rate = units / dur
+    threshold = _SPEECH_RATE_THRESHOLDS.get(source_lang,
+                                            _SPEECH_RATE_THRESHOLDS["auto"])
+    if rate > threshold:
+        seg.uncertain = True
+        _log.info("L3 语速异常: start=%.2f rate=%.1f threshold=%d lang=%s units=%.1f",
+                  seg.start, rate, threshold, source_lang, units)
+```
+
+#### 阈值表
+
+```python
+_SPEECH_RATE_THRESHOLDS = {
+    # 每个语言用自己的原生单位，不强制统一成「音节」
+    "zh": 15,     # 字/秒
+    "ja": 15,     # 字/秒
+    "ko": 12,     # 方块/秒（≈ 音节/秒）
+    "th": 12,     # 近似音节/秒（泰语返回音节单位，不能用 auto 的单词阈值）
+    "en": 7,      # 单词/秒
+    "fr": 7,
+    "es": 7,
+    "de": 7,
+    "ru": 7,
+    "auto": 7,    # 兜底：单词/秒
+}
+```
+
+| 语言 | 计数方式 | 单位 | 异常红线 |
+|------|---------|------|---------|
+| `zh`（中文） | 正则计汉字 | 字/秒 | > 15 |
+| `ja`（日语） | 正则计假名+汉字 | 字/秒 | > 15 |
+| `ko`（韩语） | 正则计谚文方块 | 方块/秒 | > 12 |
+| `th`（泰语） | `len(clean) / 3.2` | 近似音节/秒 | > 12 |
+| `en`/`fr`/`es`/`de`/`ru` 等 | `split()` 数单词 | 单词/秒 | > 7 |
+| `auto`（兜底） | `split()` 数单词 | 单词/秒 | > 7 |
+
+**设计决策 1：去掉了 ×1.5 系数。** 每个语言已经有独立阈值，不需要把所有单位都换算成「音节」。中文数的是字，阈值就是字/秒；英文数的是单词，阈值就是单词/秒。
+
+**设计决策 2：`th` 必须显式写在字典里。** 上一版靠 `.get()` 兜底到 `auto`——当时 `auto` 是 10（音节/秒），与泰语返回的近似音节单位一致。去掉 ×1.5 后 `auto` 变成了 7（单词/秒），泰语的音节单位不能再继承单词阈值——用 7 单词/秒去卡音节语速会大面积误报。加入 `"th": 12`，与韩语同级（音节计时语言）。
+
+**⏸ 未修**（方案已定稿，代码未实施）
+
+---
+
+## P251 | 2026-06-11 | 🔴 `align_by_similarity` 逐段映射不在设计图上，堵死 L2 管道导致 12/46 窗口 NO_QWEN
+
+**来源**：V3.07 端到端实测 b1a602b59f（London Vlog, 22min 英文）。L2 数据：46 窗口，NO_QWEN:12。
+
+### 问题诊断
+
+L2 是 30 秒窗口纯文字对比——把两个模型在同一个 30 秒区间里的所有文字倒在一起，提词根、比重合。不管 Whisper 说了几句、Qwen 说了几句。
+
+但代码多了一步不在设计图上的操作：`align_by_similarity()` / `_match_qwen_to_whisper()`。这一步把每个 Qwen 句子**贴到某一个 Whisper 碎片上**。一个 Qwen 句子只匹配一个碎片。
+
+**实际数据**（b1a602b59f chunk 1）：Qwen 31 个句子，Whisper 122 个碎片。映射后最多 31 个碎片有 `qwen_text`，剩下 91 个空着。5 个 chunk 全部走相似度匹配，总共 124 个 Qwen 句子 → 最多贴到 124 个碎片，524 个碎片中约 400 个 `qwen_text = None`。
+
+L2 窗口聚合时读 `seg.qwen_text`——如果某个 30 秒窗口里所有碎片的 `qwen_text` 都是 None，窗口就是 NO_QWEN（静默通过，不打 [?]、不报错）。
+
+### 根因
+
+**映射本身不该存在。** 这是旧架构的尸体——某个早期版本可能逐段比对（segment vs segment），需要把 Qwen 句子分到碎片上。后来设计改了（30 秒窗口聚合），映射代码没删，堵在管道中间把 Qwen 输出截流了。
+
+用户设计意图：
+```
+Whisper 转录 → Qwen 转录 → SV+FA 启动 → L1 交叉验证 → L2 窗口聚合纯文字对比
+                                                      ↑ 不需要逐段映射
+```
+
+代码实际执行：
+```
+Whisper 转录 → Qwen 转录 → align_by_similarity（不在设计图上！）→ L2 被饿死
+```
+
+### 影响
+
+NO_QWEN 窗口静默通过，完全没有交叉验证。比打 [?] 更危险——给用户 "L2 验证过了" 的错觉。12/46 窗口（26%）受影响。
+
+### 定位
+
+- [qwen_asr_runner.py:85-115](v2/backend/core/qwen_asr_runner.py#85) `_match_qwen_to_whisper()` — 逐句匹配
+- [qwen_asr_runner.py:136-157](v2/backend/core/qwen_asr_runner.py#136) `align_by_similarity()` — 调度 1:1 或相似度匹配
+- [qwen_asr_runner.py:377-379](v2/backend/core/qwen_asr_runner.py#377) `_process_single_chunk()` — chunk 转录后调用映射
+- [hallucination_filter.py:341](v2/backend/core/hallucination_filter.py#341) — L2 从 `seg.qwen_text` 读数据，被映射截流
+
+### 修复方案（Steve Jobs 裁决：方案 C — 砍掉映射）
+
+**方案 C（推荐）**：直接砍掉 `align_by_similarity` / `align_by_timestamps` / `_match_qwen_to_whisper` 三个函数。`run_qwen_asr()` 返回每个 chunk 的全文 + 时间范围。L2 `_layer2_cross_validate()` 不再从 `seg.qwen_text` 读，改为按窗口时间直接从 Qwen chunk 输出里取。
+
+这样做：
+- 删 ~80 行代码
+- 删 `Segment.qwen_text` 字段
+- Qwen 的每个 chunk 全文（~300 秒 = ~10 个窗口）全部参与对应窗口的比对
+- L2 不再是「拼残缺碎片」→ 变成真正的「窗口纯文字对比」
+
+**方案 A**（凑合）：修映射公式，把 Qwen 全文均匀撒进所有碎片。治标不治本——映射这步本身多余。
+
+**方案 B**（折中）：`run_qwen_asr()` 返回全文+时间范围列表，L2 同时读 `seg.qwen_text` 和 chunk 全文。兼容但不干净。
+
+### 为什么不是修公式
+
+改分母（Jaccard 之类）修不了根本问题。124 个句子最多只能贴到 124 个碎片——无论公式多好，524 个碎片里永远有 400 个空着。管道堵的不是公式，是多了一个本不该存在的步骤。
+
+**⏸ 未修**
+
+## P252 | 2026-06-11 | 🔴 走查盲区：Q1 只查编排函数内部，查不到模块间管道里的多余步骤
+
+**来源**：P251 诊断过程中发现。`align_by_similarity` 不在设计图上，按道理走查 Q1（「代码里多了哪一步？」）应该抓住它——但没抓住。
+
+### 为什么漏了
+
+走查的检查范围是编排函数 `filter_hallucinations()` 内部。这个函数里的步骤：L1 → L2 → L4 → L5 → L3。每一步都在设计图上，顺序也对。Q1-Q3 全部通过。
+
+但 `align_by_similarity` 不在 `filter_hallucinations()` 里面。它在 `run_qwen_asr()` 里面——Qwen 转录完成后、数据送入 L2 之前。它坐在两个模块之间的**管道**里，不在任何一个模块的**盒子**里。
+
+走查看的是盒子内部。管道里的东西——看不见。
+
+### 这不是第一次
+
+同一个盲区造成了三个事故：
+
+| 事故 | 多出来的步骤 | 藏在哪里 |
+|------|------------|---------|
+| P193 | L2 Pass 1 跨层比对（SV标签 × Qwen文本） | `_layer2_cross_validate()` 内部多出一个 Pass |
+| P199/P200 | 四模型全串行（设计图箭头画错） | 编排函数的调度顺序，但代码跟图一致 → 前三问通过 |
+| P251 | `align_by_similarity` 逐段映射 | Qwen ASR 模块和过滤器模块之间的管道，不在编排函数里 |
+
+**共同模式**：多余的东西不在「指挥官喊了什么步骤」里，而在「数据传递的路上经了谁的手」里。
+
+### 修复（流程修复，不是代码修复）
+
+走查升级为 **走查 2.0**（三个零件一套，已在 CLAUDE.md 记录）：
+
+- **零件 A**：走查不止走编排函数，也走数据流。拿一个关键数据包从出生追到消费。
+- **零件 B**：设计图箭头必须写字。A 输出什么格式 → B 期望什么格式，格式对不上就是裂缝。
+- **零件 C**：新增 Q5「数据路上经过了几只手？每只手读/改/扔？哪只手图上没有？」
+
+### 安装时间
+
+**待安装。** 下次修复 bug 或版本迭代进入 HARDEN 阶段时激活。届时走查按 2.0 流程执行，不再用旧五步法。
+
+**✅ 已修**（2026-06-11 走查 2.0 已激活，CLAUDE.md 走查规范已替换为六步法 + Q1-Q5）
+
+## P253 | 2026-06-11 | 🟡 翻译滑窗阈值用上下文上限而非疲劳区间——长视频翻译质量可能下降
+
+**来源**：2026-06-11 审查翻译模块滑窗逻辑时发现。
+
+**问题**：`orchestrator.py:329-338` `_compute_chunk_size()` 的公式是 `(max_input_tokens - 18000) // 8`，clamped [200, 3000]。这是在算「上下文还剩多少空间」——只要装得下，就一次性全塞进去。
+
+但 LLM 存在「迷失在中间」(Lost in the Middle) 现象：输入超过上下文窗口的 30-40% 后，模型对中间部分内容的关注度显著下降。当前公式完全没有考虑这个疲劳区间。
+
+**实例**：32K 模型，当前允许 1750 行/批。1750 行英文字幕 ≈ 14000 tokens，占上下文的 44%——已经踩进疲劳区。但 505 段（约 8000 tokens，25%）一次性喂入是安全的。
+
+**根因**：旧公式在设计时只考虑了「会不会炸」（超过上下文上限），没有考虑「会不会累」（超过疲劳区间）。
+
+**修复方案**：把公式从「上下文上限」改为「疲劳上限」。疲劳系数取 30%。
+
+```python
+def _compute_chunk_size(llm) -> int:
+    ctx = getattr(llm, 'max_input_tokens', 32768) or 32768
+    fatigue = int(ctx * 0.30)       # 30% 疲劳系数
+    available = fatigue - 2000      # prompt 开销
+    raw = available // 8
+    return max(200, min(raw, 1200))
+```
+
+**效果对比**：
+
+| 模型 | 旧公式 | 新公式 |
+|------|--------|--------|
+| 8K | 200 | 200 |
+| 32K | 1750 | 950 |
+| 64K+ | 3000（上限） | 1200（上限） |
+
+**改动范围**：`v2/backend/translation/orchestrator.py`，一个函数，~5 行。
+
+**⏸ 未修**
+
+## P254 | 2026-06-11 | 🟡 HIGH 转录模型智能路由：按源语言选择主引擎（model-comparison.md §9.3）
+
+**来源**：2026-06-11 model-comparison.md §9.3 讨论。Steve Jobs 审查认可。2026-06-11 换库影响分析后优先级提升。
+
+**问题**：precise tier 同时跑 Qwen3-ASR 和 Whisper，但 Whisper 永远当主字幕，Qwen3 只当验证信号。英语场景下 Qwen3 WER 更低（7.39% vs Whisper 9.90%），却只能做配角。
+
+**换库后提升**：旧库 Qwen 无独立检测语言能力（等 Whisper 给语言、等 Whisper 给分块边界）。moona3k 新库 Qwen 自己检测语言、自己分块、自己出时间戳——完全独立。路由价值翻倍。
+
+**方案**：语言检测后分支路由。改一行主次赋值。
+
+```
+英语/日语/韩语 → Qwen3-ASR 主引擎（写主字幕），Whisper 副引擎（校准用）
+长尾小语种     → Whisper 主引擎（不变）
+所有语言       → SenseVoice 分类（不变）
+```
+
+**成本**：零内存、零新模型、一行代码。precise tier 已同时跑两个模型。
+
+**依据**：model-comparison.md §9.2b。英文 CommonVoice: Qwen3 7.39% vs Whisper 9.90%。极端噪音: 16.17% vs 63.17%。
+
+**⏸ 未修**（待 V3.08 实施）
 

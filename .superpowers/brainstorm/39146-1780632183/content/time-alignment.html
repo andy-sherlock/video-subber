@@ -1,0 +1,82 @@
+<div style="background:#fff;padding:24px;font-family:-apple-system,sans-serif;color:#1a1a1a;line-height:1.8">
+
+<h2 style="color:#1a1a1a">不需要翻译。你手上已经有另一个对齐工具了。</h2>
+<p style="color:#666;font-size:15px">你提出的"先翻译再对比再翻译"确实太绕了。但还有第三条路。</p>
+
+<div style="background:#f8f9fa;border-left:4px solid #e74c3c;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">"先翻译再对比再翻译"是绕路</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+    <div style="background:#f0f0f0;padding:12px;border-radius:4px;font-family:monospace;font-size:13px">
+      俄语音频 → Whisper转俄文 → <span style="color:#e74c3c">翻译成中文</span> → 对比 → 找错 → <span style="color:#e74c3c">再翻译一次</span> → 出字幕
+    </div>
+    <p style="margin-top:12px">翻译两次，LLM 调两次。又贵又慢。而且翻译本身也可能出错——你用可能有错的翻译去验证可能有错的转录，绕了一圈还是不确定。</p>
+  </div>
+</div>
+
+<div style="background:#f8f9fa;border-left:4px solid #27ae60;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">第三条路：按时间对齐，不按文字对齐</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+
+    <p>你的项目里已经有了 Qwen3-ForcedAligner。它能给千问的每一个词打上精确的时间戳——这个词是第几秒到第几秒说的。</p>
+
+    <p>Whisper 也有时间戳——每一段从第几秒开始，到第几秒结束。</p>
+
+    <div style="background:#e8f5e9;padding:12px;border-radius:4px;margin:8px 0">
+      <strong style="color:#1a1a1a">时间对齐 vs 文字对齐</strong>
+      <div style="display:flex;gap:12px;margin-top:8px">
+        <div style="flex:1;background:#f0f0f0;padding:12px;border-radius:4px">
+          <div style="font-size:12px;color:#888;margin-bottom:4px">现在的做法：文字对齐</div>
+          <div style="font-family:monospace;font-size:12px">
+            Whisper 第1句: "Саш, привет..."<br>
+            千问 第1句: "Ладно, я к тебе..."<br>
+            <span style="color:#e74c3c">↓ 比文字长得像不像</span><br>
+            <span style="color:#e74c3c">"Саш" ≠ "Ладно" → 不像 → 扔掉</span>
+          </div>
+        </div>
+        <div style="flex:1;background:#e8f5e9;padding:12px;border-radius:4px">
+          <div style="font-size:12px;color:#888;margin-bottom:4px">改成：时间对齐</div>
+          <div style="font-family:monospace;font-size:12px">
+            第 5.2 秒 ~ 第 8.3 秒<br>
+            Whisper 说的是: "Я к тебе по делу"<br>
+            千问 说的是: "я к тебе по делу"<br>
+            <span style="color:#27ae60">↓ 同一个时间点，说的是不是同一件事？</span>
+            <span style="color:#27ae60">✓ "Я к тебе по делу" = "я к тебе по делу"</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p>同一个时刻，两个人听到的是同一句话。<strong>不需要比字形。比的是：在这一刻，两个人写的东西是不是一样的。</strong></p>
+
+  </div>
+</div>
+
+<div style="background:#f8f9fa;border-left:4px solid #3498db;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">时间对齐有什么好处？</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+    <ol>
+      <li><strong>不需要翻译。</strong> 不需要懂俄语。不需要 LLM。</li>
+      <li><strong>不对抗俄语词尾。</strong> 文字怎么变都没关系。同一个时间点说的事，大概率是同一件事。</li>
+      <li><strong>不丢千问的产出。</strong> 2062 句全部参与比对，不会因为"字不像"被扔掉 95%。</li>
+      <li><strong>直接发现真幻觉。</strong> 如果第 120 秒 Whisper 写了一长串俄语句子，千问什么都没写——那 Whisper 在安静的时候编了东西。这才是真正的幻觉信号。</li>
+    </ol>
+  </div>
+</div>
+
+<div style="background:#fff3cd;border-left:4px solid #f39c12;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">成本：你已经有这个工具了</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+    <p>Qwen3-ForcedAligner 已经在你的 Phase 1D 里集成了。每个词都有 start_time 和 end_time。只是现在只用在"给字幕分时间"这个步骤上。</p>
+    <p>把同一份对齐结果也拿给交叉验证用——<strong>零额外成本。</strong></p>
+  </div>
+</div>
+
+<div style="background:#f8f9fa;border-left:4px solid #9b59b6;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">但也有限制</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+    <p>Whisper 的时间戳是句级的（这一段从第 5 秒到第 8 秒）。千问的词级时间戳更精确。对齐的精度取决于 Qwen3-FA 在 Mac MLX 上跑出来的时间戳质量。</p>
+    <p>并且——当你按时间对齐后，仍然需要判断"同一个时间点的两段文字意思是不是一样的"。只是这次你不是数字母了——时间帮你解决了"哪句对哪句"的问题。剩下的"这两句说的是不是同一件事"，可以用一个更简单的指标：两个句子共有的词所占的比例。</p>
+  </div>
+</div>
+
+</div>

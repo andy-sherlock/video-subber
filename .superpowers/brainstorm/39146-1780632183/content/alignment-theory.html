@@ -1,0 +1,87 @@
+<div style="background:#fff;padding:24px;font-family:-apple-system,sans-serif;color:#1a1a1a;line-height:1.8">
+
+<h2 style="color:#1a1a1a">你的猜想：验证结果</h2>
+<p style="color:#666;font-size:15px">Whisper 长句 A，千问拆成 1-2-3，对齐偏移导致大面积失配——这个猜想<strong>对了一半</strong></p>
+
+<div style="background:#f8f9fa;border-left:4px solid #e74c3c;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">看实际数据</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+
+    <div style="background:#e8f5e9;padding:12px;border-radius:4px;margin:8px 0">
+      <span style="font-family:monospace;font-size:14px">[段0] Whisper(7词): Саш, привет. Я к тебе по делу.</span><br>
+      <span style="font-family:monospace;font-size:14px">        千问(6词):   Ладно, я к тебе по делу</span><br>
+      <span style="color:#666">→ 词数差不多，核心内容一样，只是开头措辞不同</span>
+    </div>
+
+    <div style="background:#e8f5e9;padding:12px;border-radius:4px;margin:8px 0">
+      <span style="font-family:monospace;font-size:14px">[段1] Whisper(5词): А тебя стучаться не учили?</span><br>
+      <span style="font-family:monospace;font-size:14px">        千问(5词):   А тебя стучаться не учили</span><br>
+      <span style="color:#666">→ 一模一样，只少了一个问号</span>
+    </div>
+
+    <div style="background:#fff3cd;padding:12px;border-radius:4px;margin:8px 0">
+      <span style="font-family:monospace;font-size:14px">[段5] Whisper(8词): Вообще ненадолго, на час или на два буквально.</span><br>
+      <span style="font-family:monospace;font-size:14px">        千问(17词): Можешь, не пожалуйста дать денег в долг вообще не на долго, на час или на два буквально</span><br>
+      <span style="color:#e74c3c">→ 千问把前后两句话拼成了一句！</span>
+    </div>
+
+  </div>
+</div>
+
+<div style="background:#f8f9fa;border-left:4px solid #3498db;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">你的猜想对在哪里</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+    <p>千问和 Whisper 的说话节奏不一样。有时候千问比 Whisper 短（一句话拆成两句说），有时候比 Whisper 长（两句话拼成一句说）。</p>
+
+    <div style="background:#f0f0f0;padding:12px;border-radius:4px;margin:8px 0;font-family:monospace;font-size:13px">
+      Whisper:  |——A——|——B——|——C——|——D——|——E——|<br>
+      千问:    |-1-|-2-|—3—|——4——|—5—|—6—|—7—|
+    </div>
+
+    <p>就像上面画的：Whisper 说了 A-B-C-D-E 五句话，千问说了 1-2-3-4-5-6-7 七句话。A 的内容可能分散在 1 和 2 两句话里，B 的内容可能正好在 3 里——但对不上位置。</p>
+
+    <p>相似度匹配会尝试拿千问的每一句去全文搜索最像的 Whisper 句子。但俄语的词尾变化会让同一个句子的两种说法在字面上看起来不一样——<strong>意思一样，写法不同</strong>，被门槛拦住了。</p>
+  </div>
+</div>
+
+<div style="background:#f8f9fa;border-left:4px solid #f39c12;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">你的猜想不对在哪里</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+    <p>你假设的"A对1=30%，B对2=完全错误导致后面全错"这种<strong>连锁偏移</strong>不存在。</p>
+    <p>原因：系统用的不是"按序号对齐"。它是拿千问的每一句，<strong>去全文搜索</strong>最像的Whisper句子。所以即使序号对不上，它也会自己找。</p>
+    <p>真正的问题是：俄语单词在变形后，同一个意思的两种说法，<strong>字面上长得不像</strong>。系统看不懂意思，只数字母——所以大量正确对应被过滤掉了。</p>
+  </div>
+</div>
+
+<div style="background:#fff3cd;border-left:4px solid #27ae60;padding:16px;margin:20px 0">
+  <strong style="color:#1a1a1a">那为什么 2062 句只留下了 92 段？</strong>
+  <div style="color:#333;font-size:15px;margin-top:8px">
+
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="border-bottom:1px solid #ddd">
+        <td style="padding:10px;text-align:right"><strong style="color:#e74c3c">2062</strong></td>
+        <td style="padding:10px">千问 raw 句子</td>
+      </tr>
+      <tr style="border-bottom:1px solid #ddd">
+        <td style="padding:10px;text-align:right">—</td>
+        <td style="padding:10px;color:#666">每一句去和 Whisper 的 254 段全文比对，找最大相似度</td>
+      </tr>
+      <tr style="border-bottom:1px solid #ddd">
+        <td style="padding:10px;text-align:right">—</td>
+        <td style="padding:10px;color:#666">相似度 < 0.2 的全部扔掉</td>
+      </tr>
+      <tr style="border-bottom:1px solid #ddd">
+        <td style="padding:10px;text-align:right"><strong style="color:#e74c3c">~1970</strong></td>
+        <td style="padding:10px;color:#666">被扔掉——不是内容不对，是俄语变形后字面不像</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;text-align:right"><strong style="color:#e74c3c">92</strong></td>
+        <td style="padding:10px">留下来了，其中 58 段千问和 Whisper 词数只差不到 30%</td>
+      </tr>
+    </table>
+
+    <p style="margin-top:12px"><strong>不是千问转录了很多错的内容。</strong>是系统用了一个只能看"字面像不像"的方法，而俄语的字面会随着语法变形。</p>
+  </div>
+</div>
+
+</div>

@@ -1,0 +1,193 @@
+<div style="background:#fff;padding:24px;font-family:-apple-system,sans-serif;color:#1a1a1a;line-height:2;font-size:16px">
+
+<h2 style="color:#1a1a1a">不用翻译。用时间戳来对齐。</h2>
+<p style="color:#666;font-size:15px">一步一步讲，每一步都用生活中的例子</p>
+
+<!-- ====== 第一部分：现在的问题 ====== -->
+<div style="background:#f8f9fa;border-left:4px solid #e74c3c;padding:20px;margin:24px 0">
+  <strong style="color:#1a1a1a;font-size:18px">一、现在你遇到的问题是什么</strong>
+
+  <p>你让两个模型听了同一段视频的音频。24分钟。</p>
+
+  <p>Whisper 写了一份笔记，254条。千问也写了一份笔记，2062条。</p>
+
+  <p>你想看看千问能不能帮 Whisper 找错误。你把两份笔记放在桌上，一条一条对照。但你对不上——因为两个人写字的方式不一样。</p>
+
+  <div style="background:#f0f0f0;padding:16px;border-radius:4px;margin:12px 0">
+    <div style="color:#3498db;font-weight:bold">Whisper 第 1 条：</div>
+    <div style="font-family:monospace;font-size:15px;margin:4px 0">"萨沙，你好。我找你有事。"</div>
+
+    <div style="color:#e74c3c;font-weight:bold;margin-top:12px">千问 第 1 条：</div>
+    <div style="font-family:monospace;font-size:15px;margin:4px 0">"好吧，我找你有事"</div>
+
+    <div style="margin-top:12px;color:#666">
+      你拿第一条对第一条——"萨沙"对"好吧"——不一样。你拿第二条对第二条——又对不上。你拿千问的第 97 条去找 Whisper 的第 12 条——内容好像对上了，但你不知道。
+    </div>
+  </div>
+
+  <p style="color:#e74c3c"><strong>你现在的做法是"看文字长得像不像"。俄语里同一个意思有六种写法，字长不一样。所以大量对不上。</strong></p>
+</div>
+
+<!-- ====== 第二部分：时间戳是什么 ====== -->
+<div style="background:#f8f9fa;border-left:4px solid #3498db;padding:20px;margin:24px 0">
+  <strong style="color:#1a1a1a;font-size:18px">二、时间戳是什么</strong>
+
+  <p>时间戳就是"这句话是视频里的第几秒到第几秒说的"。</p>
+
+  <p>Whisper 每写一句话，都会在边上记一个时间范围，比如"第 5.2 秒到第 8.3 秒"。</p>
+
+  <div style="background:#f0f0f0;padding:16px;border-radius:4px;margin:12px 0;font-family:monospace;font-size:15px">
+    <div>第 5.2 秒 ~ 第 8.3 秒："我找你有事。"</div>
+    <div>第 8.3 秒 ~ 第 9.1 秒："不行。"</div>
+    <div>第 9.1 秒 ~ 第 12.7 秒："为什么不行？"</div>
+  </div>
+
+  <p>你的项目还有一个工具，叫 Qwen3-ForcedAligner（已经在你的代码里了）。它能把千问的每一个词都标上精确的时间——"好吧"是第 5.2 秒说出来的，"我"是第 5.6 秒说出来的，"找你"是第 5.9 秒。</p>
+
+  <div style="background:#f0f0f0;padding:16px;border-radius:4px;margin:12px 0;font-family:monospace;font-size:15px">
+    <div>第 5.2 秒："好吧"</div>
+    <div>第 5.6 秒："我"</div>
+    <div>第 5.9 秒："找"</div>
+    <div>第 6.1 秒："你"</div>
+    <div>第 6.4 秒："有"</div>
+    <div>第 6.9 秒："事"</div>
+  </div>
+
+  <p>两个人都标了时间。只是 Whisper 标的是"一段话"的时间，千问标的是"每个词"的时间。</p>
+</div>
+
+<!-- ====== 第三部分：时间对齐是怎么做的 ====== -->
+<div style="background:#f8f9fa;border-left:4px solid #27ae60;padding:20px;margin:24px 0">
+  <strong style="color:#1a1a1a;font-size:18px">三、时间对齐——不看文字像不像，看时间点在不在同一个范围</strong>
+
+  <p>现在换个办法。不再拿千问第 1 句去对 Whisper 第 1 句了。</p>
+
+  <p>改成一个非常简单的问题：</p>
+
+  <div style="background:#e8f5e9;padding:16px;border-radius:4px;margin:12px 0;text-align:center;font-size:17px">
+    <strong>视频第 5.2 秒到第 8.3 秒<br>
+    千问听到了什么？Whisper 听到了什么？</strong>
+  </div>
+
+  <p>这就像两个人坐在同一个房间里，听同一句话。时间是 5 点 20 分。<br>
+  你问他们俩："刚才那分钟，对方说了什么？"<br>
+  一个人的答案是"我找你有事"。另一个人的答案是"好吧，我找你有事"。</p>
+
+  <p>你不用去比对两个人的每一句话的每一个字母。你只需要知道——他们在同一个时间段里听到的，是同一段声音。</p>
+
+  <div style="background:#f0f0f0;padding:16px;border-radius:4px;margin:12px 0">
+    <div style="color:#3498db;font-weight:bold">按时间对齐：第 5.2 秒 ~ 第 8.3 秒</div>
+    <div style="font-family:monospace;font-size:15px;margin:8px 0">
+      Whisper 在这个时间段说了：<span style="color:#3498db">"我找你有事。"</span>
+    </div>
+    <div style="font-family:monospace;font-size:15px;margin:8px 0">
+      千问 在这个时间段说了：<span style="color:#e74c3c">"好吧 我 找 你 有 事"</span>
+    </div>
+    <div style="margin-top:12px;color:#27ae60">
+      ✓ 这两段话是在同一个时间点说的。那就对上了。<br>
+      ✓ 不需要比字。不需要翻译。只需要看秒数。
+    </div>
+  </div>
+
+  <p style="color:#27ae60"><strong>时间帮你解决了"哪句对哪句"的问题。你不再需要猜了。</strong></p>
+</div>
+
+<!-- ====== 第四部分：对上了之后怎么做 ====== -->
+<div style="background:#f8f9fa;border-left:4px solid #f39c12;padding:20px;margin:24px 0">
+  <strong style="color:#1a1a1a;font-size:18px">四、对上了之后，怎么判断两个模型说得一样不一样</strong>
+
+  <p>时间把 2062 句千问和 254 段 Whisper 都归到了各自的时间段里。</p>
+
+  <p>现在你只需要这样看：</p>
+
+  <div style="background:#e8f5e9;padding:16px;border-radius:4px;margin:12px 0">
+    <div style="font-weight:bold;color:#27ae60">情况一：两个人都说了话，内容差不多</div>
+    <div style="font-family:monospace;font-size:14px;margin:4px 0">
+      第 5-8 秒，Whisper："我找你有事。"<br>
+      第 5-8 秒，千问："我 找 你 有 事"
+    </div>
+    <div style="color:#27ae60">→ 正常。两个人都确认这里有人说话。</div>
+  </div>
+
+  <div style="background:#fff3cd;padding:16px;border-radius:4px;margin:12px 0">
+    <div style="font-weight:bold;color:#f39c12">情况二：两个人说的内容差很多</div>
+    <div style="font-family:monospace;font-size:14px;margin:4px 0">
+      第 120-122 秒，Whisper："我把钱还给你了。"<br>
+      第 120-122 秒，千问："别再说了 我不想听"
+    </div>
+    <div style="color:#f39c12">→ 有分歧。这段要标个问号。可能是 Whisper 听错了，也可能是千问问错了。</div>
+  </div>
+
+  <div style="background:#fce4ec;padding:16px;border-radius:4px;margin:12px 0">
+    <div style="font-weight:bold;color:#e74c3c">情况三：千问没说话，只有 Whisper 说了</div>
+    <div style="font-family:monospace;font-size:14px;margin:4px 0">
+      第 180-185 秒，Whisper："我当然会还你钱的。"<br>
+      第 180-185 秒，千问：〈没有说话〉
+    </div>
+    <div style="color:#e74c3c">→ 这是一个红色警报。千问觉得这个时间段是安静的。Whisper 可能在安静的地方自己编了一句话。这就是真正的幻觉信号。</div>
+  </div>
+</div>
+
+<!-- ====== 第五部分：和现在的做法比 ====== -->
+<div style="background:#f8f9fa;border-left:4px solid #9b59b6;padding:20px;margin:24px 0">
+  <strong style="color:#1a1a1a;font-size:18px">五、和现在的做法对比一下</strong>
+
+  <table style="width:100%;border-collapse:collapse;font-size:15px;margin-top:12px">
+    <tr style="border-bottom:1px solid #ddd">
+      <td style="padding:12px;background:#f0f0f0;font-weight:bold">现在的做法</td>
+      <td style="padding:12px;background:#f0f0f0;font-weight:bold">改成时间对齐</td>
+    </tr>
+    <tr style="border-bottom:1px solid #ddd">
+      <td style="padding:12px">拿千问第1句对Whisper第1句，第2句对第2句……或者去全文搜索最像的那一句</td>
+      <td style="padding:12px">看时间——第5秒到第8秒，两个人写的都是什么</td>
+    </tr>
+    <tr style="border-bottom:1px solid #ddd">
+      <td style="padding:12px">比较两个句子每个字母像不像</td>
+      <td style="padding:12px">比较同一个时间点的两段话说的是不是同一件事</td>
+    </tr>
+    <tr style="border-bottom:1px solid #ddd">
+      <td style="padding:12px">俄语词尾变化会让同一个意思看起来像两个不同的词</td>
+      <td style="padding:12px">同一段音频不会有第二个内容。时间是确定的</td>
+    </tr>
+    <tr style="border-bottom:1px solid #ddd">
+      <td style="padding:12px">2062句只留下了92段（5%）</td>
+      <td style="padding:12px">2062句全部参与，按时间分到254个时间段里</td>
+    </tr>
+    <tr>
+      <td style="padding:12px">需要 LLM 翻译才能理解意思</td>
+      <td style="padding:12px;color:#27ae60">不需要翻译。不需要 LLM。时间是通用的</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ====== 第六部分：为什么可行 ====== -->
+<div style="background:#e8f5e9;border-left:4px solid #27ae60;padding:20px;margin:24px 0">
+  <strong style="color:#1a1a1a;font-size:18px">六、为什么这个方法能行</strong>
+
+  <p>你有一段 24 分钟的音频。第 5 分 20 秒到第 5 分 25 秒，只有一句人声。两个人同时听到的都是这一句话。</p>
+
+  <p>不管俄语怎么变，不管词尾怎么扭——这个时间点是确定的。5分20秒就是5分20秒。</p>
+
+  <p>你不需要懂俄语。你只需要知道：</p>
+
+  <div style="background:#f0f0f0;padding:16px;border-radius:4px;margin:12px 0">
+    <div>✓ 千问在这个时间点说了话 → 有人声</div>
+    <div>✓ 千问在这个时间点没说话 → 可能是安静的</div>
+    <div>✗ 如果千问没说话、Whisper 说了 → Whisper 可能在安静的地方产生了幻觉</div>
+  </div>
+
+  <p style="color:#27ae60"><strong>你不需要知道他们说了什么。你只需要知道他们有没有在同一个时间点都说了话。</strong></p>
+</div>
+
+<!-- ====== 第七部分：限制 ====== -->
+<div style="background:#fff3cd;border-left:4px solid #f39c12;padding:20px;margin:24px 0">
+  <strong style="color:#1a1a1a;font-size:18px">七、这个方法的限制</strong>
+
+  <p>1. 时间戳必须准确。Whisper 的时间戳是句级的（误差可能有一两秒），千问 FA 的时间戳是词级的（误差几十毫秒）。粗的和细的要叠在一起。</p>
+
+  <p>2. 千问和 Whisper 可能对同一个时间段有不同长短的发言。一个人说了5秒，另一个说了7秒。需要规定一个规则——"如果两个时间有重叠，就算匹配"。</p>
+
+  <p>3. Whisper 有时会把一句话的时间标到一段很长的范围（比如"第5秒到第15秒"），但实际上中间有一大段是背景音乐。千问只在第5到第7秒有词。这时你要决定怎么处理音乐段。</p>
+</div>
+
+</div>

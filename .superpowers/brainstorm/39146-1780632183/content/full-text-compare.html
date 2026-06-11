@@ -1,0 +1,65 @@
+<h2>你的第二个想法</h2>
+<p class="subtitle">把两个模型各自产出的整篇文字做对比——不按段对齐，按内容对齐</p>
+
+<div class="section">
+  <h3>现在的做法：逐段硬对齐</h3>
+  <div style="background:#1a1a2e;padding:16px;border-radius:8px;font-size:13px;font-family:monospace;line-height:1.8">
+    <div>Whisper 第1段: "Диана, сколько раз я у тебя же просил..." ──────┐</div>
+    <div>千问 第1个碎词: "Диана" ──────────────────────────────┘ <span style="color:#e74c3c">❌ 对不上</span></div>
+    <div style="margin-top:8px">Whisper 第2段: "Нет." ────────────────────────────┐</div>
+    <div>千问 第2个碎词: "сколько" ────────────────────────────┘ <span style="color:#e74c3c">❌ 对不上</span></div>
+    <div style="margin-top:8px">Whisper 第3段: "Почему?" ──────────────────────────┐</div>
+    <div>千问 第3个碎词: "раз" ─────────────────────────────────┘ <span style="color:#e74c3c">❌ 对不上</span></div>
+    <div style="margin-top:16px;color:#f39c12">← 这就是 35% 的原因：一粒米去配一盘菜</div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>你提出的做法：两篇文章对比</h3>
+  <div style="background:#16213e;padding:16px;border-radius:8px;font-size:13px;font-family:monospace;line-height:1.8">
+    <div style="color:#3498db"><strong>Whisper 完整转录（去时间戳）:</strong></div>
+    <div style="background:#1a2a3e;padding:8px;margin:4px 0;border-radius:4px">
+      Блин, по голове его постучало. Ладно, я к тебе по делу. Можешь мне дать денег? Нет. Почему? Диана, сколько раз я у тебя же просил...
+    </div>
+    <div style="color:#e74c3c;margin-top:12px"><strong>千问 完整转录（去时间戳）:</strong></div>
+    <div style="background:#3e1a1a;padding:8px;margin:4px 0;border-radius:4px">
+      Блин по голове постучало. Ладно я к тебе по делу. Можешь мне пожалуйста дать денег. Нет. Почему. Диана сколько раз я у тёжи ден...
+    </div>
+    <div style="margin-top:12px;text-align:center;font-size:16px;color:#f39c12">
+      ↓ 逐句比对（不是逐段） ↓
+    </div>
+    <div style="background:#1a1a2e;padding:8px;margin:4px 0;border-radius:4px">
+      <span style="color:#27ae60">✓ 两句都有 "Блин, по голове его постучало"</span><br>
+      <span style="color:#e74c3c">✗ Whisper: "постучало" / 千问: "постучало" — 一致</span><br>
+      <span style="color:#27ae60">✓ 两句都有 "Ладно, я к тебе по делу"</span><br>
+      <span style="color:#e74c3c">✗ Whisper: "Можешь" / 千问: "Можешь мне пожалуйста" — <strong>多了一个词</strong></span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>这个方案的真正价值</h3>
+  <div style="display:flex;gap:16px">
+    <div style="flex:1;background:#16213e;padding:16px;border-radius:8px">
+      <div class="label">跳过的坑</div>
+      <p>不再需要千问和Whisper说话方式一样。碎词没关系，整句也没关系。我们比的是<strong>整篇文章</strong>，不是逐段逐句。</p>
+    </div>
+    <div style="flex:1;background:#16213e;padding:16px;border-radius:8px">
+      <div class="label">真正能发现的问题</div>
+      <p>Whisper写了一段话，千问写了一段话。同一个音频。如果两段话<strong>在同一个位置出现了完全不同的词</strong>——那才是真正的幻觉信号。</p>
+    </div>
+    <div style="flex:1;background:#16213e;padding:16px;border-radius:8px">
+      <div class="label">解决你第一个问题的关键</div>
+      <p>千问为什麽只能蹦碎词？参数调对了（1.1+20），但它就是这风格。换比对方式——比对全文——才是正解。不是让千问改说话方式，是改我们听它说话的方式。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>但有一个真问题</h3>
+  <div style="background:#2c3e50;padding:16px;border-radius:8px">
+    <p>千问 2062 个碎词，Whisper 266 个句子，拼出来的两篇完整文章，<strong>长度差多少？</strong></p>
+    <p>如果千问的文章比 Whisper 长了一倍（全是重复的碎词），那比文章也会带来一堆无效对比。</p>
+    <p>反过来——如果千问说出来的文章，内容本身就是对的，只是句子碎。那全文对比就是一条直路。</p>
+  </div>
+</div>
