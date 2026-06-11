@@ -9,7 +9,6 @@ For audio longer than 20 minutes, chunks are formed at Whisper segment boundarie
 (batched into ~5-minute groups) and each chunk is transcribed independently.
 """
 import gc
-import json
 import logging
 import os
 import subprocess
@@ -82,21 +81,6 @@ def _resolve_language(lang: str | None) -> str | None:
 # ═══════════════════════════════════════════════════════════════════
 # Long-audio chunking helpers
 # ═══════════════════════════════════════════════════════════════════
-
-def _get_audio_duration(audio_path: str) -> float:
-    """Get audio duration in seconds via ffprobe.  Returns 0.0 on failure."""
-    cmd = [
-        "ffprobe", "-v", "quiet", "-print_format", "json",
-        "-show_format", audio_path,
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        info = json.loads(result.stdout)
-        return float(info["format"]["duration"])
-    except Exception:
-        _log.warning("ffprobe 获取时长失败", exc_info=True)
-        return 0.0
-
 
 def _chunk_segments(segments, max_duration=_CHUNK_MAX_DURATION_S):
     """Group segments into batches of ~5 minutes each.
