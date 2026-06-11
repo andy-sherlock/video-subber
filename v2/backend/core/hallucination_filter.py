@@ -196,6 +196,26 @@ def _layer1_dual_signal(seg, aligner_result=None) -> bool:
         return False
 
 
+def _qwen_segments_as_alignment(qwen_chunks) -> list:
+    """Flatten Qwen word-level segments into FA-compatible alignment list.
+
+    MLX path: qwen_chunks carry segments=[{text, start, end}] from internal FA.
+    This flattens them into [{text, start, end}] — same shape as external FA's
+    aligner_result, so L1's _segment_has_alignment() works unchanged.
+    """
+    alignment = []
+    for chunk in qwen_chunks or []:
+        if not isinstance(chunk, dict):
+            continue
+        for seg in chunk.get("segments") or []:
+            start = seg.get("start")
+            end = seg.get("end")
+            if start is not None and end is not None:
+                alignment.append({"text": seg.get("text", ""),
+                                  "start": start, "end": end})
+    return alignment
+
+
 def _segment_has_alignment(seg, aligner_result) -> bool:
     """Check if any aligned word falls within the segment's time range."""
     if aligner_result is None:
@@ -580,9 +600,16 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
         if not hasattr(seg, "uncertain"):
             seg.uncertain = False
 
+    # When Qwen chunks carry word-level timestamps (MLX path), derive
+    # alignment data from them — no external FA needed for L1.
+    effective_alignment = aligner_result
+    if not effective_alignment and _has_timestamp_segments(qwen_chunks):
+        effective_alignment = _qwen_segments_as_alignment(qwen_chunks)
+        _log.info("L1 使用 Qwen 内部 FA 时间戳: %d 词", len(effective_alignment))
+
     for seg in segments:
         if not seg.filtered:
-            _layer1_dual_signal(seg, aligner_result)
+            _layer1_dual_signal(seg, effective_alignment)
 
     surviving = [s for s in segments if not s.filtered]
     qwen_reliable = _qwen_is_reliable(qwen_chunks)

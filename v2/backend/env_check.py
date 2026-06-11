@@ -96,10 +96,15 @@ def check_sensevoice() -> dict:
 
 
 def check_qwen_asr() -> dict:
-    """Check if Qwen3-ASR MLX is installed (Apple Silicon only)."""
+    """Check if Qwen3-ASR is installed (MLX on Apple Silicon, or PyTorch)."""
     try:
-        from qwen3_asr_mlx import Qwen3ASR  # noqa: F401
-        return {"ready": True}
+        from mlx_qwen3_asr import transcribe  # noqa: F401
+        return {"ready": True, "backend": "mlx"}
+    except ImportError:
+        pass
+    try:
+        from qwen_asr import Qwen3ASRModel  # noqa: F401
+        return {"ready": True, "backend": "pytorch"}
     except ImportError:
         return {"ready": False}
 

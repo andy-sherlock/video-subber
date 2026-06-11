@@ -72,6 +72,29 @@ def _resolve_language(lang: str | None) -> str | None:
 # Long-audio chunking helpers
 # ═══════════════════════════════════════════════════════════════════
 
+def _get_audio_duration(audio_path: str) -> float:
+    """Get audio duration in seconds via ffprobe."""
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        audio_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return float(result.stdout.strip())
+
+
+def _chunk_by_time(total_duration, max_duration=_CHUNK_MAX_DURATION_S):
+    """Split audio into fixed-interval time chunks (no Whisper segments needed)."""
+    chunks = []
+    t = 0.0
+    while t < total_duration:
+        end = min(t + max_duration, total_duration)
+        chunks.append((t, end))
+        t = end
+    return chunks
+
+
 def _chunk_segments(segments, max_duration=_CHUNK_MAX_DURATION_S):
     """Group segments into batches of ~5 minutes each.
 
@@ -193,50 +216,25 @@ def _transcribe_chunk(model, audio_path, t_start, t_end, language,
             pass
 
 
-def _qwen_consumer(q, audio_path, language, qwen_chunks):
-    """Consumer thread: transcribe queued chunks, append results to qwen_chunks.
-
-    Each result is {text, segments, t_start, t_end}. MLX results include
-    word-level timestamps in segments; PyTorch results have segments=[].
-    """
-    try:
-        model = _load_qwen_model()
-    except Exception:
-        _log.warning("千ASR 消费者线程模型加载失败")
-        while True:
-            chunk = q.get()
-            if chunk is None:
-                break
-        return
-
-    try:
-        idx = 0
-        while True:
-            chunk = q.get()
-            if chunk is None:
-                break
-            _chunk_segments, t_start, t_end = chunk
-            result = _transcribe_chunk(model, audio_path, t_start, t_end,
-                                       language, idx)
-            if result.get("text", "").strip():
-                qwen_chunks.append(result)
-            idx += 1
-    except Exception:
-        _log.warning("千ASR 消费者线程异常", exc_info=True)
-    finally:
-        del model
-        gc.collect()
-
-
-def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> list:
+def _run_qwen_asr_chunked(audio_path: str, total_duration: float,
+                           segments: list = None, language=None) -> list:
     """Chunked cross-validation for long audio.
 
     Returns list of {text, segments, t_start, t_end}. MLX results include
     word-level timestamps in segments; PyTorch results have segments=[].
+
+    When segments is provided, chunks at Whisper segment boundaries.
+    When segments is None, chunks at fixed 5-minute intervals.
     """
-    chunks = _chunk_segments(segments)
-    _log.info("Qwen3-ASR 分段交叉验证: %d chunks (%d segments)",
-              len(chunks), len(segments))
+    if segments:
+        raw_chunks = _chunk_segments(segments)
+        time_chunks = [(t_start, t_end) for (_s, _e, t_start, t_end) in raw_chunks]
+        _log.info("Qwen3-ASR 分段交叉验证: %d chunks (%d segments)",
+                  len(time_chunks), len(segments))
+    else:
+        time_chunks = _chunk_by_time(total_duration)
+        _log.info("Qwen3-ASR 独立分段: %d chunks (%.0fs 音频)",
+                  len(time_chunks), total_duration)
 
     t0 = time.time()
     try:
@@ -247,9 +245,9 @@ def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> lis
     _log.info("Qwen3-ASR 模型加载耗时 %.1fs", time.time() - t0)
 
     qwen_chunks = []
-    for idx, (seg_start, seg_end, t_start, t_end) in enumerate(chunks):
+    for idx, (t_start, t_end) in enumerate(time_chunks):
         result = _transcribe_chunk(model, audio_path, t_start, t_end,
-                                   language, idx, len(chunks))
+                                   language, idx, len(time_chunks))
         if result.get("text", "").strip():
             qwen_chunks.append(result)
 
@@ -262,23 +260,35 @@ def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> lis
 
 # ── Public entry point ──
 
-def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
+def run_qwen_asr(audio_path: str, segments: list = None, language=None) -> list:
     """Return Qwen-ASR output as a list of {text, segments, t_start, t_end}.
 
     MLX backend: segments contain word-level timestamps [{text, start, end}].
     PyTorch backend: segments is [].
     Returns [] when Qwen is unavailable or produced nothing.
+
+    When segments is None, Qwen runs independently — gets audio duration via
+    ffprobe and chunks by fixed time intervals if needed.
     """
     if not is_qwen_asr_available():
         _log.warning("Qwen3-ASR 未安装，跳过交叉验证")
         return []
 
-    if not segments:
-        return []
-    total_duration = segments[-1].end
+    if segments is not None:
+        if not segments:
+            return []
+        total_duration = segments[-1].end
+    else:
+        try:
+            total_duration = _get_audio_duration(audio_path)
+        except Exception:
+            _log.warning("无法获取音频时长，跳过 Qwen 交叉验证")
+            return []
+
     if total_duration > _LONG_AUDIO_THRESHOLD_S:
         _log.info("音频 %.0fs > 20min，启用 Qwen 分段对齐", total_duration)
-        return _run_qwen_asr_chunked(audio_path, segments, language=language)
+        return _run_qwen_asr_chunked(audio_path, total_duration,
+                                     segments=segments, language=language)
 
     t0 = time.time()
     try:
