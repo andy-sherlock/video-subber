@@ -70,6 +70,7 @@ def _run_sensevoice_chunked(audio_path: str, device: str,
             model="iic/SenseVoiceSmall",
             trust_remote_code=True,
             device=device,
+            disable_pbar=True,     # P238: 关闭 tqdm 进度条，避免 stderr BrokenPipe
         )
     except Exception:
         _log.warning("SenseVoice 模型加载失败", exc_info=True)
@@ -177,6 +178,7 @@ def run_sensevoice(audio_path: str, device: str = "cpu",
             model="iic/SenseVoiceSmall",
             trust_remote_code=True,
             device=device,
+            disable_pbar=True,     # P238: 关闭 tqdm 进度条，避免 stderr BrokenPipe
         )
     except Exception:
         _log.warning("SenseVoice 模型加载失败", exc_info=True)

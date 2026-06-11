@@ -281,7 +281,10 @@ def transcribe(audio_path: str, model_size: str = "medium",
                     results.append(s)
 
                     if progress_callback and n_total % 10 == 0:
-                        progress_callback(n_total)
+                        try:
+                            progress_callback(n_total)
+                        except Exception:
+                            pass  # pipe broken or other transient error — worker continues
 
                     chunk_dur = seg.end - results[chunk_start_idx].start
                     if chunk_dur >= _CHUNK_MAX_DURATION_S:

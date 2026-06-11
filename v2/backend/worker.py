@@ -109,8 +109,11 @@ from backend.key_manager import scrub_logs
 
 def emit(event_type: str, **kwargs):
     msg = {"type": event_type, **kwargs}
-    sys.stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
+    try:
+        _real_stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
+        _real_stdout.flush()
+    except (BrokenPipeError, OSError):
+        pass
 
 
 
@@ -366,9 +369,12 @@ def main():
                     progress_callback=prog,
                 )
                 if token_usage:
-                    msg = json.dumps({"type": "token_usage", "usage": token_usage}, ensure_ascii=False)
-                    _real_stdout.write(msg + "\n")
-                    _real_stdout.flush()
+                    try:
+                        msg = json.dumps({"type": "token_usage", "usage": token_usage}, ensure_ascii=False)
+                        _real_stdout.write(msg + "\n")
+                        _real_stdout.flush()
+                    except (BrokenPipeError, OSError):
+                        pass
             except ImportError:
                 # orchestrator not available — abort with a clear error
                 raise RuntimeError("翻译模块未就绪，请检查安装。")
@@ -382,13 +388,16 @@ def main():
             _all_failed = len(failed) == total and total > 0
             if _has_llm_keys and _all_failed:
                 stderr_progress("translate", 40, "LLM 翻译全部失败，等待用户选择…")
-                msg = json.dumps({
-                    "type": "llm_failed",
-                    "message": "LLM 翻译全部失败，是否改用免费引擎（Google/Bing/有道）继续？",
-                    "total": total,
-                }, ensure_ascii=False)
-                _real_stdout.write(msg + "\n")
-                _real_stdout.flush()
+                try:
+                    msg = json.dumps({
+                        "type": "llm_failed",
+                        "message": "LLM 翻译全部失败，是否改用免费引擎（Google/Bing/有道）继续？",
+                        "total": total,
+                    }, ensure_ascii=False)
+                    _real_stdout.write(msg + "\n")
+                    _real_stdout.flush()
+                except (BrokenPipeError, OSError):
+                    pass
 
                 decision_file = job_dir / "llm_fallback.json"
                 _deadline = time.time() + 120
@@ -408,12 +417,15 @@ def main():
                 if _decision == "use_free":
                     if _auto_fallback:
                         stderr_progress("translate", 40, "超时无回应，已自动切换免费引擎继续翻译…")
-                        _note = json.dumps({
-                            "type": "notice",
-                            "message": "LLM 翻译未能完成，已自动切换免费引擎（Google/Bing/有道）。",
-                        }, ensure_ascii=False)
-                        _real_stdout.write(_note + "\n")
-                        _real_stdout.flush()
+                        try:
+                            _note = json.dumps({
+                                "type": "notice",
+                                "message": "LLM 翻译未能完成，已自动切换免费引擎（Google/Bing/有道）。",
+                            }, ensure_ascii=False)
+                            _real_stdout.write(_note + "\n")
+                            _real_stdout.flush()
+                        except (BrokenPipeError, OSError):
+                            pass
                     else:
                         stderr_progress("translate", 40, "已切换为免费引擎，正在重新翻译…")
                     zh_list, failed_indices, token_usage, _ = translate_with_orchestrator(
@@ -618,12 +630,17 @@ def _friendly_error(raw: str) -> str:
 
 def stderr_progress(stage: str, percent: int, message: str, detail: str = ""):
     """直接写入 _real_stdout，不切换全局 sys.stdout（避免多线程竞态）。"""
-    msg = json.dumps({
-        "type": "progress", "stage": stage, "percent": percent,
-        "message": message, "detail": detail,
-    }, ensure_ascii=False)
-    _real_stdout.write(msg + "\n")
-    _real_stdout.flush()
+    try:
+        msg = json.dumps({
+            "type": "progress", "stage": stage, "percent": percent,
+            "message": message, "detail": detail,
+        }, ensure_ascii=False)
+        _real_stdout.write(msg + "\n")
+        _real_stdout.flush()
+    except (BrokenPipeError, OSError):
+        # Pipe broken (browser tab closed, WebSocket disconnected).
+        # Silently stop sending progress — the worker continues processing.
+        pass
 
 
 if __name__ == "__main__":
