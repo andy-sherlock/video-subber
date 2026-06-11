@@ -319,22 +319,52 @@ def _qwen_is_reliable(qwen_chunks: list) -> bool:
     return True
 
 
-def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language):
-    """P251: place Qwen-ASR text into 30s windows by stem similarity.
+def _has_timestamp_segments(qwen_chunks):
+    """Check if any chunk carries word-level timestamp segments (MLX path)."""
+    for chunk in qwen_chunks or []:
+        if isinstance(chunk, dict) and chunk.get("segments"):
+            return True
+    return False
 
-    Qwen-ASR emits per-chunk text with coarse time bounds (t_start/t_end).
-    Split each chunk into sentences; place each sentence into the
-    best-matching window — highest stem overlap with that window's Whisper
-    text — searching only the windows the chunk's time range covers. A window
-    may hold several sentences; the cursor only moves forward (monotonic), so
-    sentences never jump backwards. This replaces the per-segment 1:1 map that
-    dropped ~75% of Qwen sentences. Returns per-window Qwen text, parallel to
-    whisper_windows. Pure text logic — identical on MLX and PyTorch backends.
+
+def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language):
+    """Place Qwen-ASR text into 30s windows.
+
+    Two paths:
+      - Timestamp path (MLX): each segment has start/end → precise window index.
+      - Similarity path (PyTorch fallback): stem overlap heuristic.
     """
     num_windows = len(whisper_windows)
     qwen_windows = ["" for _ in range(num_windows)]
     if not qwen_chunks or num_windows == 0:
         return qwen_windows
+
+    if _has_timestamp_segments(qwen_chunks):
+        return _assign_by_timestamps(qwen_chunks, num_windows, window_size)
+
+    return _assign_by_similarity(qwen_chunks, whisper_windows, window_size, language)
+
+
+def _assign_by_timestamps(qwen_chunks, num_windows, window_size):
+    """Place Qwen segments into windows using their precise start times."""
+    qwen_windows = ["" for _ in range(num_windows)]
+    last = num_windows - 1
+    for chunk in qwen_chunks:
+        if not isinstance(chunk, dict):
+            continue
+        for seg in chunk.get("segments") or []:
+            text = (seg.get("text") or "").strip()
+            if not text:
+                continue
+            win = min(last, max(0, int(seg["start"] // window_size)))
+            qwen_windows[win] += " " + text
+    return qwen_windows
+
+
+def _assign_by_similarity(qwen_chunks, whisper_windows, window_size, language):
+    """Fallback: place Qwen text into windows by stem similarity (PyTorch)."""
+    num_windows = len(whisper_windows)
+    qwen_windows = ["" for _ in range(num_windows)]
 
     w_stems = [LightweightStemmer.clean_and_stem(w or "", language)
                for w in whisper_windows]
@@ -345,9 +375,6 @@ def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language)
         text = (chunk.get("text") or "").strip()
         if not text:
             continue
-        # Clamp BOTH ends into [0, num_windows-1]. A chunk whose time bounds
-        # overrun the Whisper timeline (padding overrun, bad checkpoint data)
-        # must never index past the window list.
         last = num_windows - 1
         lo = min(last, max(0, int((chunk.get("t_start") or 0) // window_size)))
         hi = min(last, max(lo, int((chunk.get("t_end") or 0) // window_size)))
@@ -365,7 +392,7 @@ def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language)
                     best_score = score
                     best_win = w
             qwen_windows[best_win] += " " + sentence
-            cursor = best_win  # monotonic: sentences flow forward
+            cursor = best_win
     return qwen_windows
 
 
