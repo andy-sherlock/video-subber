@@ -345,10 +345,12 @@ def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language)
         text = (chunk.get("text") or "").strip()
         if not text:
             continue
-        lo = max(0, int((chunk.get("t_start") or 0) // window_size))
-        hi = min(num_windows - 1, int((chunk.get("t_end") or 0) // window_size))
-        if hi < lo:
-            hi = lo
+        # Clamp BOTH ends into [0, num_windows-1]. A chunk whose time bounds
+        # overrun the Whisper timeline (padding overrun, bad checkpoint data)
+        # must never index past the window list.
+        last = num_windows - 1
+        lo = min(last, max(0, int((chunk.get("t_start") or 0) // window_size)))
+        hi = min(last, max(lo, int((chunk.get("t_end") or 0) // window_size)))
         cursor = lo
         for sentence in _split_for_l2(text):
             q_stems = LightweightStemmer.clean_and_stem(sentence, language)
