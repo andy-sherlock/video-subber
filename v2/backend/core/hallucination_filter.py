@@ -110,13 +110,33 @@ HALLUCINATION_KEYWORDS = (
     "音楽", "拍手", "笑い声",
 )
 
+# P250: thresholds in speech-units/sec. CJK (zh/ja) counts characters
+# (1 char = 1 syllable); other languages count whitespace-split words.
+# An English word averages 5-6 chars, so the old char-based en=25 fired on
+# normal speech (~4.5 words/sec); 8 words/sec is the repetition-hallucination
+# floor.
 _SPEECH_RATE_THRESHOLDS = {
-    "zh": 15,
-    "ja": 15,
-    "en": 25,
-    "ru": 25,
-    "auto": 20,
+    "zh": 15,    # chars/sec
+    "ja": 15,    # chars/sec
+    "en": 8,     # words/sec
+    "ru": 8,     # words/sec
+    "auto": 7,   # words/sec (split fallback)
 }
+
+
+def count_speech_units(text: str, lang: str) -> int:
+    """Speech units for speech-rate estimation (P250).
+
+    CJK languages are syllable-timed and unspaced: one character ≈ one
+    syllable, so count characters (matches the original len() behaviour for
+    zh/ja exactly). Everything else is counted by whitespace-split words.
+    """
+    t = text.strip()
+    if not t:
+        return 0
+    if lang in ("zh", "ja"):
+        return len(t)
+    return len(t.split())
 
 _RE_BRACKET = re.compile(r"^\s*[\[\(（【].+[\]\)）】]\s*$")
 _RE_REPEATED_PATTERN = re.compile(r"^(.{1,4})\1{2,}$")
@@ -418,12 +438,12 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
 
 def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
     dur = seg.end - seg.start
-    text_len = len(seg.text.strip())
+    units = count_speech_units(seg.text, source_lang)
 
-    if dur < 0.1 and text_len > 5:
+    if dur < 0.1 and units > 2:
         seg.filtered = True
         seg.filter_reason = "layer3_impossible_duration"
-        _log.info("L3 不可能时长: start=%.2f dur=%.3f len=%d", seg.start, dur, text_len)
+        _log.info("L3 不可能时长: start=%.2f dur=%.3f units=%d", seg.start, dur, units)
         return
 
     if dur <= 0:
@@ -431,12 +451,12 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
         seg.filter_reason = "layer3_impossible_duration"
         return
 
-    cps = text_len / dur
+    rate = units / dur
     threshold = _SPEECH_RATE_THRESHOLDS.get(source_lang, _SPEECH_RATE_THRESHOLDS["auto"])
-    if cps > threshold:
+    if rate > threshold:
         seg.uncertain = True
-        _log.info("L3 语速异常: start=%.2f cps=%.1f threshold=%d lang=%s",
-                  seg.start, cps, threshold, source_lang)
+        _log.info("L3 语速异常: start=%.2f rate=%.1f threshold=%d lang=%s",
+                  seg.start, rate, threshold, source_lang)
 
 
 def filter_hallucinations(segments: list, source_lang: str = "auto",
