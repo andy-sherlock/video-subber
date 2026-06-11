@@ -1082,7 +1082,8 @@ function handleFoundJob(d,filename){
     const fill=$('fill-'+d.job_id);const step=$('step-'+d.job_id);
     if(step){step.textContent='正在恢复处理…';step.style.color=''}
     if(fill){fill.style.width='0%';fill.style.background=''}
-    if(!activeJobs[d.job_id]){activeJobs[d.job_id]={ws:null,pollTimer:null,filename:card.querySelector('.job-card-name').textContent,config:{...d.config}};connectCard(d.job_id)}
+    if(!activeJobs[d.job_id]){activeJobs[d.job_id]={ws:null,pollTimer:null,filename:card.querySelector('.job-card-name').textContent,config:{...d.config}}}
+connectCard(d.job_id)
     card.scrollIntoView({behavior:'smooth'});
     showToast('✅ 已恢复任务，正在继续处理…')
   }
