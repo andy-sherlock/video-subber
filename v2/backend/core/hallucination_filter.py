@@ -284,31 +284,91 @@ def _layer5_dedup(segments: list) -> list:
 # (repetition collapse) and therefore an untrustworthy cross-validation referee.
 _QWEN_COLLAPSE_RATIO = 0.3
 
+# P251: local sentence split for L2 Qwen handling. Kept here (not imported from
+# qwen_asr_runner) because qwen_asr_runner already imports from this module —
+# importing back would create a circular import.
+_L2_SENTENCE_SPLIT = re.compile(r"[。！？.!?；;]+")
 
-def _qwen_is_reliable(segments: list) -> bool:
-    """Detect Qwen-ASR repetition collapse (P148).
 
-    When Qwen-ASR's cross-validation output is dominated by a single identical
-    string (e.g. job 97c57255ec: 58% of segments became
-    "1056234897 нет ты меня прости"), it is an unreliable referee. L2 must not
-    use it to flag the correct Whisper text. Returns False when one qwen_text
-    value covers more than _QWEN_COLLAPSE_RATIO of the non-empty qwen outputs.
+def _split_for_l2(text: str) -> list:
+    return [p.strip() for p in _L2_SENTENCE_SPLIT.split(text or "") if p.strip()]
+
+
+def _qwen_is_reliable(qwen_chunks: list) -> bool:
+    """Detect Qwen-ASR repetition collapse (P148, P251).
+
+    Qwen-ASR now hands L2 a list of per-chunk dicts {text, t_start, t_end}
+    instead of per-segment qwen_text. Split all chunk text into sentences;
+    when one identical sentence dominates (> _QWEN_COLLAPSE_RATIO of the
+    non-empty sentences, e.g. job 97c57255ec rehearsed
+    "1056234897 нет ты меня прости"), Qwen is an unreliable referee — skip L2.
     """
-    texts = [(getattr(s, "qwen_text", None) or "").strip() for s in segments]
-    texts = [t for t in texts if t]
-    if len(texts) < 5:
+    sentences = []
+    for chunk in qwen_chunks or []:
+        if isinstance(chunk, dict):
+            sentences.extend(_split_for_l2(chunk.get("text")))
+    sentences = [s for s in sentences if s]
+    if len(sentences) < 5:
         return True  # too little data to judge — don't disable L2
-    most_common, count = Counter(texts).most_common(1)[0]
-    if count / len(texts) > _QWEN_COLLAPSE_RATIO:
-        _log.warning("L2 跳过：千问疑似坍缩 (同一串占 %d/%d=%.0f%%): %r",
-                     count, len(texts), 100 * count / len(texts),
+    most_common, count = Counter(sentences).most_common(1)[0]
+    if count / len(sentences) > _QWEN_COLLAPSE_RATIO:
+        _log.warning("L2 跳过：千问疑似坍缩 (同一句占 %d/%d=%.0f%%): %r",
+                     count, len(sentences), 100 * count / len(sentences),
                      most_common[:40])
         return False
     return True
 
 
+def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language):
+    """P251: place Qwen-ASR text into 30s windows by stem similarity.
+
+    Qwen-ASR emits per-chunk text with coarse time bounds (t_start/t_end).
+    Split each chunk into sentences; place each sentence into the
+    best-matching window — highest stem overlap with that window's Whisper
+    text — searching only the windows the chunk's time range covers. A window
+    may hold several sentences; the cursor only moves forward (monotonic), so
+    sentences never jump backwards. This replaces the per-segment 1:1 map that
+    dropped ~75% of Qwen sentences. Returns per-window Qwen text, parallel to
+    whisper_windows. Pure text logic — identical on MLX and PyTorch backends.
+    """
+    num_windows = len(whisper_windows)
+    qwen_windows = ["" for _ in range(num_windows)]
+    if not qwen_chunks or num_windows == 0:
+        return qwen_windows
+
+    w_stems = [LightweightStemmer.clean_and_stem(w or "", language)
+               for w in whisper_windows]
+
+    for chunk in qwen_chunks:
+        if not isinstance(chunk, dict):
+            continue
+        text = (chunk.get("text") or "").strip()
+        if not text:
+            continue
+        lo = max(0, int((chunk.get("t_start") or 0) // window_size))
+        hi = min(num_windows - 1, int((chunk.get("t_end") or 0) // window_size))
+        if hi < lo:
+            hi = lo
+        cursor = lo
+        for sentence in _split_for_l2(text):
+            q_stems = LightweightStemmer.clean_and_stem(sentence, language)
+            if not q_stems:
+                continue
+            best_win = cursor
+            best_score = -1.0
+            for w in range(cursor, hi + 1):
+                ws = w_stems[w]
+                score = len(q_stems & ws) / len(q_stems) if ws else 0.0
+                if score > best_score:
+                    best_score = score
+                    best_win = w
+            qwen_windows[best_win] += " " + sentence
+            cursor = best_win  # monotonic: sentences flow forward
+    return qwen_windows
+
+
 def _layer2_cross_validate(segments: list, language: str = "auto",
-                           custom_thresholds: dict = None):
+                           custom_thresholds: dict = None, qwen_chunks=None):
     """P160: 30s-window stem-overlap cross-validation (B+A architecture).
 
     Chop audio into 30s windows, stem words from Whisper and Qwen,
@@ -337,7 +397,6 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
     num_windows = int(total_duration_s // WINDOW_SIZE) + 1
 
     whisper_windows = ["" for _ in range(num_windows)]
-    qwen_windows = ["" for _ in range(num_windows)]
 
     def _find_best_window(start, end):
         best = int(start // WINDOW_SIZE)
@@ -358,7 +417,11 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
         win = _find_best_window(seg.start, seg.end)
         if win < num_windows:
             whisper_windows[win] += " " + seg.text
-            qwen_windows[win] += " " + (getattr(seg, "qwen_text", None) or "")
+
+    # P251: assign Qwen text to 30s windows by stem similarity (replaces the
+    # per-segment qwen_text that the dropped 1:1 map left mostly empty).
+    qwen_windows = _assign_qwen_to_windows(
+        qwen_chunks, whisper_windows, WINDOW_SIZE, language)
 
     # ── Stem + score each window ──
     MIN_STEMS = 5  # P171: fewer stems → LOW_DATA (not enough evidence)
@@ -460,7 +523,7 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
 
 
 def filter_hallucinations(segments: list, source_lang: str = "auto",
-                          aligner_result=None) -> list:
+                          aligner_result=None, qwen_chunks=None) -> list:
     """Five-layer hallucination filter. Order: L1→L2→L4→L5→L3.
 
     Args:
@@ -469,6 +532,10 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
         aligner_result: Optional Qwen3-FA alignment data (list of aligned word
             dicts). When provided, L1 uses dual-signal (SenseVoice + Qwen3-FA).
             When None, L1 skips entirely.
+        qwen_chunks: Optional Qwen3-ASR output as a list of {text, t_start,
+            t_end} dicts (P251). L2 assigns this text to 30s windows by
+            similarity instead of reading a per-segment qwen_text. When None
+            or empty, L2 runs with no Qwen cross-validation signal.
 
     Returns:
         Only segments with filtered=False, re-numbered.
@@ -489,9 +556,10 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
             _layer1_dual_signal(seg, aligner_result)
 
     surviving = [s for s in segments if not s.filtered]
-    qwen_reliable = _qwen_is_reliable(surviving)
+    qwen_reliable = _qwen_is_reliable(qwen_chunks)
     if qwen_reliable:
-        surviving, _ignore_stats = _layer2_cross_validate(surviving, source_lang)
+        surviving, _ignore_stats = _layer2_cross_validate(
+            surviving, source_lang, qwen_chunks=qwen_chunks)
 
     for seg in surviving:
         if not seg.filtered:

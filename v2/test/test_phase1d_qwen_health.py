@@ -6,6 +6,9 @@ and skip cross-validation, instead of stamping [?] on the correct Whisper text.
 
 Reproduces job 97c57255ec: 116/198 segments got the identical garbage
 "1056234897 нет ты меня прости" -> L2 marked 77% of correct subtitles [?].
+
+P251: Qwen reaches L2 / the collapse check via a qwen_chunks list, not
+per-segment qwen_text.
 """
 import unittest
 import sys
@@ -16,8 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 class DummySeg:
     """Minimal segment for filter testing."""
-    def __init__(self, text, start=0.0, end=1.0, sensevoice_tag=None,
-                 qwen_text=None):
+    def __init__(self, text, start=0.0, end=1.0, sensevoice_tag=None):
         self.text = text
         self.start = start
         self.end = end
@@ -26,31 +28,34 @@ class DummySeg:
         self.filter_reason = None
         self.uncertain = False
         self.words = []
-        self.qwen_text = qwen_text
         self.zh = None
+
+
+def _chunk(text, start, end):
+    return {"text": text, "t_start": start, "t_end": end}
 
 
 class TestQwenHealthCheck(unittest.TestCase):
     """P148: collapsed Qwen must not poison L2."""
 
     def test_collapsed_qwen_does_not_flag_uncertain(self):
-        """80% of qwen_text is the same garbage string -> L2 skipped, 0 [?]."""
+        """80% of qwen chunks are the same garbage string -> L2 skipped, 0 [?]."""
         from backend.core.hallucination_filter import filter_hallucinations
 
         garbage = "1056234897 нет ты меня прости"
-        segs = []
-        # 8/10 segments: Whisper text is good & distinct, Qwen collapsed.
+        segs, qwen_chunks = [], []
+        # 8/10: Whisper text is good & distinct, Qwen collapsed to garbage.
         for i in range(8):
             segs.append(DummySeg(f"正常的第{i}句字幕内容", start=float(i),
-                                 end=float(i) + 1.0, sensevoice_tag="Speech",
-                                 qwen_text=garbage))
-        # 2/10 segments: Qwen agrees with Whisper.
+                                 end=float(i) + 1.0, sensevoice_tag="Speech"))
+            qwen_chunks.append(_chunk(garbage, float(i), float(i) + 1.0))
+        # 2/10: Qwen agrees with Whisper.
         for i in range(8, 10):
             segs.append(DummySeg(f"正常的第{i}句字幕内容", start=float(i),
-                                 end=float(i) + 1.0, sensevoice_tag="Speech",
-                                 qwen_text=f"正常的第{i}句字幕内容"))
+                                 end=float(i) + 1.0, sensevoice_tag="Speech"))
+            qwen_chunks.append(_chunk(f"正常的第{i}句字幕内容", float(i), float(i) + 1.0))
 
-        result = filter_hallucinations(segs, source_lang="zh")
+        result = filter_hallucinations(segs, source_lang="zh", qwen_chunks=qwen_chunks)
 
         flagged = [s for s in result if s.uncertain]
         self.assertEqual(
@@ -63,12 +68,12 @@ class TestQwenHealthCheck(unittest.TestCase):
         from backend.core.hallucination_filter import filter_hallucinations
 
         qwen_texts = ["天地人年月日", "春夏秋冬花", "东西南北中", "金木水火土", "风雨雷电云"]
-        segs = []
+        segs, qwen_chunks = [], []
         for i in range(5):
             segs.append(DummySeg(f"你我他是谁第{i}段", start=float(i),
-                                 end=float(i) + 1.0, sensevoice_tag="Speech",
-                                 qwen_text=qwen_texts[i]))
-        result = filter_hallucinations(segs, source_lang="zh")
+                                 end=float(i) + 1.0, sensevoice_tag="Speech"))
+            qwen_chunks.append(_chunk(qwen_texts[i], float(i), float(i) + 1.0))
+        result = filter_hallucinations(segs, source_lang="zh", qwen_chunks=qwen_chunks)
 
         flagged = [s for s in result if s.uncertain]
         self.assertGreater(len(flagged), 0,

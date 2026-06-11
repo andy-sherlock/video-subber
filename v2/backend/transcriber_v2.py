@@ -43,7 +43,6 @@ class Segment:
         self.zh = ""
         self.words = []
         self.sensevoice_tag = None
-        self.qwen_text = None
         self.filtered = False
         self.filter_reason = None
 
@@ -242,6 +241,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
     # ═══════════════════════════════════════════════════════════════
     qwen_queue = None
     qwen_thread = None
+    qwen_chunks = []  # P251: Qwen-ASR output as {text, t_start, t_end} for L2
     if use_qwen and filter_keywords:
         from backend.core.qwen_asr_runner import (
             is_qwen_asr_available, _qwen_consumer,
@@ -250,7 +250,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
             qwen_queue = queue.Queue()
             qwen_thread = threading.Thread(
                 target=_qwen_consumer,
-                args=(qwen_queue, audio_path, detected_lang),
+                args=(qwen_queue, audio_path, detected_lang, qwen_chunks),
             )
             qwen_thread.start()
 
@@ -403,7 +403,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
         _log.info("Qwen3-ASR 交叉验证开始 (tier=%s)", transcription_tier)
         from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
         if is_qwen_asr_available():
-            results = run_qwen_asr(audio_path, results, language=detected_lang)
+            qwen_chunks = run_qwen_asr(audio_path, results, language=detected_lang)
         else:
             _log.warning("Qwen3-ASR 不可用，跳过交叉验证")
 
@@ -462,7 +462,8 @@ def transcribe(audio_path: str, model_size: str = "medium",
     # ── Step 6: Five-layer hallucination filter ──
     if filter_keywords:
         results = filter_hallucinations(results, detected_lang,
-                                        aligner_result=aligner_result)
+                                        aligner_result=aligner_result,
+                                        qwen_chunks=qwen_chunks)
 
     if not results:
         _log.error("未检测到任何语音内容")

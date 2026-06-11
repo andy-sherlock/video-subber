@@ -334,7 +334,6 @@ def main():
                     "text": s.text, "speaker_change": s.speaker_change,
                     "uncertain": s.uncertain,
                     "sensevoice_tag": getattr(s, "sensevoice_tag", None),
-                    "qwen_text": getattr(s, "qwen_text", None),
                     "words": getattr(s, "words", []),
                 } for s in segments], f, ensure_ascii=False, indent=2)
             ck.save("transcribe", meta=config)
@@ -346,7 +345,6 @@ def main():
                 s.speaker_change = r.get("speaker_change", False)
                 s.uncertain = r.get("uncertain", False)
                 s.sensevoice_tag = r.get("sensevoice_tag", None)
-                s.qwen_text = r.get("qwen_text", None)
                 s.words = r.get("words", [])
 
         total = len(segments)
