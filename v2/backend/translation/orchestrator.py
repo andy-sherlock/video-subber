@@ -327,15 +327,22 @@ _OVERLAP_RATIO = 0.2
 
 
 def _compute_chunk_size(llm) -> int:
-    """Return chunk size (line count) based on the model's context window.
+    """Return chunk size (line count) based on the model's fatigue limit (P253).
 
-    Formula: (max_input_tokens - 18000) // 8, clamped to [200, 3000].
-    18000 = 16000 output + 2000 prompt overhead.
-    8 = average tokens per indexed line.
+    LLMs suffer from "Lost in the Middle": attention degrades once input
+    crosses ~30% of the context window. Instead of (ctx - 18000)//8 which
+    fills all remaining space up to the ceiling, use a fatigue-aware cap:
+    ctx * 30% → subtract prompt overhead (2000 tokens) → convert to lines.
+
+    Old formula: (32768 - 18000)//8 = 1750 lines/batch ≈ 14000 tokens (44%).
+    New formula: (32768*0.30 - 2000)//8 ≈ 950 lines/batch (30%). 64K+ models
+    capped at 1200 (was 3000).
     """
     ctx = getattr(llm, 'max_input_tokens', 32768) or 32768
-    raw = (ctx - 18000) // 8
-    return max(200, min(raw, 3000))
+    fatigue = int(ctx * 0.30)
+    available = fatigue - 2000  # prompt overhead
+    raw = available // 8
+    return max(200, min(raw, 1200))
 
 _SEAM_CONTEXT = 50
 _INDEXED_LINE_RE = re.compile(r"\[(\d+)\]\s*(.+)")
