@@ -5,6 +5,8 @@ Hard filters discard; soft filters only mark uncertain.
 """
 import logging
 import re
+import unicodedata
+from bisect import bisect_right
 from collections import Counter
 
 _log = logging.getLogger("hallucination_filter")
@@ -143,7 +145,29 @@ _RE_REPEATED_PATTERN = re.compile(r"^(.{1,4})\1{2,}$")
 _RE_REPEATED_WORDS = re.compile(r"^(\S+)(\s+\1)+$")
 
 
-def _layer1_dual_signal(seg, aligner_result=None) -> bool:
+def _has_cjk_text(text: str) -> bool:
+    normalized = unicodedata.normalize("NFKC", text or "")
+    for ch in normalized:
+        if "\u3040" <= ch <= "\u30ff":  # Japanese kana
+            return True
+        if "\u3400" <= ch <= "\u9fff":  # CJK ideographs
+            return True
+        if "\uac00" <= ch <= "\ud7af":  # Korean hangul
+            return True
+    return False
+
+
+def _mark_cjk_repetition_uncertain(seg, text: str) -> bool:
+    if not _has_cjk_text(text):
+        return False
+    seg.uncertain = True
+    seg.filter_reason = "layer4_cjk_repetition_uncertain"
+    _log.info("L4 CJK重复保留为疑似 [?]: start=%.2f text=%r",
+              seg.start, seg.text[:50])
+    return True
+
+
+def _layer1_dual_signal(seg, aligner_result=None, source_lang="auto") -> bool:
     """L1: SenseVoice + Qwen3-FA dual-signal cross-verification (Phase 1D).
 
     Four-way decision matrix (requires both signals):
@@ -176,6 +200,12 @@ def _layer1_dual_signal(seg, aligner_result=None) -> bool:
 
     # ── Dual-signal path (only when we have actual alignment data) ──
     if is_nonhuman and not has_alignment:
+        if _has_cjk_text(seg.text):
+            seg.uncertain = True
+            seg.filter_reason = "layer1_sv_nonhuman_cjk_uncertain"
+            _log.info("L1 SV非人声但含CJK文本，保留为疑似 [?]: start=%.2f tag=%s text=%r",
+                      seg.start, tag, seg.text[:50])
+            return False
         seg.filtered = True
         seg.filter_reason = "layer1_dual_confirm_nonhuman"
         _log.info("L1 双确认丢弃: start=%.2f tag=%s text=%r",
@@ -188,6 +218,13 @@ def _layer1_dual_signal(seg, aligner_result=None) -> bool:
                   seg.start, tag)
         return False
     elif not is_nonhuman and not has_alignment:
+        # P262: 短词豁免——对齐器在 ≤3 个语音单位时物理层面无法可靠对齐。
+        # 但只豁免"Speech"标签的短词；Music/Noise 标签的短词仍然标记 [?]
+        # （因为背景音中出现的短词更可能是幻觉）。
+        if tag == "Speech" and count_speech_units(seg.text, source_lang) <= 3:
+            _log.info("L1 短词豁免: start=%.2f tag=%s text=%r",
+                      seg.start, tag, seg.text[:50])
+            return False
         seg.uncertain = True
         _log.info("L1 疑似幻觉 [?]: start=%.2f tag=%s text=%r",
                   seg.start, tag, seg.text[:50])
@@ -258,16 +295,21 @@ def _layer4_regex(seg) -> bool:
         _log.info("L4 括号描述: start=%.2f text=%r", seg.start, t[:50])
         return True
 
-    t_nospace = t.replace(" ", "")
+    t_nospace = unicodedata.normalize("NFKC", t.replace(" ", ""))
     if getattr(seg, "l2_status", None) != "GREEN":
         if len(t_nospace) >= 3 and _RE_REPEATED_PATTERN.match(t_nospace):
+            if _mark_cjk_repetition_uncertain(seg, t_nospace):
+                return False
             seg.filtered = True
             seg.filter_reason = "layer4_regex"
             _log.info("L4 重复模式: start=%.2f text=%r", seg.start, t[:50])
             return True
 
     if getattr(seg, "l2_status", None) != "GREEN":
-        if _RE_REPEATED_WORDS.match(t):
+        t_normalized = unicodedata.normalize("NFKC", t)
+        if _RE_REPEATED_WORDS.match(t_normalized):
+            if _mark_cjk_repetition_uncertain(seg, t_normalized):
+                return False
             seg.filtered = True
             seg.filter_reason = "layer4_regex"
             _log.info("L4 重复词: start=%.2f text=%r", seg.start, t[:50])
@@ -339,6 +381,103 @@ def _qwen_is_reliable(qwen_chunks: list) -> bool:
     return True
 
 
+def _extract_qwen_sentences(qwen_chunks):
+    """P256: merge word-level Qwen timestamps into sentence-level.
+
+    Each Qwen chunk has segments=[{text, start, end}] at word level.
+    This groups consecutive words into sentences (split by _L2_SENTENCE_SPLIT)
+    and returns [{text, start, end}] at sentence level.
+    """
+    if not qwen_chunks:
+        return []
+    all_words = []
+    for chunk in qwen_chunks:
+        if not isinstance(chunk, dict):
+            continue
+        chunk_words = []
+        for seg in chunk.get("segments") or []:
+            text = (seg.get("text") or "").strip()
+            start = seg.get("start")
+            end = seg.get("end")
+            if text and start is not None and end is not None:
+                chunk_words.append({"text": text, "start": start, "end": end})
+        if chunk_words:
+            all_words.append(chunk_words)
+    if not all_words:
+        return []
+    sentences = []
+    for chunk_words in all_words:
+        buf_texts = []
+        buf_start = None
+        for w in chunk_words:
+            if buf_start is None:
+                buf_start = w["start"]
+            buf_texts.append(w["text"])
+            if _L2_SENTENCE_SPLIT.search(w["text"]):
+                text = " ".join(buf_texts).strip()
+                clean = [p.strip() for p in _L2_SENTENCE_SPLIT.split(text)
+                         if p.strip()]
+                if clean:
+                    sentences.append({"text": clean[0], "start": buf_start,
+                                      "end": w["end"]})
+                buf_texts = []
+                buf_start = None
+        if buf_texts:
+            text = " ".join(buf_texts).strip()
+            if text:
+                sentences.append({"text": text, "start": buf_start,
+                                  "end": chunk_words[-1]["end"]})
+    return sentences
+
+
+_SMART_WINDOW_DEFAULT = 30
+_SMART_WINDOW_MIN = 20
+_SMART_WINDOW_MAX = 40
+
+
+def _build_smart_boundaries(qwen_chunks, total_duration):
+    """P256: build window boundaries aligned to Qwen sentence edges.
+
+    Starts from fixed 30s cuts, then slides each cut point to avoid splitting
+    a Qwen sentence. The sentence's occupancy ratio decides which side absorbs
+    it. Windows are clamped to [20s, 40s].
+
+    Returns a sorted list of floats: [0, b1, b2, ..., total_duration].
+    """
+    ws = _SMART_WINDOW_DEFAULT
+    if total_duration <= ws:
+        return [0.0, total_duration]
+
+    fixed = [i * ws for i in range(1, int(total_duration // ws) + 1)
+             if i * ws < total_duration]
+    if not fixed:
+        return [0.0, total_duration]
+
+    sentences = _extract_qwen_sentences(qwen_chunks)
+
+    boundaries = list(fixed)
+    for i, b in enumerate(boundaries):
+        straddlers = [s for s in sentences
+                      if s["start"] < b < s["end"]]
+        if not straddlers:
+            continue
+        s = straddlers[0]
+        left_ratio = (b - s["start"]) / (s["end"] - s["start"])
+        new_b = s["end"] if left_ratio >= 0.5 else s["start"]
+
+        prev = boundaries[i - 1] if i > 0 else 0.0
+        nxt = boundaries[i + 1] if i + 1 < len(boundaries) else total_duration
+        win_left = new_b - prev
+        win_right = nxt - new_b
+        if win_left < _SMART_WINDOW_MIN or win_right < _SMART_WINDOW_MIN:
+            continue
+        if win_left > _SMART_WINDOW_MAX or win_right > _SMART_WINDOW_MAX:
+            continue
+        boundaries[i] = new_b
+
+    return [0.0] + boundaries + [total_duration]
+
+
 def _has_timestamp_segments(qwen_chunks):
     """Check if any chunk carries word-level timestamp segments (MLX path)."""
     for chunk in qwen_chunks or []:
@@ -347,7 +486,8 @@ def _has_timestamp_segments(qwen_chunks):
     return False
 
 
-def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language):
+def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language,
+                            boundaries=None):
     """Place Qwen-ASR text into 30s windows.
 
     Two paths:
@@ -360,12 +500,13 @@ def _assign_qwen_to_windows(qwen_chunks, whisper_windows, window_size, language)
         return qwen_windows
 
     if _has_timestamp_segments(qwen_chunks):
-        return _assign_by_timestamps(qwen_chunks, num_windows, window_size)
+        return _assign_by_timestamps(qwen_chunks, num_windows, window_size,
+                                     boundaries=boundaries)
 
     return _assign_by_similarity(qwen_chunks, whisper_windows, window_size, language)
 
 
-def _assign_by_timestamps(qwen_chunks, num_windows, window_size):
+def _assign_by_timestamps(qwen_chunks, num_windows, window_size, boundaries=None):
     """Place Qwen segments into windows using their precise start times."""
     qwen_windows = ["" for _ in range(num_windows)]
     last = num_windows - 1
@@ -376,7 +517,10 @@ def _assign_by_timestamps(qwen_chunks, num_windows, window_size):
             text = (seg.get("text") or "").strip()
             if not text:
                 continue
-            win = min(last, max(0, int(seg["start"] // window_size)))
+            if boundaries:
+                win = min(last, max(0, bisect_right(boundaries, seg["start"]) - 1))
+            else:
+                win = min(last, max(0, int(seg["start"] // window_size)))
             qwen_windows[win] += " " + text
     return qwen_windows
 
@@ -418,13 +562,13 @@ def _assign_by_similarity(qwen_chunks, whisper_windows, window_size, language):
 
 def _layer2_cross_validate(segments: list, language: str = "auto",
                            custom_thresholds: dict = None, qwen_chunks=None):
-    """P160: 30s-window stem-overlap cross-validation (B+A architecture).
+    """P160/P256: window stem-overlap cross-validation (B+A architecture).
 
-    Chop audio into 30s windows, stem words from Whisper and Qwen,
-    compare stem sets.  Windows above threshold → GREEN, below → YELLOW.
+    P256: windows align to Qwen sentence boundaries (smart boundaries)
+    instead of fixed 30s cuts. Falls back to fixed 30s when no Qwen
+    timestamps are available.
 
-    Returns (annotated_segments, window_stats).  Caller replaces segments
-    with the returned list.
+    Returns (annotated_segments, window_stats).
     """
     if not segments:
         return segments, {}
@@ -438,22 +582,26 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
         thresholds.update(custom_thresholds)
     current_threshold = thresholds.get(language, 0.30)
 
-    # ── Window stemming ──
+    # ── P256: smart window boundaries ──
     WINDOW_SIZE = 30
     total_duration_s = max(getattr(s, "end", 0) for s in segments)
     if total_duration_s <= 0:
         return segments, {}
-    num_windows = int(total_duration_s // WINDOW_SIZE) + 1
+
+    boundaries = _build_smart_boundaries(qwen_chunks, total_duration_s)
+    num_windows = len(boundaries) - 1
 
     whisper_windows = ["" for _ in range(num_windows)]
 
     def _find_best_window(start, end):
-        best = int(start // WINDOW_SIZE)
+        idx = max(0, bisect_right(boundaries, start) - 1)
+        best = min(idx, num_windows - 1)
         max_overlap = 0
-        for w in range(int(start // WINDOW_SIZE),
-                       min(int(end // WINDOW_SIZE) + 1, num_windows)):
-            ws = w * WINDOW_SIZE
-            we = ws + WINDOW_SIZE
+        lo = max(0, bisect_right(boundaries, start) - 1)
+        hi = min(num_windows - 1, bisect_right(boundaries, end) - 1)
+        for w in range(lo, hi + 1):
+            ws = boundaries[w]
+            we = boundaries[w + 1]
             overlap = min(end, we) - max(start, ws)
             if overlap > max_overlap:
                 max_overlap = overlap
@@ -467,14 +615,13 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
         if win < num_windows:
             whisper_windows[win] += " " + seg.text
 
-    # P251: assign Qwen text to 30s windows by stem similarity (replaces the
-    # per-segment qwen_text that the dropped 1:1 map left mostly empty).
     qwen_windows = _assign_qwen_to_windows(
-        qwen_chunks, whisper_windows, WINDOW_SIZE, language)
+        qwen_chunks, whisper_windows, WINDOW_SIZE, language,
+        boundaries=boundaries)
 
     # ── Stem + score each window ──
-    MIN_STEMS = 5  # P171: fewer stems → LOW_DATA (not enough evidence)
-    _BGM_THRESHOLD = 0.20  # P229: relaxed threshold for BGM-override windows
+    MIN_STEMS = 5
+    _BGM_THRESHOLD = 0.20
     window_stats = {}
     for idx in range(num_windows):
         w_text = whisper_windows[idx].strip()
@@ -496,9 +643,6 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
         shared = w_stems & q_stems
         score = len(shared) / max(len(w_stems), len(q_stems)) if (w_stems or q_stems) else 0.0
 
-        # P229: if any segment in this window was SV-overridden by L1
-        # (BGM override), use lower threshold — Qwen ASR is less reliable
-        # in background music, so we tolerate lower stem overlap.
         win_has_bgm = any(
             getattr(seg, "bgm_override", False)
             for seg in segments
@@ -522,8 +666,9 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
     # ── P149 calibration diagnostics ──
     for idx in sorted(window_stats):
         ws = window_stats[idx]
-        t0, t1 = idx * WINDOW_SIZE, (idx + 1) * WINDOW_SIZE
-        _log.debug("L2 窗口[%d] %d-%ds | w=%d q=%d shared=%d score=%.3f → %s",
+        t0 = boundaries[idx]
+        t1 = boundaries[idx + 1]
+        _log.debug("L2 窗口[%d] %.1f-%.1fs | w=%d q=%d shared=%d score=%.3f → %s",
                    idx, t0, t1, ws["w_count"], ws["q_count"],
                    ws["shared"], ws["score"], ws["status"])
 
@@ -540,7 +685,7 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
         else:
             seg.l2_status = "NO_DATA"
 
-    _log.info("L2 窗口比对完成: %d 窗口, 阈值=%.2f, 最低词干=%d, %s",
+    _log.info("L2 窗口比对完成: %d 窗口 (P256 智能边界), 阈值=%.2f, 最低词干=%d, %s",
               num_windows, current_threshold, MIN_STEMS,
               {s: sum(1 for v in window_stats.values() if v["status"] == s)
                for s in ("GREEN", "YELLOW", "LOW_DATA", "EMPTY", "NO_QWEN")})
@@ -572,7 +717,7 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
 
 
 def filter_hallucinations(segments: list, source_lang: str = "auto",
-                          aligner_result=None, qwen_chunks=None) -> list:
+                          aligner_result=None, qwen_chunks=None, skip_l1: bool = False) -> list:
     """Five-layer hallucination filter. Order: L1→L2→L4→L5→L3.
 
     Args:
@@ -602,14 +747,15 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
 
     # When Qwen chunks carry word-level timestamps (MLX path), derive
     # alignment data from them — no external FA needed for L1.
-    effective_alignment = aligner_result
-    if not effective_alignment and _has_timestamp_segments(qwen_chunks):
-        effective_alignment = _qwen_segments_as_alignment(qwen_chunks)
-        _log.info("L1 使用 Qwen 内部 FA 时间戳: %d 词", len(effective_alignment))
+    if not skip_l1:
+        effective_alignment = aligner_result
+        if not effective_alignment and _has_timestamp_segments(qwen_chunks):
+            effective_alignment = _qwen_segments_as_alignment(qwen_chunks)
+            _log.info("L1 使用 Qwen 内部 FA 时间戳: %d 词", len(effective_alignment))
 
-    for seg in segments:
-        if not seg.filtered:
-            _layer1_dual_signal(seg, effective_alignment)
+        for seg in segments:
+            if not seg.filtered:
+                _layer1_dual_signal(seg, effective_alignment, source_lang)
 
     surviving = [s for s in segments if not s.filtered]
     qwen_reliable = _qwen_is_reliable(qwen_chunks)

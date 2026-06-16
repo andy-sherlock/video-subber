@@ -588,7 +588,7 @@ function _settingsMatchDone(){
 function refreshStartBtn(){
   if(!State.videoFile&&!State.localPath&&!State.sourceUrl){sbtn.disabled=true;sbtn.textContent='选择视频文件开始';return}
   if(State.doneJobConfig){
-    if(_settingsMatchDone()){sbtn.disabled=true;sbtn.textContent='已完成（修改设置后可重跑）'}
+    if(_settingsMatchDone()){sbtn.disabled=false;sbtn.textContent='重新处理';State.forceRerun=true}
     else{sbtn.disabled=false;sbtn.textContent='用新设置重跑';State.forceRerun=true}
     return;
   }

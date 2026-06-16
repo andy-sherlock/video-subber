@@ -4,41 +4,72 @@
 
 ---
 
-## 🔧 下一批修复（15 个 · V3.08 统一处理）
+## 🔧 遗留未修（5 个 · V3.08+ 处理）
 
-### 1-6：代码 Bug
-
-| # | 编号 | 定位 | 问题 | 有方案 |
-|---|------|------|------|--------|
-| 1 | P181 | `frontend/index.html` | handleFoundJob 跳过 connectCard | ❌ |
-| 2 | P225 | `qwen_asr_runner.py:283` | PyTorch 路径 result[0].text 当单对象取 | ❌ |
-| 3 | P242 | `transcriber_v2.py` | transcribe_raw() MLX 后端崩溃 | ❌ |
-| 4 | P245 | `main.py:69` | GLOBAL_HASH_INDEX 无锁 | ❌ |
-| 5 | P250 | `hallucination_filter.py:419` | L3 语速单位用错 → 203 假 [?] | ✅ |
-| 6 | P251 | `qwen_asr_runner.py:85` | align_by_similarity 堵死 L2 → 12 NO_QWEN | ✅ |
-
-### 7-10：架构债 / 设计缺陷
-
-| # | 编号 | 定位 | 问题 | 有方案 |
-|---|------|------|------|--------|
-| 7 | P191 | `transcriber_v2.py` | transcribe() 圈复杂度 41 | ❌ |
-| 8 | P219 | 6 文件 | 6 个函数复杂度过高（codegraph 审计） | ❌ |
-| 9 | P253 | `orchestrator.py:329` | 滑窗阈值用上下文上限 → 长视频翻译质量降 | ✅ |
-| 10 | P254 | `transcriber_v2.py` | 按源语言智能路由主引擎（Qwen3 vs Whisper） | ✅ |
-
-### 11-15：设计 / 流程未实现
+### 代码 Bug
 
 | # | 编号 | 定位 | 问题 |
 |---|------|------|------|
-| 11 | P196 | `CLAUDE.md` | Bug 修复流水线缺双签审查 |
-| 12 | P223 | `qwen_aligner.py` | FA 分段对齐并行化 |
-| 13 | P247 | `orchestrator.py` | P1 ASR 分歧裁决未实现（🟡 MEDIUM，描述已修正为主引擎版本） |
-| 14 | P252 | `CLAUDE.md` | 走查 2.0 已写入未激活 |
-| 15 | P237 | `worker.py` | 系统日志是"日记"不是"黑匣子"（P0） |
+| 1 | P181 | `frontend/index.html` | handleFoundJob 跳过 connectCard |
+| 2 | P245 | `main.py:69` | GLOBAL_HASH_INDEX 无锁 |
 
-> **已关闭（换 MLX ASR 库自然解决 · 2026-06-11）**：P179（L2 Whisper 逐字时间戳）· P212（FA 真声验证）· P149/P171（L2 门槛校准）。换库后千问自带词级时间戳→L2 归窗精确化→三个问题同时消失。
+### 架构债
+
+| # | 编号 | 定位 | 问题 |
+|---|------|------|------|
+| 3 | P191 | `transcriber_v2.py` | transcribe() 圈复杂度 41 |
+| 4 | P219 | 6 文件 | 6 个函数复杂度过高（codegraph 审计） |
+
+### 功能未实现
+
+| # | 编号 | 定位 | 问题 |
+|---|------|------|------|
+| 5 | P223 | `qwen_aligner.py` | FA 分段对齐并行化（⏸ V3.10+） |
+
+### 待修 Bug（后续批次新增）
+
+| # | 编号 | 定位 | 问题 |
+|---|------|------|------|
+| ~~6~~ | ~~P258~~ | ~~`worker.py:587-595`~~ | ~~UI [?] 百分比分子分母不匹配 → 误报 15%~~ ✅ 已修（分子分母改为同一阶段计算） |
+| 7 | P259 | `hallucination_filter.py` | 跨语言 L3 语速阈值未用真实多语言视频验证（🟡 MEDIUM） |
+| ~~8~~ | ~~P260~~ | ~~`worker.py:431-511`~~ | ~~P247 Refiner 放错位置~~ ✅ 已修（Refiner 在翻译前执行） |
+| ~~9~~ | ~~P261~~ | ~~`transcriber_v2.py:760-768`~~ | ~~P254 合成段导致 L1 失效~~ ✅ 已修（L1 在 Whisper 原稿上跑，组装在后） |
+
+### 平台适配（V3.09 独立分支）
+
+| # | 编号 | 定位 | 问题 |
+|---|------|------|------|
+| — | P266 | `transcriber_v2.py:253` | **Mac 端 Whisper 换 mlx-whisper**。faster-whisper 在 Mac 上无 GPU 后端（CTranslate2 不支持 Metal），50min 视频需 100min。换 Apple 官方的 mlx-whisper（Metal GPU），预计 ~5min。先不动模型（保持 large-v3），引擎换完拿到加速后再评估切 turbo。单独开 Git 分支，V3.09 执行。 |
+| — | P267 | `transcriber_v2.py` + `qwen_asr_runner.py` | **Windows 端双引擎适配**（2026-06-13 调研完成）。方案：① **Whisper**：沿用 faster-whisper + CUDA + int8_float16 + batch_size=8（全球最快 Whisper 实现，RTF 0.02，1h 音频约 1.3min，不需要换）；② **Qwen3-ASR**：用官方 qwen-asr + PyTorch CUDA（0.6B=2-3GB 显存, 1.7B=4-5GB 显存），备选 Qwen3-ASR-GGUF 混合引擎（ONNX encoder + llama.cpp decoder，RTF 0.05，快 7.5 倍但社区维护）。待 Mac 端 P266 完成后 Windows 真机实测。V3.09 执行。 |
+
+### Whisper 模型选型参考（2026-06-13 调研）
+
+**术语：**
+- **fp16** = 全精度（16 位浮点），最准但吃显存
+- **int8** = 压缩版（8 位整数），精度损失极小（WER 几乎不变），显存省 35%
+- **batch=N** = N 路并行处理，快但更吃显存
+
+**各模型对比（日语基准）：**
+
+| 模型 | 参数量 | 速度 | 日语 JSUT CER | 日语 TEDx CER | 多语言 WER | 要点 |
+|------|--------|------|-------------|-------------|-----------|------|
+| **large-v3**（当前） | 1.55B | 基准（1x） | — | **9.2%** | **12.3%** | 质量天花板 |
+| large-v3-turbo | 809M | **快 4-6x** | 12.0% | 9.5%（+0.3） | 14.8%（+2.5） | 速度/质量最优平衡 |
+| large-v2 | 1.55B | ~1x | — | 9.9%（+0.7） | — | 上代，比 turbo 慢且差 |
+| medium | 769M | 快 | — | 11.0%（+1.8） | — | 不推荐（turbo 全方位碾压） |
+| distil-large-v3 | 756M | 最快 | 不支持 | 不支持 | — | 仅英文，不考虑 |
+
+**结论：**
+- **turbo 在日语上退化极小**（CER 9.2→9.5%，仅 +0.3 点），但速度快 4-6 倍
+- turbo 比 v2 更快、更准——v2 没有存在的理由
+- **注意**：turbo 在日语音频中有英単語幻覚（hallucination）报告，且翻译任务退化。我们只用转录（不用翻译），但幻觉问题需要在实测中验证
+- **策略**：P266/P267 先稳住 large-v3 换引擎，引擎换完后如果还嫌慢，切 turbo 实测日语素材，幻觉不严重就直接换
+
+> **已关闭/已修（从原 15 个批次中清除）**：P225 ✅（TDD 修复）· P242 ✅（死代码，换库后删除）· P250 ✅ · P251 ✅ · P253 ✅ · P254 ✅ · P196 ✅（双签审查已写入 CLAUDE.md）· P247 ✅ · P252 ✅（走查 2.0 已激活）· P265 ✅（中点落入 + CJK 无空格拼接）
 >
-> **其他 14 个未修问题**（UX 7 个 → V3.09 PySide6 / 功能缺失 3 个 / 环境打包 3 个 / 外部限制 1 个）不在本批次，各自跟版本走。
+> **已关闭（换 MLX ASR 库自然解决 · 2026-06-11）**：P179 · P212 · P149/P171。
+>
+> **其他未修问题**（UX 7 个 → V3.09 PySide6 / 功能缺失 3 个 / 环境打包 3 个 / 外部限制 1 个）不在本批次，各自跟版本走。
 
 ---
 
@@ -4354,8 +4385,6 @@ full_text = result[0].text if result else ""
 
 **关联**：[[P207]]（FA 升级触发）、[[P221]]（return_time_stamps 错误）、[[P222]]（语言名错误）
 
-**⏸ 未修**
-
 ---
 
 ## P226 | 2026-06-09 | 🔴 千问 MLX 加速包丢失——`qwen3-asr-mlx` 从未列入依赖清单
@@ -4500,101 +4529,37 @@ full_text = result[0].text if result else ""
 
 ## P237 | 2026-06-09 | 🔴 系统日志是"日记"不是"黑匣子"（P0）
 
-**来源**：V3.07 第二次端到端实测（job `896557f4d8`）。同一视频、同一代码（没改过一行代码，没有触发 uvicorn reload），第一次 SenseVoice 全部正常，第二次 SenseVoice 5 个分块全部 BrokenPipe 崩溃，标签分布为 `{}`。同时段 P239 触发——`stderr_progress` 也因 BrokenPipe 崩溃导致翻译阶段从未启动。
+**来源**：V3.07 第二次端到端实测（job `896557f4d8`）。同一视频、同一代码，第一次 SenseVoice 正常，第二次 5 个分块全部 BrokenPipe 崩溃。日志只能看到"崩了"，看不到崩时内存/GPU/步骤/segments 数量——根因全靠猜。
 
-**现象**：当前日志格式为"开始做X"和"X做完了/失败了"。中间没有系统状态信息。出问题时只能看到"什么崩了"，看不到"崩的时候系统处于什么状态"。
+**根因**：日志设计是"事件记录"模式（日记），不是"状态快照"模式（黑匣子）。崩溃时没有自动抓取系统参数。
 
-**根因**：日志设计是"事件记录"模式（日记），不是"状态快照"模式（黑匣子）。没有在每个关键步骤前后自动抓取系统参数。目前**真实根因未知**——只有推测，无法确认。
+**最终方案（方案 C · Jobs + 双方工程师三轮审查定稿）**：Post-mortem Dump（死后遗言）。atexit handler + global current_step + try/except 单次快照。40 行代码，零新文件，全部内联在 worker.py。不去每步前后抓 14 个快照点——只在进程死的时候抓一次。
 
-### 崩溃现场复盘
-
-**崩溃时间**：2026-06-09，V3.07 HARDEN 阶段第二次端到端实测
-
-**被测视频**：London Vlog，22 分钟英文 vlog，Whisper 转录 ~440 段
-
-**同时运行的模型**（四个模型同时在内存里）：
-| 模型 | 角色 | 大约内存 |
-|------|------|---------|
-| Whisper large-v3 | 主转录员，MLX 后端 | ~2-3 GB |
-| Qwen3-ASR | 交叉验证转录员，MLX 后端 | ~2-3 GB |
-| SenseVoice | 声音分类（人声/非人声/音乐），CPU fnasz | ~1 GB |
-| Qwen3-FA (ForcedAligner) | 强制对齐校对员 | ~1-2 GB，但 P220 一次性申请 18.82 GiB |
-
-**同时段已知事件**：
-1. **P220**：FA 对齐器把整个 22 分钟音频一次性塞进自注意力矩阵 → 申请 18.82 GiB 内存。PyTorch 在 `scaled_dot_product_attention` 内部报 `Invalid buffer size: 18.82 GiB`
-2. **P238**：SenseVoice 5 个分块全部 BrokenPipeError。堆栈定位在 `fnasz/auto/auto_model.py → tqdm/std.py → fp_write() → BrokenPipeError`
-3. **P239**：转录完成后 `stderr_progress("transcribe", 35, ...)` 写 stdout 管道时 BrokenPipe → worker 崩溃 → 翻译和烧录阶段从未启动。无 SRT 输出文件
-
-**数据管道架构（PIPE 从哪里来）**：
+**实现 Checklist**：
 ```
-worker_manager.py:45
-  subprocess.Popen([python, -m, backend.worker, config.json],
-    stdout=subprocess.PIPE,   ← 第 47 行，父进程 uvicorn 在读这一端
-    stderr=subprocess.PIPE,   ← 第 48 行
-  )
-
-worker.py:17
-  _real_stdout = sys.stdout   ← 保存原始 stdout（就是上面那个 PIPE 的写入端）
-
-worker.py:631-640 (stderr_progress)
-  _real_stdout.write(...)     ← 写到 PIPE → 父进程 uvicorn 读取
-  except (BrokenPipeError, OSError): pass  ← P239 已修：崩溃时静默跳过
-
-sensevoice_runner.py:89 (model.generate)
-  fnasz internal → tqdm → stderr → PIPE(子进程 stderr) → uvicorn 读取
-  ← P238 已修：加 disable_pbar=True 关掉 tqdm
+□ 1. worker.py 顶部: current_step = "init"
+□ 2. 每个关键步骤前: current_step = "..."（赋值前如果是在函数内部 → global current_step）
+     transcribe / sensevoice / hallucination / translate / subtitle
+     五处赋值，每处一行
+□ 3. 写 _crash_snapshot():
+     import psutil, threading, sys
+     proc = psutil.Process()
+     return {
+         "time": time.time(),
+         "step": current_step,
+         "memory_mb": proc.memory_info().rss / 1024 / 1024,
+         "segments": len(segments) if "segments" in dir() else 0,
+         "mlx_available": "mlx" in sys.modules,
+         "threads": threading.active_count(),
+     }
+□ 4. except Exception 块中: debug.log 写入 JSON dump + traceback
+□ 5. 手动触发崩溃验证快照写入
+□ 6. 不建新文件；不建 utils/
 ```
 
-**可能的根因推测（按可能性排序）**：
+**代码量**：~45 行。零新文件。零新依赖。
 
-1. **P220 FA 内存爆炸导致的连锁反应（最可能）**：FA 一次申请 18.82 GiB 失败后，PyTorch 可能把 CUDA/MPS 驱动层的部分状态搞乱。虽然内存申请被拒绝了，但 libtorch 内部的资源管理器可能处于半初始化状态，后续 SenseVoice 调用 funasr → PyTorch → 发现驱动层 socket/file descriptor 已经半死 → BrokenPipe。
-
-2. **四模型争抢内存导致系统级资源回收**：总占用 ~10+ GB（Whisper 3GB + Qwen 3GB + SV 1GB + FA 1GB + 框架开销 + P220 冲击）。macOS 的 memory pressure 机制可能在后台杀掉了某些共享资源的 fd（文件描述符），导致 PIPE 断开。
-
-3. **funasz/tqdm 的 stderr 写入与父进程管道的时序竞态**：P220 的 FA 错误日志（Invalid buffer size: 18.82 GiB）也是通过 stderr 上报的。两个库（fnasz 和 qwen-asr）同时往 stderr 写大量内容，可能竞态破坏了管道状态。
-
-**以上全部是推测。因为日志里没有系统状态快照，没有内存使用量记录，没有进程/线程数记录，没有 GPU 状态记录。**
-
-### 解决方案
-
-建立系统化日志框架——在公共模块中创建一个 `checkpoint(name, status)` 工具函数，在 10 个关键步骤的入口和出口各调用一次。自动记录：
-1. 步骤名 + 开始/结束/错误状态
-2. 时间戳 + 耗时
-3. 内存使用量（总内存、已用、可用，通过 `psutil.virtual_memory()`）
-4. 当前 Python 进程的 RSS/VMS（通过 `psutil.Process().memory_info()`）
-5. 当前 Python 进程的线程数（通过 `psutil.Process().num_threads()`）
-6. 成功/失败，失败时自动附完整堆栈
-
-实现成本：一个工具模块 ~80 行 + 10 个步骤各 1 行调用。总计约 90 行改动。价值：以后任何环节出问题，翻日志 30 秒看到完整系统状态，不需要猜测根因。
-
-### 关联问题（同一测试中连锁暴露）
-
-| 问题 | 现象 | 是否已修 |
-|------|------|---------|
-| P220 | FA O(n²) 长音频内存爆炸（18.82 GiB） | ✅ 已修（按 Whisper 句子分段对齐） |
-| P238 | SV tqdm 写 stderr 管道断 → 5 块全崩 | ✅ 已修（`disable_pbar=True`） |
-| P239 | stderr_progress BrokenPipe → 翻译未启动 | ✅ 已修（try/except 兜底） |
-| **P237** | **日志无系统状态，根因靠猜** | **❌ 未修** |
-
-### 下一次排查的入口
-
-如果 SenseVoice 再崩一次，从这些位置开始查（全部在 `v2/` 下）：
-
-| 查什么 | 文件 | 行号 |
-|--------|------|------|
-| SV 分段处理入口 | `backend/core/sensevoice_runner.py` | 46 `_run_sensevoice_chunked()` |
-| SV 非分段入口 | `backend/core/sensevoice_runner.py` | 143 `run_sensevoice()` |
-| SV 崩溃点（已加固） | `backend/core/sensevoice_runner.py` | 89 `model.generate()` — P238 已关 tqdm |
-| SV 错误兜底 | `backend/core/sensevoice_runner.py` | 118 `except Exception: _log.warning(...)` — 只记日志，不抛异常 |
-| 子进程管道建立 | `backend/worker_manager.py` | 45 `subprocess.Popen(stdout=PIPE, stderr=PIPE)` |
-| Worker 进度写入 | `backend/worker.py` | 631 `stderr_progress()` — P239 已加 BrokenPipe 兜底 |
-| FA 对齐入口 | `backend/core/qwen_aligner.py` | `align_segments()` — P220 已改为句子分段 |
-| 硬件检测（RAM） | `backend/core/hardware_detector.py` | 60 `psutil.virtual_memory().total` — 只在启动时调一次 |
-| 转录管线编排 | `backend/transcriber_v2.py` | 179 `transcribe()` — SV+FA 并行启动逻辑（P199/P200 修复后） |
-
-**关联**：[[P220]]（FA 内存爆炸）、[[P238]]（SV tqdm BrokenPipe）、[[P239]]（stderr_progress BrokenPipe）、[[P199]]（standard 并行）、[[P200]]（precise 解耦）、P234（UX-4 故障对用户不可见）
-
-**⏸ 未修**（2026-06-10 补全崩溃数据，待 V3.08 实现黑匣子日志）
+**⚠️ 部分实现，未闭环**（2026-06-14 复查）：`worker.py` 已有 `current_step` 和 `_crash_snapshot()`，但异常处理处只写 traceback，没有调用 `_crash_snapshot()` 把内存、线程、步骤等状态写进 debug.log。因此 P237 不能算已修，仍保留待做。
 
 ## P238 | 2026-06-09 | 🔴 SenseVoice 因 tqdm 进度条 BrokenPipe 全部崩溃
 
@@ -4758,19 +4723,70 @@ BrokenPipeError: [Errno 32] Broken pipe
 
 ---
 
-## P247 | 2026-06-10 | 🟡 MEDIUM 设计一致性：P1 ASR 分歧裁决未实现
+## P247 | 2026-06-12 | 🟡 MEDIUM Transcript Refiner——LLM 双稿裁判 + 边界修复 + 润色去问号
 
-**来源**：设计一致性走查。
+**来源**：2026-06-12 ASR 分支实测（London VLOG），Jobs + 用户七轮方案讨论定稿。
 
-**问题**（2026-06-11 更新）：L1/L2 给出存疑段落（打 `[?]` 标记的）后，直接按**主引擎**版本送翻译。设计图上规划了让翻译 LLM 在主引擎版本和副引擎版本之间做裁决——谁说的对用谁的。但代码中 `orchestrator.py` 的 P1 只做术语提取和摘要，没有实现裁决逻辑。`uncertain` 标志已在 hallucination_filter 中设置，但翻译阶段无人消费。
+**一句话**："LLM sees both transcripts, judges discrepancies, fixes boundaries, polishes text."
 
-**换库后影响**：千问有了精确时间戳，L1 双信号验证更可靠。`[?]` 标记不再是噪音——是真实的「两个引擎意见不一致」信号。LLM 裁决成功率更高。
+**实测数据**（同一视频三次测试）：
 
-**定位**：功能尚未开发，非代码 bug。需新增 LLM 调用，读取全文 `uncertain=True` 的段，用上下文判断原文是否可信。
+| 版本 | [?] 数 | [?] 率 | 主要成因 |
+|------|--------|--------|---------|
+| 1.srt（旧版）| 283 | 25.5% | P250 语速单位错 + P251 管道堵死 |
+| 2.srt（旧版）| 299 | 26.8% | 同上 |
+| 3.srt（本次）| 77 | 7.1% | 主要是短词（FA 最小词数限制） |
 
-**⏸ 未修**
+**三层方案**：
 
----
+**第一层：代码（L1 短词豁免 + 多语言支持）**
+在 `hallucination_filter.py` 新增 `_is_short_word_exempt(text, lang)`：
+- zh/ja → `len(text) <= 4`（字符数）
+- 其他语言 → `len(text.split()) <= 3`（词数）
+短词豁免 → 不打 [?]，直接通过。
+
+**第二层：LLM 双稿裁判（核心创新）**
+LLM 同时收到两份 SRT：
+- 主稿：千问的句级字幕（Whisper 骨架组装后，可能有边界偏差和个别错词）
+- 参考稿：Whisper 的原始句级字幕
+LLM 对比两份稿子——发现千问写 "claw"、Whisper 写 "clock"，前面在问 "What time is it?" → 判 Whisper 的 "clock" 正确。修改主稿。
+
+**第三层：边界修复 + 润色**
+LLM 通读全文，发现格子边界处"末尾多了一个不属于这句话的词"——把它移到下一句开头。**只改文字，不改时间戳。** 同时加标点、去口语词、理断句。
+
+**Prompt（双稿版）**：
+```
+You are an expert subtitle editor. You receive TWO transcripts of the same audio.
+SRT A (primary, more accurate overall) is your working copy.
+SRT B (reference) comes from a different transcriber — use it to spot errors.
+
+CRITICAL RULES:
+1. Do not alter, merge, or delete any ID or Timestamp lines.
+2. Compare A against B: when A has a suspicious word, check B's version.
+   Use context to decide which is correct. Fix A if needed.
+3. Fix boundary errors: if a word at the end of one segment clearly belongs
+   to the next, move it. Only change text — keep timestamps as-is.
+4. Fix disfluencies, add punctuation, smooth phrasing. Do NOT rewrite meaning.
+5. For segments ending with "[?]", judge based on context — remove or correct.
+6. Short utterances have been pre-validated — only process [?] on longer ones.
+7. Output ONLY the valid SRT. No conversational intros or outros.
+
+[SRT A — Primary (Qwen)]
+...
+[SRT B — Reference (Whisper)]
+...
+```
+
+**流水线位置**：位于 L2 交叉验证之后、翻译开始之前。修改后的流程：
+```
+转录 → P254 路由 → L1（千问原稿）→ 词变句子 → L2 交叉验证 → P247 Refiner（双稿裁判+润色）→ 翻译
+```
+
+**Refiner 的 `_build_llm_backends` 需加 else 日志**：当前无 else → 静默跳过。需加 `_log.warning` 以便排查。
+
+**代码量**：~95 行。零新文件。零新依赖。
+
+**✅ 已修**（2026-06-13）。Plan C 单段隔离安全阀实现：`_clean_dist()` 归一化编辑距离（去空格+去标点后比较），阈值 0.80，逐段拦截而非全局回滚。FJIN-141 实测 843 个 `[?]` 降到 0。后续由 P263+P264 双稿裁判重构替代原有全篇 SRT 方案。
 
 ## P248 | 2026-06-10 | 🟡 设计一致性：P3 反思仅在翻译失败时触发
 
@@ -5104,25 +5120,696 @@ def _compute_chunk_size(llm) -> int:
 
 **⏸ 未修**
 
-## P254 | 2026-06-11 | 🟡 HIGH 转录模型智能路由：按源语言选择主引擎（model-comparison.md §9.3）
+## P254 | 2026-06-11 | 🟡 HIGH 转录模型智能路由——按源语言切换主引擎 + Whisper 骨架组装句级字幕
 
-**来源**：2026-06-11 model-comparison.md §9.3 讨论。Steve Jobs 审查认可。2026-06-11 换库影响分析后优先级提升。
+**来源**：2026-06-11 model-comparison.md §9.3。Jobs + 双方工程师三轮审查定稿。2026-06-12 流水线架构重设计。
 
-**问题**：precise tier 同时跑 Qwen3-ASR 和 Whisper，但 Whisper 永远当主字幕，Qwen3 只当验证信号。英语场景下 Qwen3 WER 更低（7.39% vs Whisper 9.90%），却只能做配角。
+**问题**：Whisper 永远主引擎。英语 Qwen3 WER 7.39% vs Whisper 9.90%，更准更快的模型当配角。且千问只输出词级时间戳（无天然句级分割），切换后缺乏句级字幕切分能力。
 
-**换库后提升**：旧库 Qwen 无独立检测语言能力（等 Whisper 给语言、等 Whisper 给分块边界）。moona3k 新库 Qwen 自己检测语言、自己分块、自己出时间戳——完全独立。路由价值翻倍。
+**最终方案（综合 P254+P261+P247）**：
 
-**方案**：语言检测后分支路由。改一行主次赋值。
+**第一步：语言路由**——在 transcriber_v2.py 两个引擎都跑完后，if 语句交换主副引擎（英语/日/韩/中 → Qwen 主）。
+
+**第二步：L1 先验证**——L1（SenseVoice + Qwen FA）直接对千问原始词级数据做交叉验证，不被任何重装操作干扰（P261）。
+
+**第三步：Whisper 骨架组装**——L1 完成后，用 Whisper 的 570 个句级时间窗口做"筐"，把千问的词按时间落入筐里组成句级字幕。时间戳用千问词级精度。边界处可能偏差 0.1-0.3 秒（1-2 词错位），交给 P247 Refiner 修复。
+
+**实现 Checklist**：
+```
+□ 1. _qwen_chunks_to_segments(qwen_chunks, whisper_segments=results):
+     - 打平千问所有词级时间戳到一个总清单
+     - 遍历 Whisper 每个时间窗口 [t_start, t_end]
+     - 收集所有开始时间落在窗口里的千问词
+     - 拼接成句子，时间戳取首词 start 和末词 end
+     - 无千问词时用 Whisper 原文兜底
+□ 2. 语言路由:
+     if detected_lang in {"en", "ja", "ko", "zh"} and qwen_chunks:
+         保存 _qwen_raw（供 L1/L2 交叉验证）
+         primary = _qwen_chunks_to_segments(qwen_chunks, whisper_segments=results)
+         results = primary; qwen_chunks = list(_qwen_raw)
+□ 3. 保留原始 Qwen 词级时间戳供 L1/L2
+```
+
+**依赖**：换 MLX ASR 库（moona3k）。Qwen 独立检测语言/分块/出时间戳。
+
+**代码量**：~60 行。零新文件。
+
+**流水线位置**：转录 → P254 路由 → L1（千问原稿）→ 词变句子 → L2 → P247 Refiner → 翻译
+
+**✅ 已修**（框架已实现，待 P260/P261 配套修改完成）
+
+## P255 | 2026-06-12 | 🟡 MEDIUM Windows 端千问 ASR 时间戳未启用——L2 归窗走猜测路径
+
+**来源**：2026-06-12 V3.07 换库后架构审查（Steve Jobs 视角）发现。
+
+**问题**：`qwen_asr_runner.py:191-197` PyTorch 路径调用 `model.transcribe()` 时没有传 `return_time_stamps=True`，返回 `segments = []`（无词级时间戳）。导致 Windows 端 L2 归窗只能走 `_assign_by_similarity()`（基于词干相似度猜测放置），而不是 MLX 路径的 `_assign_by_timestamps()`（精确时间戳放置）。
+
+**影响**：
+- Windows 用户（主要用户群）的 L2 交叉验证精度低于 Mac 开发环境
+- `_assign_by_similarity()` 是猜测逻辑，跨窗口误放会降低窗口词干重叠分数
+- 存在两套完全不同的归窗代码路径，维护成本翻倍
+
+**验证方式**：测试文件 `test_arch7_pipeline.py:43` 已记录 `v0.0.6 API: audio, context, language, return_time_stamps`——库 API 支持该参数。需在 Windows 真机上验证：① 传 `return_time_stamps=True` 后返回格式是什么 ② 时间戳精度是否与 MLX 路径一致
+
+**修复方案**：
+1. 在 Windows 机器上测试 `return_time_stamps=True` 的返回格式
+2. 确认格式后修改 `_transcribe_chunk()` 和 `run_qwen_asr()` 的 PyTorch 路径，提取词级时间戳
+3. 如果格式与 MLX 一致（`[{text, start, end}]`），可以删除 `_assign_by_similarity()` 整条代码路径
+
+**前置条件**：需要 Windows 真机 + `qwen-asr==0.0.6` 环境
+
+**⏸ 未修**（待 Windows 真机测试）
+
+## P256 | 2026-06-12 | 🟡 MEDIUM L2 固定 30 秒窗口切割句子——智能窗口边界对齐
+
+**来源**：2026-06-12 V3.07 换库后架构审查（用户提出）。
+
+**问题**：L2 交叉验证的 30 秒窗口是固定切割（0-30s, 30-60s, 60-90s...）。当句子跨越窗口边界时，会导致：
+- 句子被切成两半分到不同窗口，词干重叠分数被人为拉低
+- 同一段语音的文字在两个模型的归窗不一致
+- 例：Whisper 句子 28-31s 被 overlap 放入窗口 0，千问词 "大概率" 在 30.2s 被放入窗口 1
+
+**方案**：占比滑动 + 千问画线。
+
+**核心设计决策**（2026-06-12 锁定）：
+1. **窗口边界由千问的时间戳决定**（千问有词级时间戳，精度最高）
+2. **占比滑动规则**：分界线处如果有句子被切断，看千问这个句子在分界线两边的占比。占比大的那一边"吃掉"整个句子——窗口边界向反方向滑动
+   - 例1：千问句子 28-31s 骑在 30s 分界线上，28-30s 占 2/3 → 窗口向后滑到 31s（前一个窗口吃掉整句）
+   - 例2：千问句子 29.5-35s 骑在 30s 分界线上，29.5-30s 占 1/11 → 窗口向前滑到 29.5s（后一个窗口吃掉整句）
+3. **Whisper 文字归到千问画好的窗口里**（Whisper 不参与画线决策）
+4. 窗口大小有硬约束：最短 20 秒、最长 40 秒，超出范围强制切
+
+**为什么不需要两个模型投票**：两个模型听到同一段音频，句子的起止时间方向几乎不会相反。差别只在精度（千问 28.3-31.1s vs Whisper 28-32s），不在方向。用精度更高的那个画线就够了。
+
+**好处**：
+- 每个窗口内都是完整句子，词干对比更可靠
+- 消除因窗口边界切割导致的假 YELLOW
+- 一个模型画线、另一个跟着走——零冲突解决逻辑
+
+**验证策略**：Mac 端先验证逻辑正确性，Windows 端再验证体验一致性。两端都必须通过。
+
+**前置条件**：P255（Windows 端千问时间戳启用）——没有词级时间戳就无法知道千问句子的结尾位置
+
+**✅ 已修（Mac 端）**（2026-06-12）。裁剪版 6 步流水线完成：office-hours → TDD（21 新测试）→ 双签影响面 → 双签 diff（7 findings）→ 设计一致性走查 → verification（512/513 全量零回归）。Windows 端依赖 P255 完成后启用。
+
+**审查发现（待未来版本清理）**：
+- `_find_best_window` 死代码 L556-557（bisect_right 重复计算）
+- BGM 检查 O(W×S) 性能（L605-608，每个窗口遍历全部 segments）
+- `WINDOW_SIZE` / `_SMART_WINDOW_DEFAULT` 双源常量
+- chunk→segments 三次迭代可提取公共 helper
+- `_has_timestamp_segments` 多次调用可缓存
+- `_get_audio_duration` 与 `extractor.py:get_video_duration` 重复
+
+
+## P258 | 2026-06-12 | 🟡 LOW UI [?] 百分比计算 bug——分子分母用不同阶段的段数，误报 15%
+
+**来源**：2026-06-12 ASR 分支实测后 SRT 对比分析。用户发现 UI 显示 15%，但实际只有 7.1%。
+
+**问题**：`worker.py:350` 在句子拆分**前**取了 `total = len(segments)`（520 段），但 `worker.py:587` 在句子拆分**后**数了 `qm_count`（77 个）。前端 `r = qm_count / segment_count = 77/520 = 14.8% ≈ 15%`。但拆分后实际段数是 1083，正确比例应为 `77/1083 = 7.1%`。
+
+**根因**：T4 LLM 句子拆分（L501-511）把一个原始段切成多行字幕，子段全部继承 `uncertain=True`。`total` 变量在拆分前就赋值了，拆分后没更新。分母 520、分子 77——两个数字来自不同的阶段，不匹配。
+
+**修复**：把 `qm_count` 提前到 L350（与 `total` 同时、句子拆分前），删掉 L587 的重新计数。`total`（分母）和 `qm_count`（分子）都基于拆分前的段数——一致、干净、不影响"翻译失败"显示。
+
+**✅ 已修**（2026-06-12）
+
+
+## P259 | 2026-06-12 | 🟡 MEDIUM 跨语言 L3 语速阈值未用真实多语言视频验证
+
+**来源**：2026-06-12 用户提出。相关问题在 problems.md L525、L603、L698 三处提及但从未正式编号。
+
+**问题**：P250 修复后，L3 已按语言分 5 个阈值：
+
+| 语言 | 阈值 | 单位 | 依据 |
+|------|------|------|------|
+| zh | 15 | 字/秒 | 音节计时语言，极限 12-15 |
+| ja | 15 | 字/秒 | 同上 |
+| en | 8 | 词/秒 | 重音计时语言，极限 ~10 |
+| ru | 8 | 词/秒 | 同上 |
+| auto | 7 | 词/秒 | 兜底 |
+
+这些阈值是基于语言学理论推算的——**从未用真实的多语言视频验证过。** 只测过英文（London VLOG），中文/日文/俄文视频的实际 L3 表现未知。
+
+**历史上三次提到这个问题都说了同一句话**（L525/L603/L698）：
+> "不提前解决没有出现的问题。"
+
+但现在情况变了——P250 已经修完，阈值字典已经存在，只需跑几个不同语言的测试视频看 L3 是否有异常误报/漏报。验证成本极低（跑 4-5 个不同语言视频看 `[?]` 率是否正常即可），不再需要"等出现再说"。
+
+**验证方法**：
+1. 准备 5 个语言的测试视频：英文 ✅（已测）、中文、日文、俄文、一个 auto 兜底语言（如泰文）
+2. 各跑一次 precise tier 完整流水线
+3. 检查 L3 语速异常的日志数量——如果某个语言的异常数量异常高（>50 条）或异常低（0 条），说明阈值不合理
+
+**⏸ 未修**（待有对应语言测试视频时执行）
+
+
+## P260 | 2026-06-12 | ~~🔴 P0~~ ✅ P247 Refiner 放错位置——LLM 英文校对在翻译之后执行
+
+**来源**：2026-06-12 Run 7 实测发现问题（用户指出）。
+
+**问题**：P247 Refiner（LLM 转录后英文校对）被放在了 worker.py 的 Step 4（字幕生成），而 Step 4 排在 Step 3（翻译）之后。用户的需求是"转录完成后用 LLM 校对英文原文"——校对必须在翻译之前。
+
+**当前错误流程**：
+```
+转录 → 翻译（拿着错误英文翻成了错误中文）→ 字幕生成（这时候才校对英文，来不及了）
+```
+
+**最终方案（综合 P247/P254/P261）**：
+
+P247 Refiner 的位置从 Step 4（字幕生成/翻译后）移到 L2 交叉验证之后、翻译开始之前。完整流水线：
 
 ```
-英语/日语/韩语 → Qwen3-ASR 主引擎（写主字幕），Whisper 副引擎（校准用）
-长尾小语种     → Whisper 主引擎（不变）
-所有语言       → SenseVoice 分类（不变）
+转录 → P254 路由 → L1（千问原稿）→ Whisper 骨架组装词变句子 → L2 交叉验证 → P247 Refiner（双稿裁判+边界修复+润色）→ 翻译
 ```
 
-**成本**：零内存、零新模型、一行代码。precise tier 已同时跑两个模型。
+**同时修复**：
+- Refiner 的 `_build_llm_backends(api_keys)` 可能返回空列表，`if _backends:` 需加 `else: _log.warning(...)` 以便排查
+- `TranslationResult` 拆盒子已修（`hasattr(_refined, "text")`）
+- Qwen 加载失败静默问题已修（`exc_info=True`）
 
-**依据**：model-comparison.md §9.2b。英文 CommonVoice: Qwen3 7.39% vs Whisper 9.90%。极端噪音: 16.17% vs 63.17%。
+**✅ 已修**（2026-06-14）。Refiner 在 worker.py:431-511 执行，翻译在 line 513 开始。
 
-**⏸ 未修**（待 V3.08 实施）
 
+## P261 | 2026-06-12 | ~~🔴 P0~~ ✅ P254 合成段导致 L1 失效——需改为"先验证再合成"
+
+**来源**：2026-06-12 Run 7 实测——370 段中 360 段被 L1 打 `[?]`（97%）。2026-06-12 用户 + Jobs 流水线架构定稿。
+
+**问题**：当前 Whisper 骨架方案（Run 7）的流程是"先合成再验证"——先把千问的词按 Whisper 时间窗口重新打包，再送给 L1。L1 不认识合成段 → 97% [?]。
+
+**最终方案（"先验证再合成"）**：
+1. L1 交叉验证时，拿到的仍然是千问的原始词级数据（`_qwen_raw`），不被任何人重新包装
+2. L1 验证通过后，再用 Whisper 的句子边界把千问的词组装成句级字幕
+3. 时间戳用千问自己的词级时间戳确定句子的开始和结束时间
+4. 边界偏差（0.1-0.3 秒，1-2 词错位）交给 P247 Refiner 通过双稿裁判修复
+
+**完整流水线位置（L1 和组装可并行）**：
+```
+转录 → P254 路由 → 保留 _qwen_raw
+                  ├─→ L1 看 _qwen_raw 原稿（不打 [?]）     ← 并行
+                  └─→ Whisper 骨架组装（_qwen_chunks_to_segments） ← 并行
+                  ↓（汇合）
+                  L2 交叉验证 → P247 Refiner（双稿裁判+边界修复）→ 翻译
+```
+
+**关键区别**：旧方案是"改好了再给校对员看"——校对员看不懂（97% [?]）。新方案是"校对员先看原稿，看完了再誊写到正式卷子上"。
+
+**需改动文件**：transcriber_v2.py 的 `_qwen_chunks_to_segments()` 和 P254 路由逻辑——拆分为两步：L1 用 `_qwen_raw`，组装用 whisper_segments。
+
+**✅ 已修**（2026-06-14）。L1 在 transcriber_v2.py:760-768 对 Whisper 原稿跑交叉验证，组装在 line 770 之后执行。L1 标记通过 bisect 时间重叠搬运到组装后的段落（line 773-821）。
+
+## P262 | 2026-06-13 | 🔴 P1 `_is_short_word_exempt` 被误删，`[?]` 率飙到 12.9%
+
+**问题**：2026-06-12 TDD 修改中删除了 `_is_short_word_exempt` 函数（调用处 hallucination_filter.py:191 + 定义处 :200-210）。该函数的作用是：英文 ≤3 词 / 中日文 ≤4 字的极短句，L1 直接放行不打 `[?]`。原因是强制对齐算法在 1-2 词的短句上物理层面无法可靠对准时间戳（需要 ≥3-4 词才有足够音素样本）。
+
+**现象**：396 段字幕中 46 段带 `[?]`（12.9%），全部来自短句的中文翻译（"好吧""天哪""自己""火车"等）。这些大部分是真人说话，不是幻觉。
+
+**解决方案**：
+1. 恢复 `_is_short_word_exempt`，但不是原样恢复——加固：短词 + SenseVoice 标签="Speech" → 豁免；短词 + 标签="Music/Noise" → 不豁免
+2. 即：`if len(text.split()) <= 3 and tag == "Speech": return False`
+
+**影响文件**：hallucination_filter.py
+**状态**：✅ 已修（2026-06-13）
+
+
+
+## P268 | 2026-06-14 | 🔴 P0 L1 承载段错误：应固定使用 SenseVoice × Qwen 时间戳验证
+
+**问题**：L1 的设计原则不应该跟“谁是主引擎”绑定。不管最终字幕文字来自 Qwen 还是 Whisper，L1 都应该用 SenseVoice 判断某个时间范围是不是人声，再用 Qwen ASR 内部 FA 时间戳确认这段时间有没有 Qwen 词，因为当前规划里 Qwen 时间戳是最可靠的时间证据。当前代码实际仍然让 L1 遍历 Whisper 原稿段：SenseVoice 标签先贴到 `_whisper_segments`，L1 再对 `_whisper_segments` 调 `_layer1_dual_signal()`，最后把过滤/不确定标记按时间重叠搬运到 Qwen 组装段。
+
+**为什么这是 bug**：
+
+1. **和设计不一致**：`MLX-ASR-换库方案.md` 明确写“L1: SV标签 × Qwen时间戳（不用外部FA）”，并写“Qwen segments 供 L1+L2 共用”。P254/P261 也写“L1（千问原稿）”“L1 看 `_qwen_raw` 原稿”。但当前实现是“Qwen 时间戳作为证据，Whisper 段作为工作台”。
+
+2. **Whisper 质量会决定 L1 是否有效**：FJIN-141 第一次测试里 Whisper large-v3 输出 3375 段，SenseVoice 因此处理 25 chunks，L1 有大量判断；第二次 Whisper tiny 只输出 3 段，SenseVoice 只处理 2 chunks，L1 只出现 2 条“SV误判清除”，几乎没有起到过滤作用。Qwen 两次都稳定输出 25 chunks / 5132 segments，但 L1 没直接消费这些 Qwen 原稿段。这个问题跟主引擎无关，只要 L1 的承载段来自 Whisper，L1 就会被 Whisper 段数和质量拖住。
+
+3. **后续没有第二次 L1 兜底**：`filter_hallucinations(... skip_l1=(_which_primary == "qwen"))` 在 Qwen 主引擎时跳过过滤器内部 L1。也就是说前面这次基于 Whisper 段的 L1 一旦失效，后面不会重新用 Qwen 段补跑。
+
+**关键代码证据**：
+
+- `v2/backend/transcriber_v2.py:612-624`：Qwen 主引擎时保存 `_whisper_segments = results` 和 `_qwen_raw = qwen_chunks`。
+- `v2/backend/transcriber_v2.py:652-665`：`_sv_target = _whisper_segments if _whisper_segments else results`，SenseVoice 的分段目标仍是 Whisper 段。
+- `v2/backend/transcriber_v2.py:760-768`：L1 构造 `_l1_align = _qwen_segments_as_alignment(qwen_chunks)`，但循环对象是 `for _ws in _whisper_segments`。
+- `v2/backend/transcriber_v2.py:770-821`：L1 标记通过时间重叠从 Whisper 段搬运到 Qwen 组装段。
+- `v2/backend/transcriber_v2.py:823-828`：Qwen 主引擎时后续过滤器跳过 L1。
+
+**测试日志证据**：
+
+- 第一次 FJIN-141：`/Users/andy/.video-subber/logs/4754e3947e/debug.log` 显示 Whisper 转录 3375 段，SenseVoice 分段处理 25 chunks / 3375 segments，L1 大量输出“SV误判清除/双确认丢弃”，最终返回 2249 段。
+- 第二次 FJIN-141：`/Users/andy/.video-subber/logs/b544184558/user.log` 显示 Whisper 转录 3 段，Qwen 仍输出 25 chunks，SenseVoice 分段处理 2 chunks / 3 segments，L1 只输出 2 条“SV误判清除”，最终返回 944 段。
+- 两次 transcript 对比：第一次 2249 段中 1418 段纯数字；第二次 944 段纯数字为 0，但 883 段 uncertain，且 944 段全部没有 `whisper_text`。
+
+**根因**：P261 修复时只解决了“先组装再 L1 导致 97% [?]”的问题，但实现选择了一个半修方案：把 L1 提前到组装前跑，同时仍然沿用 Whisper 原稿段作为 L1 的承载段。这样确实避免了“合成段不被 L1 认识”，但没有完成设计要求的“L1 固定看 Qwen 时间戳 + SenseVoice 声音事件”。当 Whisper 输出异常时，SenseVoice 覆盖和 L1 有效性仍然被 Whisper 拖垮。
+
+**修复方向**：
+
+1. **SenseVoice 脱离 Whisper 段**：改为按固定时间窗口或 Qwen 时间范围跑全音频，产出可按时间查询的声音事件。固定窗口指每隔一段时间切一块音频，比如 30 秒或 60 秒，不依赖 Whisper 分出来多少段。
+2. **L1 直接验证 Qwen 段**：从 `_qwen_raw` 构造 Qwen-side segments，给每个 Qwen 段按时间贴 SenseVoice 标签，再用 Qwen 内部 FA 时间戳判断这段有没有词。不能再遍历 `_whisper_segments`。
+3. **Whisper 降级为参考稿**：Whisper 可以继续用于参考边界、双稿裁判或少数语言回退，但不能决定 L1 有没有工作对象。
+4. **补测试**：新增一个回归测试，模拟 Qwen 有 5132 个词级段、Whisper 只有 3 段，断言 L1 仍会覆盖 Qwen 时间范围，而不是只处理 3 个 Whisper 段。
+
+**成人影片场景影响分析**：
+
+日本成人影片里有大量非对白声音：叫声、喘息、笑声、肉体碰撞声、床/环境摩擦声、背景音乐。L1 修正后可以明显改善“非人声声音被误转成字幕”的问题，但不能单独保证字幕完全正确。
+
+理想 L1 对四类情况的处理应该是：
+
+1. **真实对白**：SenseVoice 判断为 Speech，Qwen 时间戳里有词 → 保留。这是最稳定的情况。
+2. **碰撞/摩擦/背景音乐**：SenseVoice 判断为非 Speech，Qwen 时间戳里没有词 → 删除。这是 P268 修完后最直接改善的部分。
+3. **叫声/喘息但不是对白**：SenseVoice 可能判断为 Speech 或 Breath，Qwen 可能输出很短的“あ”“ん”“はぁ”等词。当前 L1 如果只看“Qwen 有时间戳”会倾向保留，仍可能产出无意义字幕。这里需要在 L1 后增加“对白价值判断”：短促、重复、无语义的叫声默认不翻译或只按配置保留。
+4. **噪声触发 Qwen 幻觉**：肉体碰撞声、节奏性摩擦声可能让 ASR 幻听成短词或数字。即使 Qwen 给了时间戳，也不等于这是真对白。SenseVoice 非 Speech + Qwen 只有 1-2 个短 token 时，不能直接判定“SV 错了”，应标记为可疑或删除。
+
+所以 P268 的修复目标不是“所有成人片字幕立刻正确”，而是先让 L1 的工作对象正确：全程覆盖 Qwen 时间线，不再被 Whisper 段数拖垮。修完后还需要一层“对白/非对白”策略，专门处理叫声、喘息和撞击声。
+
+**实际修复（2026-06-14）**：
+
+1. `transcriber_v2.py` 新增 `_qwen_chunks_to_segments()`，从 Qwen 词级时间戳构造 L1 工作段。
+2. `transcriber_v2.py` 新增 `_propagate_l1_marks()`，把 L1 结果从 Qwen L1 段搬到最终组装段。
+3. SenseVoice 的输入源改为 Qwen L1 段；L1 循环对象也改为 Qwen L1 段，不再遍历 `_whisper_segments`。
+4. `_whisper_is_usable()` 替换旧健康判断：Whisper 段数太少、覆盖率太低、数字幻觉太多、重复坍缩太严重时，不能再当可靠参考。
+5. L1 增加 SV 误杀保护：SenseVoice 标非人声但段内有 CJK 文本时，不直接删除，改标 `uncertain`。
+
+**验证**：
+- `test/test_p268_p269_pipeline.py` 覆盖 Qwen L1 时间线、L1 标记搬运、Whisper 健康判断。
+- 相关路径验证：`110 passed, 2 warnings`。
+- 完整真实 FJIN-141 长视频端到端待在有 Metal/GPU/API key 的开发环境重跑。
+
+**状态**：✅ 已修（2026-06-14，真实长视频待重跑）
+
+## P269 | 2026-06-14 | 🔴 P1 P247 Refiner 缺少单稿语义疏通模式
+
+**问题**：P247 Refiner 的历史目标是“LLM 双稿裁判 + 边界修复 + 润色去问号”。当 Qwen 和 Whisper 两份稿子都可用时，LLM 应对比两份稿子，修正 `claw/clock` 这类单词误听；当一个模型崩掉、只剩 Qwen 单稿时，LLM 也应对 Qwen 单稿做句意疏通：补标点、理顺明显乱序、修正明显不成句的碎片、处理 `[?]` 不确定段。
+
+当前代码只实现了“双稿冲突裁判”的窄版：
+
+- `v2/backend/worker.py:431-444` 构造 prompt 时，只有 `seg.text` 和 `seg.whisper_text` 不一致才标 `[CONFLICT]`。
+- `v2/backend/worker.py:436-437`：如果没有 `whisper_text`，直接把 Qwen 文本当普通上下文写入，不标冲突。
+- `v2/backend/worker.py:456-458`：system prompt 写明“只有当 Qwen 明显听错而 Whisper 听对时才修正”，并要求“绝对不要抄写或输出没有任何冲突的上下文段落”。
+- `v2/backend/worker.py:481-487`：只要 LLM 返回了 `corrections`，未被纠正的段会被统一清掉 `uncertain=False`，等于把“没有冲突”当作“裁判通过”。
+
+**实测证据**：
+
+- 第一次 FJIN-141：Whisper large-v3 输出 3375 段，但大量数字幻觉；P247 日志 `corrections=0`，没有修正数字污染。
+- 第二次 FJIN-141：Whisper tiny 只输出 3 段，最终 944 个 transcript 段全部 `whisper_text=""`，其中 883 段 `uncertain=True`；P247 仍日志 `corrections=0`。
+- 第二次 transcript 样例已经出现明显碎片：`"少しですかうんお"`、`"父さんとお母さん今"`、`"ククだよ"`。这类句子没有参考稿时，当前 Refiner 不会做任何疏通。
+
+**根因**：P263/P264 重构时，为了解决“全篇双稿塞给 LLM 导致注意力稀释”和“LLM 大改字幕”的风险，把 Refiner 收缩成 JSON corrections 模式和单段安全阀。这个改动保住了安全性，但砍掉了 P247 原设计里的“全局润色 / 边界修复 / 单稿语义疏通”能力。项目记录把 P247 标为 ✅ 已修，实际只修了“双稿冲突裁判 + 安全阀”，没有覆盖“参考稿缺失时怎么办”。
+
+**解决方案**：
+
+1. **给 Refiner 加模式判断**：
+   - 双稿模式：有足够 `whisper_text` 且 Whisper 健康时，继续走现有 `[CONFLICT]` 裁判。
+   - 单稿模式：`whisper_text` 覆盖率过低、Whisper 段数过少、或 Whisper 被健康检查判坏时，改为 Qwen 单稿疏通。
+
+2. **单稿模式只处理高风险段**：
+   - `uncertain=True` 的段；
+   - 长度极短但上下文明显不完整的段；
+   - 语序明显破碎的段；
+   - L3/L4 标记过但未删除的段；
+   - 不处理稳定长句，避免 LLM 过度改写。
+
+3. **单稿模式输出仍用 JSON corrections**：
+   - 只返回需要改的段：`{"corrections":[{"seg_id":12,"fixed_text":"...","reason":"broken_sentence"}]}`。
+   - 未返回的段保持原样，不自动清掉 `uncertain`。
+
+4. **安全阀分级**：
+   - 双稿裁判：继续用 `_clean_dist()` 阈值 0.80。
+   - 单稿疏通：允许更大改动，但只限同一段内部，不允许跨段合并、删除时间戳、改 ID。若需要跨段合并，先记录为组装问题，不在 Refiner 偷偷做。
+
+5. **日志必须可见**：
+   - 打印 `P247 Refiner mode=dual/single`。
+   - 打印 `whisper_coverage`、`uncertain_count`、`candidate_count`、`corrections_count`。
+   - 如果单稿模式跳过，要写明原因。
+
+**和 P268 的区别**：
+
+- P268 修 L1：让 SenseVoice × Qwen 时间戳覆盖全片，不再被 Whisper tiny 的 3 段拖垮。
+- P269 修 Refiner：当 Whisper 参考稿缺失或崩坏时，让 LLM 仍能对 Qwen 单稿做有限疏通，而不是 `corrections=0` 后直接放行。
+
+**实际修复（2026-06-14）**：
+
+1. `worker.py` 新增 `_choose_refiner_mode()`：Whisper 健康时走 dual，不健康时走 single。
+2. `worker.py` 新增 `_select_refiner_segments()`：single 模式只发送 `uncertain`、过短、明显碎句的候选段。
+3. `worker.py` 新增 `_build_refiner_prompt()`：dual 继续双稿裁判，single 只做 Qwen 单稿有限疏通。
+4. `worker.py` 新增 `_apply_refiner_corrections()`：single 模式 `corrections=0` 不清 `uncertain`；只清实际修正过的段。
+5. single prompt 明确：不新增剧情、不跨段合并、不把叫声/喘息扩写成完整对白。
+
+**验证**：
+- `test/test_p268_p269_pipeline.py` 覆盖 single/dual 问号清理行为。
+- worker 冒烟测试生成 SRT 后，`uncertain=True` 的段保留为 `世界。 [?]`。
+- 完整真实 FJIN-141 长视频端到端待在有 Metal/GPU/API key 的开发环境重跑。
+
+**状态**：✅ 已修（2026-06-14，真实长视频待重跑）
+
+## P270 | 2026-06-14 | 🟡 P1 L4 CJK 重复短句被当结构性垃圾硬删
+
+**问题**：L4 的重复正则会把 1-4 个字符组成的重复串直接删除，例如：
+
+- `もっともっともっと`
+- `違う違う違う`
+- `やだ やだ やだ`
+- `哈哈哈哈哈哈`
+
+这些在日语/中文/韩语里可能是真实短句、反应词或叫声，不应该和数字幻觉、ASCII 垃圾重复用同一条硬删规则处理。
+
+**原因**：`_RE_REPEATED_PATTERN` 和 `_RE_REPEATED_WORDS` 只看“重复形状”，不看字符类型。旧逻辑在非 GREEN 段里直接 `filtered=True`。
+
+**解决方案**：
+
+1. 新增 `_has_cjk_text()`，先用 NFKC 标准化，避免把全角数字 `１２３` 误判成 CJK。
+2. 新增 `_mark_cjk_repetition_uncertain()`。
+3. CJK 重复：不硬删，标 `uncertain=True`，`filter_reason="layer4_cjk_repetition_uncertain"`。
+4. 非 CJK 重复、数字重复、符号重复：继续硬删。
+
+**验证**：
+- `もっともっともっと` → 保留，标 `uncertain`。
+- `やだ やだ やだ` → 保留，标 `uncertain`。
+- `１２３１２３１２３` → NFKC 后变 `123123123`，继续删除。
+- `hey hey hey` → 继续删除。
+- 相关路径验证：`110 passed, 2 warnings`。
+
+**状态**：✅ 已修（2026-06-14）
+
+## P263 + P264 | 2026-06-13 | 🔴 P1 双稿裁判重构——完整稿子 + 差异标注 + 锚点分组
+
+**合并**：原 P263（准确率）和 P264（token 浪费）实为一个问题的两面：双稿裁判把 356 段全塞给 LLM 导致注意力稀释。合并为一条，统一方案解决。
+
+### 问题
+
+Refiner 将 356 段 × 两份稿子 = 约 2500 行 SRT 一次性发给 LLM。其中大部分段 Qwen 和 Whisper 的文字完全一样，不需要裁判。真正有差异的只有 ~20 段。但 LLM 在 2500 行的海洋里注意力被稀释，"claw"和"clock"只差一个字母，LLM 未能发现。
+
+### 根本原因
+
+1. **无预过滤**：所有段一视同仁发给 LLM，80%+ token 浪费在不需要裁判的段上
+2. **无差异标注**：两份稿子平铺，LLM 不知道去哪找差异，只能全篇扫描
+3. **裁判 ≠ 翻译**：裁判只需要"读"标注处并做选择题，不需要像翻译那样逐段"理解+产出"。不会疲劳，不需要滑窗
+
+### 解决方案：完整稿子 + 差异标注 + 锚点分组
+
+**核心思路**（乔布斯方案）：LLM 相当于批卷老师——不需要通篇阅读，只看到有标注的地方，对比两个版本，回头看上下文判断。给 LLM 完整主引擎稿子做背景，只在有差异的地方标注参考版本。
+
+#### Step 0：程序比对（每次必做，零 LLM 成本）
+
+```python
+for seg in segments:
+    seg.text == seg.whisper_text → 一样，跳过
+    seg.text != seg.whisper_text → 不一样，标记为"锚点"
+```
+
+#### Step 1：Token 估算与阈值判断
+
+```
+Token 估算：总段数 × 25 token/段（含标注，经验值，实际 15-35）
+安全阈值：50000 token（DeepSeek 64K 窗口留 25% 余量给回复）
+触发分组：总Token > 50000 → 进入分组模式，否则单批模式
+
+参考数据（22分钟视频实测）：
+  356 段 → 800 行 SRT → ~15000 token → 单批模式即可
+
+各语言差异：
+  字符数不影响判断——所有参数（阈值、安全区）都按"段数"算，不按字数
+  段数 = 说话时间 / 平均每段时长（2-4秒），与语言无关
+  ±50 段 ≈ 前后各 3 分钟上下文，任何语言都够用
+```
+
+#### Step 2：单批模式（总Token ≤ 50000，覆盖 90% 场景）
+
+Prompt 格式：
+```
+你是字幕校对裁判。下面是完整字幕稿（[Primary]）。
+只关注标注了 ⚠️ 的地方——那里有一份 [Reference] 版本供你对比。
+没有标注的段直接保留，不要改。
+
+段0: こんにちは
+段1: 今日はいい天気ですね
+段2: そうですね
+...
+段25: ⚠️ 私は時計を持っている
+    [参考] 私は爪を持っている
+段26: じゃあ行きましょう
+...
+
+规则：
+1. 只判断 ⚠️ 标注的段。其余直接照抄。
+2. 对比两个版本，根据上下文选更合理的。
+3. 不确定就保留 Primary。
+4. 输出格式：每行一段，只输出文字。
+```
+
+#### Step 3：锚点分组模式（总Token > 50000，2小时+ 电影专用）
+
+```
+算法：
+1. 每个锚点画"安全区"：前后各 ±50 段（≈3分钟上下文）
+2. 安全区有重叠 → 合并为"任务区"
+3. 每个任务区单独发送 LLM（格式同单批模式）
+
+示例（2400 段，35 个锚点）：
+  任务区1: 段 0-210   （8个锚点）
+  任务区2: 段 350-720 （12个锚点）
+  任务区3: 段 890-1300（9个锚点）
+  任务区4: 段 1600-2100（6个锚点）
+
+为什么需要 ±50 段而非 ±20 段：
+  电影中可能有长对话场景。3 分钟安全区覆盖绝大多数对话上下文。
+  极端情况（"开头问时间，20分钟后说想要手表"）不需要远端上下文——
+  LLM 判断 "clock vs claw" 只需要常识 + 附近 5 段，不需要 20 分钟前的对话。
+
+为什么不切固定大小的块：
+  固定块可能在标注句需要的上游上下文中间切断。
+  锚点驱动分组 = 让内容决定在哪切，不是人为画线。
+```
+
+#### Step 4：解析 LLM 返回结果
+
+LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的保持不确定标记。
+
+### 影响文件
+
+- `worker.py`：Refiner prompt 构建逻辑（预过滤 + 标注生成 + 锚点分组 + prompt 拼装）
+- 不涉及其他文件
+
+### 实施优先级（用户决定一次性全部实现）
+
+| 功能 | 说明 |
+|------|------|
+| 预过滤 + 差异标注 | 程序比对 seg.text vs seg.whisper_text，只标注差异 |
+| 单批模式 | 完整稿子 + 标注，一次 LLM 调用 |
+| Token 估算 | 根据段数估算 token，判断走单批还是分组 |
+| 锚点分组 | 超长视频自动分任务区，每区单独调用 LLM |
+
+**覆盖场景**（所有语言通用）：
+- 日剧 40 分钟 → 单批，一次 LLM 调用
+- 电影 1.5 小时 → 单批，一次 LLM 调用
+- 电影 2 小时 → 单批或刚好触达分组
+- 电影 2.5 小时 → 锚点分组，3-5 次 LLM 调用
+
+**状态**：✅ 已修（2026-06-13）
+
+
+
+## P265 | 2026-06-13 | 🔴 P1 Qwen 词级重组产出碎片化文本（CJK 语言）
+
+**问题**：`transcriber_v2.py` 的 `_qwen_chunks_to_segments()` 函数在重组 Qwen 词级时间戳到 Whisper 句级骨架时，产出碎片化文本。50 分钟日语视频（FJIN-141）1486 段字幕中，899 段有实际文字，其中 453 段（50.4%）带不该有的分词空格，416 段（46%）内容与 Whisper 原文错位。
+
+**原因**：两个 bug 叠加——
+
+1. **Bug 1（第 216 行）**：`" ".join(w["text"] for w in in_range)` 用空格拼接 Qwen 词。英语正确，但日语/中文/韩语不需要空格。产出如 `おじ さん の チンチン 舐め` 而非 `おじさんのチンチン舐め`，翻译引擎收到碎片文本后截断翻译。
+
+2. **Bug 2（第 214 行）**：`in_range = [w for w in qwen_words if w["end"] >= t0 and w["start"] <= t1]` 用简单时间重叠分配词。Qwen 和 Whisper 对同一段音频切分方式不同，同一个词可能横跨两个 Whisper 窗口边界，导致同一个词被分配到多个窗口、或一句话的词被打散到好几个窗口。
+
+**解决方案**：
+- Bug 1：对 CJK 语言用 `"".join()`，对英语等西方语言保持 `" ".join()`。语言信息在 `detected_lang` 变量（第 281 行）已检测。
+- Bug 2：用最大重叠比例分配词（一个词只归属重叠最多的窗口），或分配完后合并相邻不完整句子，或换组装策略。
+
+**涉及文件**：`transcriber_v2.py:175-229`（`_qwen_chunks_to_segments` 函数），调用位置第 517 行。
+
+**详细文档**：`P255-重组碎片化问题-工程师文档.md`（自包含，可直接交给外部工程师阅读）
+
+**解决方案（实际采用）**：
+- Bug 1：加 `lang` 参数，CJK 用 `"".join()`，其他语言保持 `" ".join()`
+- Bug 2：中点落入判定 `t0 <= (w["start"] + w["end"]) / 2 <= t1`，每个词最多归属一个窗口
+- 防御性排序 `qwen_words.sort(key=lambda w: (w["start"] + w["end"]) / 2)`
+- 调用处（第 517 行）传入 `lang=detected_lang`
+
+**状态**：✅ 已修（2026-06-13）
+
+
+## P271 | 2026-06-14 | 🟡 P1 当前版本测试被旧版本目录污染，导致全量验证无法给绿灯
+
+**问题**：在 `video-subtitle/v2/` 根目录直接跑完整测试时，pytest 会递归扫到 `v2.10/v2.11/v2.12/v3.01/v3.02/v3.03/v3.04/v3.05` 等旧版本目录里的测试文件。这些旧测试和当前版本测试文件重名，会触发 `import file mismatch`，导致当前版本全量测试无法得到可靠结论。
+
+**原因**：当前 `v2/` 目录同时放了活跃代码和多个旧版本快照。根目录没有明确的 pytest 收集范围，测试工具会默认往下递归，把历史快照里的 `test_*.py` 也当成当前版本测试。
+
+**影响**：这不是字幕生成逻辑本身的 bug，但会阻塞当前版本验证。P268/P269/P270 的相关路径测试已经通过，真实 FJIN-141 还需要重跑；如果全量 pytest 一直被旧目录干扰，就无法判断“当前代码是否全绿”。
+
+**解决方案**：
+1. 在当前活跃版本目录加测试范围配置，只收集当前版本的 `test/`，不递归旧版本快照。
+2. 保留旧版本目录，不删除历史；只是让当前版本测试不要自动扫进去。
+3. 后续版本整理时，把旧版本快照统一移入只读归档区，避免活跃代码目录和历史快照混放。
+
+**状态**：⏳ 代码已修，待真实 FJIN-141 重跑验证（2026-06-15：新增 `extract_start` 回填、padding 裁剪、裁剪后 text 重建；相关窄测试 23 条通过；全量仍受 Metal/MLX 与 SenseVoice/funasr 环境问题阻塞）
+
+
+## P272 | 2026-06-15 | 🔴 P0 FJIN-141 新跑结果出现翻译接缝审查污染字幕
+
+**问题**：2026-06-14 23:55 新跑的 `65b1f1b3db/FJIN-141.srt` 中，字幕后半段出现大量“版本A/版本B/选B”这类审查解释文字。抽样统计：`translated.json` 里至少 90 条中文译文包含这类解释文本。用户实际观察到 49:37 附近有人说话但字幕缺失，随后说话内容延迟出现；50:00 附近多行字幕瞬间闪过。
+
+**证据**：
+- 新结果：`/Users/andy/.video-subber/jobs/65b1f1b3db/FJIN-141.srt`
+- 旧结果：`/Users/andy/.video-subber/archives/cache-clear-2026-06-14-p268-rerun/b544184558/FJIN-141.srt`
+- 新日志：`/Users/andy/.video-subber/logs/65b1f1b3db/debug.log:1598-1611`
+- 代码位置：`v2/backend/translation/orchestrator.py:393-461`
+
+**原因**：`_review_seam()` 的 prompt 要求“输出格式：[编号] 最终译文”，但 LLM 返回了“[783] 版本A...版本B...选B”这种解释。解析器 `_INDEXED_LINE_RE` 只检查行首是否有 `[编号]`，没有检查内容是不是纯译文，于是把解释当成正式字幕写回 `translated`。这不是翻译引擎失败，而是接缝审查的输出没有被约束和校验。
+
+**影响**：字幕会把审查说明当正文显示；接缝区被污染后，用户看到的不是翻译，而是内部评审文字。这个问题独立于 ASR，必须先修，否则即使 ASR 时间轴修好，字幕后半段仍会被解释文本污染。
+
+**解决方案**：
+1. `_review_seam()` 返回内容必须做“解释文本过滤”：包含 `版本A`、`版本B`、`选A`、`选B`、`更自然`、`更符合` 等审查措辞时，不允许写回字幕。
+2. 接缝审查失败或返回解释时，保留已有版本，不覆盖 `translated`。
+3. 加测试：模拟 `_review_seam()` 返回解释文本，确认不会污染字幕；模拟返回纯译文，确认可正常写回。
+
+**状态**：⏸ 未修
+
+**真实重跑复核（2026-06-15，`e5494b352d`）**：
+- 最新 SRT 和 `translated.json` 未再出现“版本A/版本B/选A/选B/字幕质量审查员”等解释文本，说明最终字幕暂时没有被污染。
+- 但 `debug.log` 里仍能看到模型返回“字幕质量审查员”“版本A/版本B/选A”这类内容，说明根因还在，只是这次没有写进最终 SRT。
+- 结论：P272 从“污染进入成品”降级为“LLM 仍会输出解释，成品暂时被挡住”。不能标已修，仍需修 `_review_seam()` 的输出过滤和失败回退。
+
+
+## P273 | 2026-06-15 | 🔴 P0 Qwen 主引擎组装仍有长空洞和瞬闪短字幕
+
+**问题**：P268/P269/P270 修完后，FJIN-141 新跑结果从 944 段变成 1049 段，但 49:20-50:20 仍然有明显时间轴问题：49:37 左右有人说话但没有字幕；50:01 附近连续出现多条 0.07s-0.25s 的短字幕，肉眼看起来就是“三行字幕一下子过去”。
+
+**证据**：
+- 新 `transcript.json`：`/Users/andy/.video-subber/jobs/65b1f1b3db/cache/c2e90d73d46a/transcript.json`
+- 旧 `transcript.json`：`/Users/andy/.video-subber/archives/cache-clear-2026-06-14-p268-rerun/b544184558/cache/c2e90d73d46a/transcript.json`
+- 新结果 49:20-50:20：14 段，全部 `uncertain=True`，其中 3 段短于 0.2 秒，最大空洞 6.96 秒；全片 1049 段中 157 段短于 0.2 秒，433 个大于 3 秒空洞。
+- 对应代码：`v2/backend/transcriber_v2.py:406-445` 的 `_assemble_qwen_primary()`。
+
+**原因**：Qwen 主引擎现在按词级时间戳组装字幕，断句条件主要是：词间停顿 `gap >= 0.5s`、句尾标点、单段超过 8 秒、单段超过 40 字。成人片这种音频里有大量短促语气词、叫声、停顿和断续说话，词级组装会产生两个坏结果：一是把真实短句拆成 0.08s 这种看不见的字幕；二是把一串内容推到后面的长段里，用户感觉“刚才说的话过一会儿才出现”。
+
+**补充诊断（2026-06-15）**：外部工程师复核 49:37-50:00 后指出同一根因链条：
+1. `_words_to_segment()` 当前没有把 Qwen 词级时间戳保存到 `seg.words`，导致组装后的段 `words=[]`。
+2. `word_align_segments()` 本来可以用 `seg.words` 做更细的时间切分，但遇到 `words=[]` 会直接跳过。
+3. `_build_split_segments()` 和 `_rule_based_split()` 只能按中文字数比例分配时间，导致“一字长挂”和“多句瞬闪”：例如一个 7.47 秒长段被翻译拆成 5 句后，第一句“ 不 ”占满大部分时间，后面几句被挤到 0.1 秒级。
+4. 因此 P268/P269/P270 修的是“保留/过滤哪些段”，但还没修“段本身怎么切、词级时间戳怎么传下去”。
+
+**二次审查补充（2026-06-15）**：外部工程师进一步指出更上游的问题：`_SENTENCE_ENDERS = ("。", "！", "？", "!", "?", "…")` 对 Qwen 日语输出基本失效。FJIN-141 的 Qwen 日语原文几乎不带句末标点，所以 `_assemble_qwen_primary()` 的句末标点断句命中率为 0%。实际只剩 `gap >= 0.5s` 和 `span >= 8.0 / len >= 40` 两条规则在工作，导致连续日语对白被一直攒到硬限制才切开。修复重点应前移：先让组装函数识别日语句尾，而不是主要依赖输出前整形。
+
+**双签审查补充（2026-06-15）**：日语句尾列表需要精简，避免误断。`れ` 会误匹配 `これ/それ/あれ/どれ` 等高频句中词，`くる` 也容易误伤 `〜てくる`，本轮删除。`の/さ/で` 句中用法较多，不能和强句末词同门槛处理，应提高到 `gap >= 0.3s` 才断。最终采用强/弱两级：强句末词 `よ/ね/な/わ/ぞ/ぜ/か/だ/ます/たい` 使用 `gap >= 0.15s`，弱句末词 `の/さ/で` 使用 `gap >= 0.3s`。
+
+**影响**：即使文字识别到了，字幕也不可读。49:37 到 50:00 的问题不是单纯漏识别，而是“组装出的字幕节奏不符合观看需求”。这会直接破坏最终成片体验。
+
+**解决方案**：
+1. `_words_to_segment()` 必须保存 `seg.words`，并统一 `text/word/start/end` 字段，保证后续 `word_align_segments()` 和拆句函数能拿到词级时间戳。
+2. `_assemble_qwen_primary()` 增加日语句尾 + 微停顿断句，采用两级规则：强句末词 `よ/ね/な/わ/ぞ/ぜ/か/だ/ます/たい` 在 `gap >= 0.15s` 时断；弱句末词 `の/さ/で` 在 `gap >= 0.3s` 时断。这里的“微停顿”是 0.1-0.3 秒级的自然说话间隔，当前 0.5 秒阈值对日语连续对白太宽。
+3. 硬限制从 `8s/40字` 调整为更温和兜底，例如日语 `5s/25字`。它只负责兜底，不能替代句尾断句；不采用 `3.5s/18字` 这种过激硬切，避免把一句话从中间切碎。
+4. `word_align_segments()` 需要兼容 Qwen `text` 字段，并补充日语句尾检测；否则即使 `seg.words` 有了，原来的英文标点正则仍会找不到边界。
+5. `_build_split_segments()` 使用 `seg.words` 分配拆句时间作为后续优化保留；只有 `words=[]` 时才允许退回按字符比例分配并记录 warning。
+6. 输出前整形不作为主方案，只保留最小日志和质量统计。先修上游组装，不在 SRT 成品上做复杂时间拉伸/挪移。
+7. 保留 P268 的 L1 逻辑不回退；这次只处理 Qwen 主稿的“日语断句、组装成字幕、词级时间戳下传”阶段。
+
+**测试要求**：
+1. `_words_to_segment()` 会保留 `seg.words`，字段至少包含 `text/word/start/end`。
+2. Qwen 日语无标点时，强句末词 + `gap >= 0.15s` 能断句。
+3. 弱句末词 `の/さ/で` 只有 `gap >= 0.3s` 才断，`gap = 0.2s` 不断。
+4. `これ` + `gap = 0.2s` 不应该断句，防止未来重新加入 `れ`。
+5. 修复后统计 FJIN-141：段数、`>3.5s` 长段数、`<0.1s` 极短段数、49:37-50:00 局部字幕是否恢复。若断太碎，把强句末阈值从 0.15 调到 0.2；若仍有长段，再考虑降到 0.12。
+
+**实现记录（2026-06-15）**：
+- 已新增 `v2/test/test_p273_qwen_ja_assembly.py`，覆盖 `seg.words` 保留、强/弱日语句尾断句、`これ + 0.2s` 不误断、英语不触发日语微停顿规则。
+- 已修改 `v2/backend/transcriber_v2.py`：新增强/弱日语句尾常量，`_words_to_segment()` 保留 `seg.words`，`_assemble_qwen_primary()` 对日语启用强/弱句尾 + 微停顿断句，并把日语硬限制改为 `5s/25字`。
+- 验证：`66 passed in 3.82s`，命令为 `.venv/bin/python -m pytest test/test_p273_qwen_ja_assembly.py test/test_p268_p269_pipeline.py test/test_p251_qwen_window_assign.py test/test_phase1d_qwen_health.py test/test_phase1d_integration.py test/test_p228_timestamp_fix.py -q`。
+
+**真实重跑复核（2026-06-15）**：
+- 新结果：`/Users/andy/.video-subber/jobs/723b866ccb/FJIN-141.srt`
+- 新日志：`/Users/andy/.video-subber/logs/723b866ccb/user.log`
+- 新 transcript：`/Users/andy/.video-subber/jobs/723b866ccb/cache/c2e90d73d46a/transcript.json`
+- 结论：P273 修改部分有效，但没有通过真实长视频验证。有效点：`transcript.json` 里 1127/1127 段都有 `words`，说明 Qwen 词级时间戳已保留下来；49:20-50:20 局部从 Run 3 的 0.07s/0.12s/0.17s 连续闪屏，变成 Run 4 只有两个 0.08s 极短段，局部可读性略好；Run 4 未再出现“版本A/版本B/选B”字幕污染。未解决点：全片仍有 179 条短于 0.2s 的字幕、435 个大于 3s 的空洞、最大空洞 67.733s；日志仍有 143 条 `L3 不可能时长` 和 157 条 `L3 语速异常`；49:20-50:20 仍有全部 `uncertain=True` 和 0.08s 短字幕。
+- 进一步判断：问题已经不是“词级时间戳没有下传”，而是 Qwen 主引擎组装策略仍会把 1 个词单独切成 0.08s 字幕，并留下几十秒未覆盖区间。下一轮应继续沿 P273 处理：给 `_assemble_qwen_primary()` 加最小时长/短词并入规则，并对超长空洞做日志化诊断，而不是回退 P268 的 L1 逻辑。
+
+**P274 后真实重跑复核（2026-06-15，`e5494b352d`）**：
+- 最新结果：`/Users/andy/.video-subber/jobs/e5494b352d/FJIN-141.srt`
+- 最新 transcript：`/Users/andy/.video-subber/jobs/e5494b352d/cache/c2e90d73d46a/transcript.json`
+- 最新日志：`/Users/andy/.video-subber/logs/e5494b352d/user.log`
+- 有效点：最新 `transcript.json` 1099/1099 段都有 `words`；21:39 附近的同一句字幕从旧 run 的 `1306.867-1310.468` 前移到 `1301.867-1305.468`，说明 P274 把 5 秒系统性后移拉回来了。
+- 未解决点：全片仍有 188 条短于 0.2s 的字幕；`uncertain` 仍有 846/1099，约 77%。其中 `[?]` 主要来自 L2 的 YELLOW/LOW_DATA，不是翻译阶段或 SRT 阶段临时加的。
+- SRT 间隔口径修正：全片仍有 417 个大于 3s、151 个大于 10s 的 SRT 间隔，最大间隔 126.920 秒。但用户人工复核后确认最大间隔 `2187.702-2325.101`（36:27.702-38:45.101）没有人说话，40:10-41:35 也没有对白。因此这些只能叫“字幕间隔”，不能直接叫“漏字幕空洞”。
+- 日志侧改善：`L3 不可能时长` 从旧 run 的 143 降到 13，`L3 语速异常` 从 157 降到 83，`L4 CJK重复保留` 从 142 降到 29。说明过滤层压力下降，但字幕最终可读性仍未过关。
+- 结论：P273 不是完全无效。P274 后用户人工确认 5 秒延迟已解决，大部分内容已经恢复成句子，不再像早期那样大量连续闪字幕或一句话被拆成小词。P273 剩余问题改为两类：① `[?]` 过多，主要由 L2 低证据窗口打标；② 仍有短字幕，需要等 P275 的人声地图完成后，才能判断哪些 SRT 间隔是真漏字幕，哪些只是正常无对白。下一步先做 P275，再决定是否继续加最小时长/短词并入。
+
+**状态**：⏸ 部分改善，未完全关闭（5 秒延迟已由 P274 修复；句子化明显改善；剩余主问题是 `[?]` 过多和短字幕。SRT 长间隔必须等 P275 人声地图后再判定是否是真漏字幕）
+
+
+## P274 | 2026-06-15 | 🔴 P0 Qwen 长音频切片 padding 导致字幕时间整体后移
+
+**问题**：FJIN-141 第四次真实重跑 `723b866ccb` 中，用户指出 21:39 人物在说话但没有字幕，后面才出现字幕，22:00 后尤其明显。复查 21:20-22:40 发现，`transcript.json` 和最终 SRT 时间完全一致，说明不是翻译或 SRT 渲染阶段推迟，而是 ASR 源稿时间已经错位。21:39 附近只有 `1297.268-1297.348` 的 0.08s 字幕“か/吗”，前一条到它之间有 18.416s 空洞；`1324.760` 前又有 9.412s 空洞。
+
+**证据**：
+- 当前源稿：`/Users/andy/.video-subber/jobs/723b866ccb/cache/c2e90d73d46a/transcript.json`
+- 当前字幕：`/Users/andy/.video-subber/jobs/723b866ccb/FJIN-141.srt`
+- 当前日志：`/Users/andy/.video-subber/logs/723b866ccb/user.log:9-10` 显示 `7431s > 20min` 后启用 `25 chunks`；`user.log:25` 显示问题时间点所在的 `chunk 5/25` 是 `1200.0s-1500.0s`。
+- 代码位置：`v2/backend/core/qwen_asr_runner.py:138-160` 提取切片时前后各加 5s padding；`v2/backend/core/qwen_asr_runner.py:185-190` 回填时间时直接加 `t_start`。
+- 对照：Run 3 `65b1f1b3db` 和 Run 4 `723b866ccb` 在 21:20-22:40 的 SRT 时间几乎一致，说明 P273 的词级下传/日语断句修改没有解决这一段的时间骨架。
+- 历史证据：P168 已在 2026-06-07 记录过同类问题“分段转录时间戳偏移 5 秒——缓冲区未修正”，当时修的是旧路径。当前 `qwen_asr_runner.py:138-190` 的长音频 Qwen 主引擎路径再次出现 `t_start` 回填，属于同类问题回归或新路径漏修。
+- Git 证据：`v3.07` 旧路径 `_process_single_chunk()` 已经在 `f9f203d` 中使用 `extract_start` 回填；`874ab188 feat(V3.07): Mac 端千问 ASR 换库 gabrimatic → moona3k` 新增/改写 `_transcribe_chunk()` 后，MLX `result.segments` 路径改为 `s["start"] + t_start`，没有继承 P168 修法。
+
+**原因**：长音频切片时，代码实际传给 Qwen 的音频不是 `t_start-t_end`，而是 `t_start-5s` 到 `t_end+5s`。模型返回的词时间是相对这个“带 padding 的临时音频”的。当前代码却把每个词的 `start/end` 加上 `t_start`，没有加真正的 `extract_start`，也没有把 padding 区间裁掉。结果是从第二个切片开始，字幕会系统性后移约 5 秒；21:39 位于 `1200-1500s` 这个切片，正好命中。这个错误曾在 P168 旧路径修过，说明当前问题不是新概念，而是新 Qwen 主链/长音频路径没有继承旧修法。P273 造成的 0.08s 短字幕和大空洞会把这个 5 秒后移放大成肉眼可见的“说完后字幕才出现”。
+
+**影响**：这是比 P273 更上游的时间轴错误。只修 `_assemble_qwen_primary()` 的最小时长/短词并入，不能消除 20 分钟后字幕整体偏晚的问题。P273 和 P274 需要一起修：P274 先把词级时间放回真实视频时间；P273 再把词组装成可读字幕。
+
+**解决方案**：
+1. `_extract_audio_chunk()` 返回 `extract_start/extract_end`，或新建小结构保存真实提取起点。
+2. `_transcribe_chunk()` 的 MLX 时间回填改为 `raw_start + extract_start`，不是 `raw_start + t_start`。
+3. 裁掉 padding 区间：只保留落在 `[t_start, t_end]` 的词；跨边界词需要 clamp 到边界，避免相邻 chunk 重复。
+4. 加单元测试：`t_start=1200`、`_AUDIO_PAD_S=5`、模型返回 `start=10` 时，绝对时间应为 `1205`；模型返回 `start=3` 时应被识别为 padding 区内容并裁掉或 clamp。
+5. 修完后真实重跑 FJIN-141，重点复查 21:39、22:00、49:37、50:00 四个点，统计 `<0.2s`、`>3s` 空洞和最大空洞。
+6. 防回归：测试必须覆盖“旧 P168 修过的 PyTorch time_stamps 路径”和“当前 MLX result.segments 路径”，防止以后再换库时只修一边。
+
+**实现记录（2026-06-15）**：
+- 已修改 `v2/backend/core/qwen_asr_runner.py`：MLX chunk 时间回填改用 `extract_start`，padding 前后区间会被裁掉，MLX chunk `text` 由裁剪后的 segments 重建。
+- 已补 P274 单测，覆盖 padding 前、中、后三段，确认只保留真实 chunk 区间里的文字。
+- 相关窄测试 23 条通过；全量验证仍受当前环境 `No Metal device available` 和 SenseVoice/funasr 段错误阻塞，不能给全量绿灯。
+
+**真实重跑复核（2026-06-15，`e5494b352d`）**：
+- 21:39 附近：旧 run `723b866ccb` 的 `1297.268-1297.347` 变成最新 `1292.268-1292.347`，正好提前 5 秒。
+- 22:00 附近：旧 run `723b866ccb` 的 `1306.867-1310.468` 变成最新 `1301.867-1305.468`，也正好提前 5 秒。
+- 结论：P274 的“长音频 chunk padding 导致 5 秒系统性后移”已被真实重跑验证为有效。
+- 注意：P274 只负责 5 秒系统性后移。后续不再用单纯 SRT gap 判断 P273 是否漏字幕；用户已确认最大 SRT 间隔 36:27-38:45 是无对白。真实漏字幕必须等 P275 生成人声/非人声时间轴后再判定。
+
+**状态**：✅ 已修（5 秒系统性后移已由 `e5494b352d` 真实重跑验证；剩余 `[?]`、短字幕和 SRT 间隔判定不归 P274）
+
+
+## P275 | 2026-06-15 | 🔴 P0 L1 只检查已有字幕段，缺少全片人声/非人声时间轴
+
+**问题**：用户人工复核 FJIN-141 最新 run `e5494b352d` 后指出：40:10-41:35 没有对白，因此不能把 SRT 中这段长间隔叫做“漏字幕空洞”。理想 L1 应该在 SenseVoice 和 Qwen FA 交叉验证后，把整条音频切成“人声区”和“非人声区”；只有“人声区内没有字幕”才叫漏字幕。当前代码没有这张全片时间轴，导致诊断报告只能从 SRT 字幕间隔推测，容易把无对白段误报为空洞。
+
+**证据**：
+- 最新结果：`/Users/andy/.video-subber/jobs/e5494b352d/FJIN-141.srt`
+- 最新日志：`/Users/andy/.video-subber/logs/e5494b352d/user.log`
+- `user.log` 显示 SenseVoice 分段处理 25 chunks，并输出标签分布 `{'BGM': 7, 'Speech': 17, 'Breath': 1}`，但最终日志没有输出全片“人声/非人声区间地图”。
+- 代码位置：`v2/backend/transcriber_v2.py` 先生成 Qwen L1 段，再给这些已有段贴 SenseVoice 标签，最后 `_propagate_l1_marks()` 把标记搬到组装后的字幕段。
+- 代码位置：`v2/backend/core/hallucination_filter.py:_layer1_dual_signal()` 的输入是单个 `seg`，它回答的是“这条字幕段该保留/删除/打问号吗”，不是“这段原始音频有没有人声”。
+
+**原因**：当前 L1 是“字幕段级检查”，不是“全音频人声地图”。它只遍历已经存在的 Qwen/字幕段；如果某段时间没有字幕段，L1 就没有对象可检查，也不会生成“这里确认是非人声”的记录。SenseVoice 虽然跑了全片分段，但结果没有被保存成可查询的人声/非人声 timeline，也没有用于“有对白但没字幕”的漏检诊断。
+
+**影响**：
+1. SRT gap 统计只能表示“字幕之间隔了多久”，不能表示“有人说话但没字幕”。
+2. 用户人工复核发现最大 gap 实际无对白后，证明当前报告口径会误报。
+3. 后续修 P273/P272 时，如果没有 L1 人声地图，就无法自动判断“长间隔是正常静音，还是 ASR 漏识别”。
+
+**解决方案**：
+1. L1 增加全片 timeline 输出：基于 SenseVoice chunk 结果生成 `voice_regions` / `non_voice_regions`，至少包含 `start/end/tag/confidence/source`。
+2. 把 Qwen FA/词级时间戳叠到这张 timeline 上：有人声 + 有 Qwen 词 → 正常候选；有人声 + 无 Qwen 词 → 记为可能漏字幕；非人声 + 有 Qwen 短词 → 疑似幻觉；非人声 + 无 Qwen 词 → 正常无字幕。
+3. 日志新增摘要：全片人声区间数、非人声区间数、有人声但无字幕区间数、最长真实漏字幕区间。
+4. SRT 质量报告以后不再直接把 `gap > N` 叫“空洞 bug”；必须先查这个 gap 是否落在人声区。
+5. 测试：构造 40:10-41:35 这种非人声长区间，断言不会报“漏字幕”；构造有人声但无 Qwen 字幕的区间，断言会报“可能漏字幕”。
+
+**状态**：⏳ 待按 bug 流水线修复（当前只完成诊断登记，尚未改代码）
+
+**分支规划（2026-06-15）**：
+- 当前 ASR 分支不继续改 P275 代码，先提交并合并主线。合并说明必须写清：P274 已修，P273 句子化改善但 `[?]` 仍多，P275 未修。
+- 合并主线后新开 `l1-voice-timeline` 分支，完整走 bug 流水线修 P275。
+- P275 之后再开 `qwen-standard-mode` 分支，落实两档模式：标准 = Qwen ASR + SenseVoice；精确 = Qwen + Whisper + SenseVoice；删除 fast/极速。
+- Whisper/MLX 换库放到 `mlx-asr-library-swap` 分支，不和 P275、模式改造混在一起。
