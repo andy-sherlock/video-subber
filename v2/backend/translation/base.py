@@ -167,6 +167,43 @@ class LLMBackend(TranslationBackend):
                 duration_ms=dur_ms,
             )
 
+    def translate_raw_json(self, prompt: str, system_prompt: str = None) -> str:
+        """发送 prompt + system_prompt，开启 JSON mode，返回 LLM 原始文本。
+
+        独立构建 request body（不经过 _build_body），直接发 HTTP 请求。
+        返回原始字符串供 json.loads() 解析。
+        """
+        import json as _json, urllib.request as _urllib, logging
+        _tlog = logging.getLogger("backend.translation")
+        t0 = __import__('time').monotonic()
+
+        msgs = []
+        if system_prompt:
+            msgs.append({"role": "system", "content": system_prompt})
+        msgs.append({"role": "user", "content": prompt})
+
+        body = _json.dumps({
+            "model": self._model,
+            "messages": msgs,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }).encode()
+
+        try:
+            req = _urllib.Request(self._api_url, data=body, headers=self._build_headers())
+            with _urllib.urlopen(req, timeout=120) as resp:
+                data = _json.loads(resp.read().decode())
+            raw = data["choices"][0]["message"]["content"]
+            dur_ms = int((__import__('time').monotonic() - t0) * 1000)
+            _tlog.debug("LLM translate_raw_json 成功 (%s): %dms, 返回%d字",
+                        self.name, dur_ms, len(raw) if raw else 0)
+            return raw
+        except Exception as e:
+            dur_ms = int((__import__('time').monotonic() - t0) * 1000)
+            _tlog.warning("LLM translate_raw_json 失败 (%s): %s (耗时 %dms)",
+                          self.name, e, dur_ms)
+            raise
+
     def translate_batch(self, texts: list[str], source_lang: str = "auto",
                         target_lang: str = "zh", context: str = "") -> TranslationResult:
         """拼接 texts → 一次 LLM 调用 → 按 '---' 切分回填。所有 LLM 统一。"""

@@ -1,9 +1,7 @@
 """Qwen3-ASR cross-validation transcription via MLX (Apple Silicon) or PyTorch (Windows).
 
-Runs Qwen3-ASR on full audio and maps its transcription to Whisper segments.
-Two alignment paths:
-  - Timestamp alignment: when the model returns word-level timestamps (PyTorch)
-  - Text similarity alignment: when timestamps are unavailable (MLX / Apple Silicon)
+MLX backend (mlx-qwen3-asr): returns word-level timestamps via internal FA.
+PyTorch backend (qwen-asr): returns text only, L2 assigns to windows by stem similarity.
 
 For audio longer than 20 minutes, chunks are formed at Whisper segment boundaries
 (batched into ~5-minute groups) and each chunk is transcribed independently.
@@ -25,7 +23,7 @@ _AUDIO_PAD_S = 5.0                # pronunciation buffer on each side
 _USE_MLX = False
 _USE_PYTORCH = False
 try:
-    from qwen3_asr_mlx import Qwen3ASR  # noqa: F401
+    from mlx_qwen3_asr import load_model as _mlx_load_model, transcribe as _mlx_transcribe  # noqa: F401
     _USE_MLX = True
 except ImportError:
     pass
@@ -36,6 +34,13 @@ except ImportError:
     pass
 
 
+def _audio_extract_bounds(start_s: float, end_s: float) -> tuple[float, float]:
+    """Return the padded ffmpeg extraction range for one ASR chunk."""
+    extract_start = max(0.0, start_s - _AUDIO_PAD_S)
+    extract_end = end_s + _AUDIO_PAD_S
+    return extract_start, extract_end
+
+
 def is_qwen_asr_available() -> bool:
     return _USE_MLX or _USE_PYTORCH
 
@@ -43,19 +48,15 @@ def is_qwen_asr_available() -> bool:
 def _load_qwen_model():
     """Load Qwen3-ASR model (MLX or PyTorch depending on platform)."""
     if _USE_MLX:
-        from qwen3_asr_mlx import Qwen3ASR
-        return Qwen3ASR.from_pretrained("mlx-community/Qwen3-ASR-1.7B-bf16")
+        model, _config = _mlx_load_model("Qwen/Qwen3-ASR-1.7B")
+        return model
     else:
         from qwen_asr import Qwen3ASRModel
         return Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
 
 
-# ── P207 qwen-asr v0.0.6: transcribe() takes (audio, context, language, return_time_stamps).
-# max_new_tokens=512 is built into the model constructor — no external cap needed.
-# P147→P156 anti-collapse params (repetition_penalty, max_tokens, etc.) removed;
-# v0.0.6 handles these internally.
-
-# P222: v0.0.6 requires full language names ("English"), not short codes ("en").
+# Both backends (MLX mlx-qwen3-asr, PyTorch qwen-asr) require full language
+# names ("English"), not short codes ("en").
 _LANG_NAME = {
     "zh": "Chinese", "en": "English", "ja": "Japanese",
     "ko": "Korean", "de": "German", "fr": "French",
@@ -72,15 +73,34 @@ def _resolve_language(lang: str | None) -> str | None:
 
 
 
-# P251: align_by_similarity / align_by_timestamps / _match_qwen_to_whisper /
-# _split_sentences removed — Qwen-ASR no longer maps onto Whisper segments.
-# L2 (_assign_qwen_to_windows in hallucination_filter) assigns Qwen text to
-# 30s windows by stem similarity instead.
 
 
 # ═══════════════════════════════════════════════════════════════════
 # Long-audio chunking helpers
 # ═══════════════════════════════════════════════════════════════════
+
+def _get_audio_duration(audio_path: str) -> float:
+    """Get audio duration in seconds via ffprobe."""
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        audio_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return float(result.stdout.strip())
+
+
+def _chunk_by_time(total_duration, max_duration=_CHUNK_MAX_DURATION_S):
+    """Split audio into fixed-interval time chunks (no Whisper segments needed)."""
+    chunks = []
+    t = 0.0
+    while t < total_duration:
+        end = min(t + max_duration, total_duration)
+        chunks.append((t, end))
+        t = end
+    return chunks
+
 
 def _chunk_segments(segments, max_duration=_CHUNK_MAX_DURATION_S):
     """Group segments into batches of ~5 minutes each.
@@ -130,8 +150,7 @@ def _extract_audio_chunk(audio_path: str, start_s: float, end_s: float,
     are fully captured, without providing semantic context (which is not
     needed for transcription).
     """
-    extract_start = max(0.0, start_s - _AUDIO_PAD_S)
-    extract_end = end_s + _AUDIO_PAD_S
+    extract_start, extract_end = _audio_extract_bounds(start_s, end_s)
     duration = extract_end - extract_start
 
     cmd = [
@@ -147,41 +166,82 @@ def _extract_audio_chunk(audio_path: str, start_s: float, end_s: float,
     subprocess.run(cmd, capture_output=True, check=True)
 
 
+def _clip_chunk_segments(raw_segments: list, extract_start: float,
+                         t_start: float, t_end: float) -> list:
+    """Map chunk-relative segment times to full audio and drop padding-only text."""
+    segments = []
+    for s in raw_segments:
+        abs_start = float(s["start"]) + extract_start
+        abs_end = float(s["end"]) + extract_start
+        if abs_end <= t_start or abs_start >= t_end:
+            continue
+        start = max(abs_start, t_start)
+        end = min(abs_end, t_end)
+        if end <= start:
+            continue
+        segments.append({"text": s["text"], "start": start, "end": end})
+    return segments
+
+
+def _join_segment_texts(segments: list, language: str) -> str:
+    lang = (language or "").lower()
+    joiner = "" if lang in ("ja", "zh", "ko", "japanese", "chinese", "korean") else " "
+    return joiner.join((s.get("text") or "").strip()
+                       for s in segments if (s.get("text") or "").strip())
+
+
 def _transcribe_chunk(model, audio_path, t_start, t_end, language,
                       chunk_idx=0, total_chunks=1):
-    """P251: transcribe one audio chunk → text.
+    """Transcribe one audio chunk.
 
-    No longer aligns to Whisper segments. The caller collects the returned
-    text as {text, t_start, t_end} and L2 assigns it to 30s windows. Identical
-    on MLX and PyTorch — both backends expose full text; word-level timestamps
-    (PyTorch only) are not needed at 30s window granularity.
+    MLX: returns {text, segments, t_start, t_end} with word-level timestamps.
+    PyTorch: returns {text, t_start, t_end} (no timestamps).
+    Segments' start/end are offset by the padded extract_start to map to the
+    full audio timeline, then clipped back to the requested chunk bounds.
     """
     fd, chunk_path = tempfile.mkstemp(
         suffix=".wav", prefix=f"qwen_chunk_{chunk_idx}_")
     os.close(fd)
     try:
+        extract_start, _extract_end = _audio_extract_bounds(t_start, t_end)
         _extract_audio_chunk(audio_path, t_start, t_end, chunk_path)
-        result = model.transcribe(
-            chunk_path,
-            language=_resolve_language(language),
-            )
         if _USE_MLX:
-            full_text = result.text if result.text else ""
+            result = _mlx_transcribe(
+                chunk_path,
+                model=model,
+                language=_resolve_language(language),
+                return_timestamps=True,
+            )
+            full_text = result.text or ""
+            raw_segments = result.segments or []
+            segments = _clip_chunk_segments(
+                raw_segments, extract_start, t_start, t_end)
+            full_text = _join_segment_texts(segments, language)
         else:
+            result = model.transcribe(
+                chunk_path,
+                language=_resolve_language(language),
+            )
             full_text = result[0].text if result else ""
+            segments = []
 
         if not full_text or not full_text.strip():
             _log.info("Qwen3-ASR chunk %d/%d 无文字, 跳过",
                       chunk_idx + 1, total_chunks)
-            return ""
+            return {"text": "", "segments": [], "t_start": t_start, "t_end": t_end}
 
-        _log.info("Qwen3-ASR chunk %d/%d 完成 (%.1fs–%.1fs)",
-                  chunk_idx + 1, total_chunks, t_start, t_end)
-        return full_text
+        _log.info("Qwen3-ASR chunk %d/%d 完成 (%.1fs–%.1fs, %d segments)",
+                  chunk_idx + 1, total_chunks, t_start, t_end, len(segments))
+        # 进度百分比
+        if total_chunks > 0:
+            pct = min(99, round((chunk_idx + 1) / total_chunks * 100))
+            _log.info("Qwen3-ASR 进度: %d%% (%d/%d chunks)", pct, chunk_idx + 1, total_chunks)
+        return {"text": full_text, "segments": segments,
+                "t_start": t_start, "t_end": t_end}
     except Exception:
         _log.warning("Qwen3-ASR chunk %d/%d 失败",
                      chunk_idx + 1, total_chunks, exc_info=True)
-        return ""
+        return {"text": "", "segments": [], "t_start": t_start, "t_end": t_end}
     finally:
         try:
             os.unlink(chunk_path)
@@ -189,64 +249,40 @@ def _transcribe_chunk(model, audio_path, t_start, t_end, language,
             pass
 
 
-def _qwen_consumer(q, audio_path, language, qwen_chunks):
-    """Consumer thread: transcribe queued chunks, append {text, t_start, t_end}
-    to the shared qwen_chunks list (P251 — no longer writes seg.qwen_text)."""
-    try:
-        model = _load_qwen_model()
-    except Exception:
-        _log.warning("千ASR 消费者线程模型加载失败")
-        while True:
-            chunk = q.get()
-            if chunk is None:
-                break
-        return
+def _run_qwen_asr_chunked(audio_path: str, total_duration: float,
+                           segments: list = None, language=None) -> list:
+    """Chunked cross-validation for long audio.
 
-    try:
-        idx = 0
-        while True:
-            chunk = q.get()
-            if chunk is None:
-                break
-            _chunk_segments, t_start, t_end = chunk
-            text = _transcribe_chunk(model, audio_path, t_start, t_end,
-                                     language, idx)
-            if text and text.strip():
-                qwen_chunks.append({"text": text, "t_start": t_start,
-                                    "t_end": t_end})
-            idx += 1
-    except Exception:
-        _log.warning("千ASR 消费者线程异常", exc_info=True)
-    finally:
-        del model
-        gc.collect()
+    Returns list of {text, segments, t_start, t_end}. MLX results include
+    word-level timestamps in segments; PyTorch results have segments=[].
 
-
-def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> list:
-    """Chunked cross-validation for long audio → list of {text, t_start, t_end}.
-
-    Batches Whisper segments into ~5-minute chunks at natural boundaries and
-    transcribes each chunk independently. L2 assigns the text to 30s windows.
+    When segments is provided, chunks at Whisper segment boundaries.
+    When segments is None, chunks at fixed 5-minute intervals.
     """
-    chunks = _chunk_segments(segments)
-    _log.info("Qwen3-ASR 分段交叉验证: %d chunks (%d segments)",
-              len(chunks), len(segments))
+    if segments:
+        raw_chunks = _chunk_segments(segments)
+        time_chunks = [(t_start, t_end) for (_s, _e, t_start, t_end) in raw_chunks]
+        _log.info("Qwen3-ASR 分段交叉验证: %d chunks (%d segments)",
+                  len(time_chunks), len(segments))
+    else:
+        time_chunks = _chunk_by_time(total_duration)
+        _log.info("Qwen3-ASR 独立分段: %d chunks (%.0fs 音频)",
+                  len(time_chunks), total_duration)
 
     t0 = time.time()
     try:
         model = _load_qwen_model()
     except Exception:
-        _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证")
+        _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证", exc_info=True)
         return []
     _log.info("Qwen3-ASR 模型加载耗时 %.1fs", time.time() - t0)
 
     qwen_chunks = []
-    for idx, (seg_start, seg_end, t_start, t_end) in enumerate(chunks):
-        text = _transcribe_chunk(model, audio_path, t_start, t_end,
-                                 language, idx, len(chunks))
-        if text and text.strip():
-            qwen_chunks.append({"text": text, "t_start": t_start,
-                                "t_end": t_end})
+    for idx, (t_start, t_end) in enumerate(time_chunks):
+        result = _transcribe_chunk(model, audio_path, t_start, t_end,
+                                   language, idx, len(time_chunks))
+        if result.get("text", "").strip():
+            qwen_chunks.append(result)
 
     del model
     gc.collect()
@@ -257,52 +293,75 @@ def _run_qwen_asr_chunked(audio_path: str, segments: list, language=None) -> lis
 
 # ── Public entry point ──
 
-def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
-    """P251: return Qwen-ASR output as a list of {text, t_start, t_end} dicts.
+def run_qwen_asr(audio_path: str, segments: list = None, language=None) -> list:
+    """Return Qwen-ASR output as a list of {text, segments, t_start, t_end}.
 
-    No longer writes seg.qwen_text. L2 assigns this text to 30s windows by
-    stem similarity. Segments are used only to size the timeline / choose the
-    chunked path. Returns [] when Qwen is unavailable or produced nothing.
+    MLX backend: segments contain word-level timestamps [{text, start, end}].
+    PyTorch backend: segments is [].
+    Returns [] when Qwen is unavailable or produced nothing.
+
+    When segments is None, Qwen runs independently — gets audio duration via
+    ffprobe and chunks by fixed time intervals if needed.
     """
     if not is_qwen_asr_available():
         _log.warning("Qwen3-ASR 未安装，跳过交叉验证")
         return []
 
-    # ── Chunked path: total audio > 20 min ──
-    if not segments:
-        return []
-    total_duration = segments[-1].end
+    if segments is not None:
+        if not segments:
+            return []
+        total_duration = segments[-1].end
+    else:
+        try:
+            total_duration = _get_audio_duration(audio_path)
+        except Exception:
+            _log.warning("无法获取音频时长，跳过 Qwen 交叉验证")
+            return []
+
     if total_duration > _LONG_AUDIO_THRESHOLD_S:
         _log.info("音频 %.0fs > 20min，启用 Qwen 分段对齐", total_duration)
-        return _run_qwen_asr_chunked(audio_path, segments, language=language)
+        return _run_qwen_asr_chunked(audio_path, total_duration,
+                                     segments=segments, language=language)
 
-    # ── Direct path: short audio, one chunk spanning the whole timeline ──
     t0 = time.time()
     try:
         model = _load_qwen_model()
     except Exception:
-        _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证")
+        _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证", exc_info=True)
         return []
     _log.info("Qwen3-ASR 模型加载耗时 %.1fs", time.time() - t0)
 
     t1 = time.time()
     try:
-        result = model.transcribe(
-            audio_path,
-            language=_resolve_language(language),
-            )
         if _USE_MLX:
-            detected_lang = getattr(result, 'language', None)
-            full_text = result.text if result.text else ""
+            result = _mlx_transcribe(
+                audio_path,
+                model=model,
+                language=_resolve_language(language),
+                return_timestamps=True,
+            )
+            detected_lang = result.language
+            full_text = result.text or ""
+            raw_segments = result.segments or []
+            ts_segments = [
+                {"text": s["text"], "start": s["start"], "end": s["end"]}
+                for s in raw_segments
+            ]
         else:
+            result = model.transcribe(
+                audio_path,
+                language=_resolve_language(language),
+            )
             detected_lang = result[0].language if result and hasattr(result[0], 'language') else None
             full_text = result[0].text if result else ""
+            ts_segments = []
     except Exception:
         _log.warning("Qwen3-ASR 转录失败，跳过交叉验证")
         del model
         gc.collect()
         return []
-    _log.info("Qwen3-ASR 转录耗时 %.1fs, language=%s", time.time() - t1, detected_lang or "unknown")
+    _log.info("Qwen3-ASR 转录耗时 %.1fs, language=%s, %d segments",
+              time.time() - t1, detected_lang or "unknown", len(ts_segments))
 
     del model
     gc.collect()
@@ -310,5 +369,7 @@ def run_qwen_asr(audio_path: str, segments: list, language=None) -> list:
     if not full_text or not full_text.strip():
         return []
 
-    _log.info("Qwen3-ASR 交叉验证完成: %d 字", len(full_text))
-    return [{"text": full_text, "t_start": 0.0, "t_end": total_duration}]
+    _log.info("Qwen3-ASR 交叉验证完成: %d 字, %d segments",
+              len(full_text), len(ts_segments))
+    return [{"text": full_text, "segments": ts_segments,
+             "t_start": 0.0, "t_end": total_duration}]

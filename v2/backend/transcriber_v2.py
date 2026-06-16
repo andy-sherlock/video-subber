@@ -1,22 +1,22 @@
 """Transcription via faster-whisper + resemblyzer speaker change detection.
 
-Simplified pipeline:
-  Whisper → [SenseVoice sound classification] → [Qwen3-ASR cross-validation]
+Pipeline:
+  Whisper ∥ Qwen3-ASR (independent, parallel)
+  → SenseVoice sound classification [+ Qwen3-FA on PyTorch path only]
   → five-layer hallucination filter → speaker detection.
 """
+import bisect
 import gc
 import logging
-import queue
 import threading
+import unicodedata
+from collections import Counter, defaultdict
 import numpy as np
 from faster_whisper import WhisperModel
 from backend.core.vad_filter import compute_speech_ratio_via_vad
-from backend.core.hallucination_filter import filter_hallucinations
+from backend.core.hallucination_filter import filter_hallucinations, _has_timestamp_segments, _qwen_is_reliable
 
 _log = logging.getLogger("transcriber")
-
-# Shared with qwen_asr_runner for streaming chunk alignment
-_CHUNK_MAX_DURATION_S = 300  # 5 minutes
 
 _SVFA_MIN_RAM_GB = 8
 
@@ -175,6 +175,423 @@ def _detect_speaker_changes(audio_path: str, segments: list) -> list:
     return segments
 
 
+_SENTENCE_ENDERS = ("。", "！", "？", "!", "?", "…")
+_JA_STRONG_ENDERS = ("よ", "ね", "な", "わ", "ぞ", "ぜ", "か", "だ", "ます", "たい")
+_JA_WEAK_ENDERS = ("の", "さ", "で")
+_JA_STRONG_ENDER_GAP = 0.15
+_JA_WEAK_ENDER_GAP = 0.3
+
+
+def _flatten_qwen_words(qwen_chunks):
+    words = []
+    for chunk in (qwen_chunks or []):
+        if not isinstance(chunk, dict):
+            continue
+        for w in chunk.get("segments") or []:
+            text = w.get("text", "").strip()
+            if text:
+                words.append({
+                    "text": text,
+                    "start": w.get("start", 0.0),
+                    "end":   w.get("end", 0.0),
+                })
+    words.sort(key=lambda w: w["start"])
+    return words
+
+
+def _words_to_segment(words, seg_id, joiner):
+    text = joiner.join(w["text"] for w in words)
+    seg = Segment(id=seg_id, text=text,
+                  start=words[0]["start"], end=words[-1]["end"])
+    seg.words = [
+        {
+            "word": w.get("word") or w.get("text", ""),
+            "text": w.get("text", ""),
+            "start": w.get("start", 0.0),
+            "end": w.get("end", 0.0),
+        }
+        for w in words
+    ]
+    seg.whisper_text = ""
+    return seg
+
+
+def _should_break_ja_sentence(prev_text, gap):
+    text = (prev_text or "").strip()
+    if not text:
+        return False
+    if gap >= _JA_STRONG_ENDER_GAP and text.endswith(_JA_STRONG_ENDERS):
+        return True
+    if gap >= _JA_WEAK_ENDER_GAP and text.endswith(_JA_WEAK_ENDERS):
+        return True
+    return False
+
+
+def _sv_tag_at(time_point, whisper_segments, ws_starts):
+    if not ws_starts:
+        return None
+    idx = bisect.bisect_right(ws_starts, time_point) - 1
+    if idx >= 0:
+        ws = whisper_segments[idx]
+        if ws.start <= time_point <= ws.end:
+            return getattr(ws, "sensevoice_tag", None)
+    return None
+
+
+def _is_repetition_pattern(text):
+    text = text.strip()
+    if not text:
+        return False
+    words = text.split()
+    if len(words) >= 4:
+        top_count = Counter(words).most_common(1)[0][1]
+        if top_count / len(words) > 0.6:
+            return True
+    sample = text[:50]
+    for length in range(2, min(10, len(sample) // 3 + 1)):
+        for i in range(len(sample) - 3 * length + 1):
+            if (sample[i:i + length]
+                    == sample[i + length:i + 2 * length]
+                    == sample[i + 2 * length:i + 3 * length]):
+                return True
+    return False
+
+
+def _whisper_is_usable(whisper_segments, total_end=None):
+    if not whisper_segments:
+        return False
+
+    if total_end is None:
+        total_end = max((getattr(s, "end", 0.0) for s in whisper_segments), default=0.0)
+
+    # Tiny/failed Whisper on long media often returns only a few broad segments.
+    if total_end >= 300 and len(whisper_segments) < 20:
+        return False
+
+    if total_end >= 300:
+        covered = sum(max(0.0, getattr(s, "end", 0.0) - getattr(s, "start", 0.0))
+                      for s in whisper_segments)
+        if total_end > 0 and covered / total_end < 0.30:
+            return False
+
+    non_empty = [s for s in whisper_segments if getattr(s, "text", "").strip()]
+    if not non_empty:
+        return False
+
+    if len(whisper_segments) < 5:
+        return True
+
+    digit_segs = []
+    for i, s in enumerate(whisper_segments):
+        cleaned = unicodedata.normalize("NFKC", s.text.strip())
+        if cleaned.isdigit():
+            digit_segs.append((i, int(cleaned)))
+
+    if len(digit_segs) / len(whisper_segments) >= 0.2:
+        return False
+
+    texts = [unicodedata.normalize("NFKC", s.text.strip()) for s in non_empty]
+    top_count = Counter(texts).most_common(1)[0][1]
+    if top_count / len(texts) >= 0.30:
+        return False
+
+    max_run = 0
+    run = 0
+    for j in range(1, len(digit_segs)):
+        ip, vp = digit_segs[j - 1]
+        ic, vc = digit_segs[j]
+        if ic == ip + 1 and 0 < vc - vp <= 3:
+            run += 1
+            max_run = max(max_run, run)
+        else:
+            run = 0
+
+    return max_run < 5
+
+
+def _pause_segment(words, start_id, lang, pause_threshold=0.5):
+    if not words:
+        return []
+    words = sorted(words, key=lambda w: w["start"])
+    joiner = "" if lang in ("ja", "zh", "ko") else " "
+
+    segments = []
+    buf = [words[0]]
+
+    for i in range(1, len(words)):
+        prev, curr = words[i - 1], words[i]
+        gap = curr["start"] - prev["end"]
+
+        should_break = gap >= pause_threshold
+        if prev["text"].rstrip().endswith(_SENTENCE_ENDERS):
+            should_break = True
+
+        text_so_far = joiner.join(w["text"] for w in buf)
+        span = curr["start"] - buf[0]["start"]
+        if span >= 8.0 or len(text_so_far) >= 40:
+            should_break = True
+
+        if should_break:
+            segments.append(_words_to_segment(buf, start_id + len(segments), joiner))
+            buf = [curr]
+        else:
+            buf.append(curr)
+
+    if buf:
+        segments.append(_words_to_segment(buf, start_id + len(segments), joiner))
+    return segments
+
+
+def _qwen_chunks_to_segments(qwen_chunks, lang):
+    words = _flatten_qwen_words(qwen_chunks)
+    return _pause_segment(words, 0, lang)
+
+
+def _propagate_l1_marks(l1_sources, assembled):
+    if not l1_sources or not assembled:
+        return assembled
+
+    l1_sources = sorted(l1_sources, key=lambda s: s.start)
+    l1_starts = [s.start for s in l1_sources]
+    for asm in assembled:
+        asm_duration = asm.end - asm.start
+
+        if asm_duration <= 0:
+            asm.filtered = False
+            asm.filter_reason = None
+            asm.uncertain = False
+            continue
+
+        lo = max(0, bisect.bisect_right(l1_starts, asm.start) - 1)
+        hi = min(len(l1_sources), bisect.bisect_right(l1_starts, asm.end) + 1)
+
+        filtered_overlap = 0.0
+        best_reason = None
+        best_reason_ov = 0.0
+        inherited_uncertain = False
+        inherited_bgm = False
+
+        for k in range(lo, hi):
+            src = l1_sources[k]
+            ov = min(asm.end, src.end) - max(asm.start, src.start)
+            if ov <= 0:
+                continue
+
+            if getattr(src, "filtered", False):
+                filtered_overlap += ov
+                if ov > best_reason_ov:
+                    best_reason_ov = ov
+                    best_reason = getattr(src, "filter_reason", "L1")
+
+            if getattr(src, "uncertain", False):
+                inherited_uncertain = True
+            if getattr(src, "bgm_override", False):
+                inherited_bgm = True
+
+        if filtered_overlap / asm_duration > 0.5:
+            asm.filtered = True
+            asm.filter_reason = best_reason
+        else:
+            asm.filtered = False
+            asm.filter_reason = None
+
+        asm.uncertain = inherited_uncertain
+        if inherited_bgm:
+            asm.bgm_override = True
+
+    return assembled
+
+
+def _find_uncovered_gaps(segments, total_start, total_end, min_gap=3.0):
+    if not segments:
+        if total_end - total_start >= min_gap:
+            return [(total_start, total_end)]
+        return []
+
+    intervals = sorted([(s.start, s.end) for s in segments])
+    merged = []
+    for start, end in intervals:
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+
+    gaps = []
+    cursor = total_start
+    for start, end in merged:
+        if start - cursor >= min_gap:
+            gaps.append((cursor, start))
+        cursor = max(cursor, end)
+    if total_end - cursor >= min_gap:
+        gaps.append((cursor, total_end))
+    return gaps
+
+
+def _assemble_qwen_primary(qwen_words, whisper_segments, lang):
+    if not qwen_words:
+        return []
+
+    joiner = "" if lang in ("ja", "zh", "ko") else " "
+    base_pause = 0.5
+    max_span = 5.0 if lang == "ja" else 8.0
+    max_chars = 25 if lang == "ja" else 40
+    ws_starts = [ws.start for ws in whisper_segments] if whisper_segments else []
+
+    segments = []
+    buf = [qwen_words[0]]
+
+    for i in range(1, len(qwen_words)):
+        prev, curr = qwen_words[i - 1], qwen_words[i]
+        gap = curr["start"] - prev["end"]
+
+        threshold = base_pause
+        if ws_starts and gap > 0:
+            mid = (prev["end"] + curr["start"]) / 2
+            tag = _sv_tag_at(mid, whisper_segments, ws_starts)
+            if tag in ("<|Breath|>", "<|Crying|>", "<|Laughter|>"):
+                threshold = base_pause * 1.5
+
+        should_break = gap >= threshold
+        if prev["text"].rstrip().endswith(_SENTENCE_ENDERS):
+            should_break = True
+        if lang == "ja" and _should_break_ja_sentence(prev.get("text", ""), gap):
+            should_break = True
+
+        text_so_far = joiner.join(w["text"] for w in buf)
+        span = curr["start"] - buf[0]["start"]
+        if span >= max_span or len(text_so_far) >= max_chars:
+            should_break = True
+
+        if should_break:
+            segments.append(_words_to_segment(buf, len(segments), joiner))
+            buf = [curr]
+        else:
+            buf.append(curr)
+
+    if buf:
+        segments.append(_words_to_segment(buf, len(segments), joiner))
+    return segments
+
+
+def _assemble_whisper_primary(qwen_words, whisper_segments, lang):
+    if not whisper_segments:
+        return _pause_segment(qwen_words, 0, lang)
+
+    joiner = "" if lang in ("ja", "zh", "ko") else " "
+    seg_starts = [ws.start for ws in whisper_segments]
+
+    word_to_seg = {}
+    for w_idx, w in enumerate(qwen_words):
+        right = bisect.bisect_right(seg_starts, w["end"])
+        left = max(0, bisect.bisect_left(seg_starts, w["start"]) - 1)
+
+        best_idx, best_ov = None, 0.0
+        for s_idx in range(left, min(right + 1, len(whisper_segments))):
+            ws = whisper_segments[s_idx]
+            ov = min(w["end"], ws.end) - max(w["start"], ws.start)
+            if ov > best_ov:
+                best_ov = ov
+                best_idx = s_idx
+
+        if best_idx is not None and best_ov > 0:
+            word_to_seg[w_idx] = best_idx
+
+    seg_to_words = defaultdict(list)
+    for w_idx, s_idx in word_to_seg.items():
+        seg_to_words[s_idx].append(w_idx)
+
+    matched = set()
+    segments = []
+    for idx, ws in enumerate(whisper_segments):
+        w_indices = seg_to_words.get(idx, [])
+        if w_indices:
+            words = sorted(
+                [qwen_words[i] for i in w_indices],
+                key=lambda w: w["start"])
+            matched.update(w_indices)
+            text = joiner.join(w["text"] for w in words)
+            seg = Segment(id=idx, text=text,
+                          start=words[0]["start"], end=words[-1]["end"])
+        else:
+            seg = Segment(id=idx, text=ws.text,
+                          start=ws.start, end=ws.end)
+        seg.whisper_text = ws.text
+        seg.sensevoice_tag = getattr(ws, "sensevoice_tag", None)
+        segments.append(seg)
+
+    unmatched = [qwen_words[i]
+                 for i in range(len(qwen_words)) if i not in matched]
+    if unmatched:
+        extra = _pause_segment(unmatched, len(segments), lang)
+        segments.extend(extra)
+        segments.sort(key=lambda s: s.start)
+
+    return segments
+
+
+def _assemble_emergency_fallback(qwen_words, whisper_segments, lang, total_end):
+    segments = []
+
+    for ws in whisper_segments:
+        if ws.text.strip().isdigit() or _is_repetition_pattern(ws.text):
+            continue
+        seg = Segment(id=len(segments), text=ws.text,
+                      start=ws.start, end=ws.end)
+        seg.whisper_text = ws.text
+        seg.uncertain = True
+        segments.append(seg)
+
+    covered = [(s.start, s.end) for s in segments]
+    orphans = [
+        w for w in qwen_words
+        if not _is_repetition_pattern(w["text"])
+        and not any(s <= w["start"] and w["end"] <= e for s, e in covered)
+    ]
+    if orphans:
+        extra = _pause_segment(orphans, len(segments), lang)
+        for s in extra:
+            s.uncertain = True
+        segments.extend(extra)
+
+    segments.sort(key=lambda s: s.start)
+    gaps = _find_uncovered_gaps(segments, 0.0, total_end)
+    for gap_start, gap_end in gaps:
+        seg = Segment(id=len(segments),
+                      text="[此时段字幕暂不可用]",
+                      start=gap_start, end=gap_end)
+        seg.uncertain = True
+        seg.whisper_text = ""
+        segments.append(seg)
+
+    segments.sort(key=lambda s: s.start)
+    return segments
+
+
+def _smart_assemble(qwen_chunks, whisper_segments, lang, primary_engine):
+    qwen_words = _flatten_qwen_words(qwen_chunks)
+    total_end = 0.0
+    if whisper_segments:
+        total_end = whisper_segments[-1].end
+    elif qwen_words:
+        total_end = qwen_words[-1]["end"]
+
+    whisper_ok = _whisper_is_usable(whisper_segments, total_end=total_end)
+    qwen_ok = _qwen_is_reliable(qwen_chunks)
+
+    if primary_engine == "qwen" and not qwen_ok:
+        primary_engine = "whisper" if whisper_ok else "dual_failed"
+    elif primary_engine == "whisper" and not whisper_ok:
+        primary_engine = "qwen" if qwen_ok else "dual_failed"
+
+    if primary_engine == "qwen":
+        return _assemble_qwen_primary(qwen_words, whisper_segments, lang)
+    elif primary_engine == "whisper":
+        return _assemble_whisper_primary(qwen_words, whisper_segments, lang)
+    else:
+        return _assemble_emergency_fallback(
+            qwen_words, whisper_segments, lang, total_end)
+
+
 def transcribe(audio_path: str, model_size: str = "medium",
                source_lang: str = "auto", skip_vad: bool = False,
                vad_threshold: float = 0.0,
@@ -237,101 +654,58 @@ def transcribe(audio_path: str, model_size: str = "medium",
     use_parallel = should_parallel_svfa(transcription_tier, ram_gb)
 
     # ═══════════════════════════════════════════════════════════════
-    # P152: 生产者-消费者流水线 — 千ASR 在 Whisper 转录期间后台运行
+    # Qwen-ASR: start independently BEFORE Whisper iterates segments.
+    # Qwen gets the full audio file, does its own chunking, doesn't
+    # wait for Whisper segment boundaries.
     # ═══════════════════════════════════════════════════════════════
-    qwen_queue = None
     qwen_thread = None
-    qwen_chunks = []  # P251: Qwen-ASR output as {text, t_start, t_end} for L2
+    _qwen_holder = {}
     if use_qwen and filter_keywords:
-        from backend.core.qwen_asr_runner import (
-            is_qwen_asr_available, _qwen_consumer,
-        )
+        from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
         if is_qwen_asr_available():
-            qwen_queue = queue.Queue()
-            qwen_thread = threading.Thread(
-                target=_qwen_consumer,
-                args=(qwen_queue, audio_path, detected_lang, qwen_chunks),
-            )
+            def _run_qwen():
+                _qwen_holder["data"] = run_qwen_asr(
+                    audio_path, language=detected_lang)
+            qwen_thread = threading.Thread(target=_run_qwen, daemon=True)
             qwen_thread.start()
+            _log.info("Qwen3-ASR 独立线程已启动（与 Whisper 并行）")
 
-            chunk_start_idx = 0
+    # ── Whisper segment iteration (single code path) ──
+    for seg in segments_iter:
+        text = seg.text.strip()
+        n_total += 1
+
+        s = Segment(
+            id=len(results),
+            start=round(seg.start, 2),
+            end=round(seg.end, 2),
+            text=text,
+        )
+        if hasattr(seg, "words") and seg.words:
+            s.words = []
+            for w in seg.words:
+                if isinstance(w, dict):
+                    s.words.append(w)
+                else:
+                    s.words.append({
+                        "word": getattr(w, "word", ""),
+                        "start": getattr(w, "start", 0.0),
+                        "end": getattr(w, "end", 0.0),
+                        "probability": getattr(w, "probability", 0.0),
+                    })
+        results.append(s)
+
+        if progress_callback and n_total % 10 == 0:
             try:
-                for seg in segments_iter:
-                    text = seg.text.strip()
-                    n_total += 1
-
-                    s = Segment(
-                        id=len(results),
-                        start=round(seg.start, 2),
-                        end=round(seg.end, 2),
-                        text=text,
-                    )
-                    if hasattr(seg, "words") and seg.words:
-                        s.words = []
-                        for w in seg.words:
-                            if isinstance(w, dict):
-                                s.words.append(w)
-                            else:
-                                s.words.append({
-                                    "word": getattr(w, "word", ""),
-                                    "start": getattr(w, "start", 0.0),
-                                    "end": getattr(w, "end", 0.0),
-                                    "probability": getattr(w, "probability", 0.0),
-                                })
-                    results.append(s)
-
-                    if progress_callback and n_total % 10 == 0:
-                        try:
-                            progress_callback(n_total)
-                        except Exception:
-                            pass  # pipe broken or other transient error — worker continues
-
-                    chunk_dur = seg.end - results[chunk_start_idx].start
-                    if chunk_dur >= _CHUNK_MAX_DURATION_S:
-                        chunk_segs = results[chunk_start_idx:len(results)]
-                        t_start = chunk_segs[0].start
-                        t_end = chunk_segs[-1].end
-                        qwen_queue.put((list(chunk_segs), t_start, t_end))
-                        chunk_start_idx = len(results)
-            finally:
-                # P182: flush remaining trailing segments before sentinel
-                if chunk_start_idx < len(results):
-                    remaining = results[chunk_start_idx:]
-                    qwen_queue.put((
-                        list(remaining),
-                        remaining[0].start,
-                        remaining[-1].end,
-                    ))
-                qwen_queue.put(None)
-
-    # ── 如果没有走流水线路径，走回原始 Whisper 循环 ──
-    if not qwen_thread:
-        for seg in segments_iter:
-            text = seg.text.strip()
-            n_total += 1
-
-            s = Segment(
-                id=len(results),
-                start=round(seg.start, 2),
-                end=round(seg.end, 2),
-                text=text,
-            )
-            if hasattr(seg, "words") and seg.words:
-                s.words = []
-                for w in seg.words:
-                    if isinstance(w, dict):
-                        s.words.append(w)
-                    else:
-                        s.words.append({
-                            "word": getattr(w, "word", ""),
-                            "start": getattr(w, "start", 0.0),
-                            "end": getattr(w, "end", 0.0),
-                            "probability": getattr(w, "probability", 0.0),
-                        })
-            results.append(s)
-
-            if progress_callback and n_total % 10 == 0:
                 progress_callback(n_total)
+            except Exception:
+                pass
+        # 每 50 段在日志中记录音频时间进度
+        _audio_duration = getattr(info, "duration", 0) or 0
+        if n_total % 50 == 0 and _audio_duration > 0 and seg.end > 0:
+            pct = min(99, round(seg.end / _audio_duration * 100))
+            _log.info("Whisper 进度: %d%% (音频 %ds/%ds, 已识别 %d 段)",
+                      pct, int(seg.end), int(_audio_duration), n_total)
 
     # ── Release Whisper model memory ──
     del model
@@ -340,76 +714,118 @@ def transcribe(audio_path: str, model_size: str = "medium",
 
     _log.info("Whisper 转录: %d 段, 语言=%s (概率 %.2f)", n_total, info.language, info.language_probability)
 
-    # ── SV+FA parallel launch (decoupled from Qwen — P199/P200) ──
+    # ── Wait for Qwen ASR ──
+    if qwen_thread:
+        qwen_thread.join()
+        _log.info("Qwen3-ASR 独立线程已结束")
+    qwen_chunks = _qwen_holder.get("data", [])
+
+    # ── P254 智能路由：按源语言切换主引擎 ──
+    # Qwen/Whisper 切句粒度不同；L2 用时间窗口比对，不依赖绝对下标
+    QWEN_PRIMARY_LANGS = {"en", "ja", "ko", "zh"}
+    _whisper_segments = None      # Whisper 原稿，仅作组装/Refiner 参考
+    _which_primary = "whisper"    # P247: 记录哪个引擎是主力（供双稿裁判 prompt 用）
+    if detected_lang in QWEN_PRIMARY_LANGS:
+        if qwen_chunks:
+            _log.info("P254 智能路由: %s → Qwen3-ASR 主引擎", detected_lang)
+            _which_primary = "qwen"
+            # ① 保存 Whisper 原稿（给组装/Refiner 做参考）
+            _whisper_segments = results
+            # ② 保存 Qwen 原始词级时间戳（供组装 + L2 使用）
+            _qwen_raw = qwen_chunks
+            # ③ 组装推迟到 L1 之后（见下方 P254 组装骨架）
+            # ④ 原始 Qwen 词级时间戳传给下游
+            qwen_chunks = list(_qwen_raw)
+        else:
+            _log.warning(
+                "P254: 语言=%s 在 QWEN_PRIMARY_LANGS 中，但 Qwen3-ASR 无产出，"
+                "回退到 Whisper 主引擎。请检查 Qwen 模型是否正常加载。",
+                detected_lang)
+
+    # ── Serial Qwen fallback (non-pipeline mode) ──
+    if transcription_tier == "precise" and filter_keywords and not qwen_thread:
+        _log.info("Qwen3-ASR 交叉验证开始 (tier=%s, 串行)", transcription_tier)
+        from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
+        if is_qwen_asr_available():
+            qwen_chunks = run_qwen_asr(audio_path, language=detected_lang)
+        else:
+            _log.warning("Qwen3-ASR 不可用，跳过交叉验证")
+
+    # ── Determine if external FA is needed ──
+    # MLX path: Qwen segments carry word-level timestamps from internal FA → skip external FA
+    # PyTorch path: no Qwen timestamps → need external FA for L1
+    has_qwen_timestamps = _has_timestamp_segments(qwen_chunks)
+    need_external_fa = not has_qwen_timestamps
+
+    _qwen_l1_segments = []
+    if _which_primary == "qwen":
+        _qwen_l1_segments = _qwen_chunks_to_segments(qwen_chunks, detected_lang)
+        if not _qwen_l1_segments:
+            _qwen_l1_segments = list(results)
+
+    # ── SenseVoice + FA (only when needed) ──
     sv_events = None
     sv_thread = None
     fa_thread = None
+    _fa_holder = {}
+
+    # P268: SenseVoice follows the Qwen timeline when Qwen is primary.
+    _sv_target = _qwen_l1_segments if _which_primary == "qwen" and _qwen_l1_segments else results
 
     if use_parallel and filter_keywords:
-        _log.info("并行模式：SenseVoice + Qwen3-FA 同时启动")
+        if has_qwen_timestamps:
+            _log.info("并行模式：SenseVoice（Qwen 内部 FA 已提供时间戳，跳过外部 FA）")
+        else:
+            _log.info("并行模式：SenseVoice + Qwen3-FA 同时启动")
 
         from backend.core.sensevoice_runner import run_sensevoice, is_sensevoice_available
         _sv_holder = {}
         if is_sensevoice_available():
             def _run_sv():
-                _sv_holder["data"] = run_sensevoice(audio_path, device="cpu", segments=results)
+                _sv_holder["data"] = run_sensevoice(audio_path, device="cpu", segments=_sv_target)
             sv_thread = threading.Thread(target=_run_sv, daemon=True)
             sv_thread.start()
 
-        from backend.core.qwen_aligner import (
-            QwenAligner, is_qwen_aligner_available, align_segments,
-        )
-        _fa_holder = {}
-        if is_qwen_aligner_available():
-            def _run_fa():
-                aligner = None
-                try:
-                    aligner = QwenAligner()
-                    if aligner._model is not None:
-                        _fa_holder["data"] = align_segments(
-                            aligner, audio_path, results, language=detected_lang)
-                except Exception as e:
-                    _fa_holder["_quality"] = "fallback"
-                    _log.warning("Qwen3-FA 并行对齐失败: %s", e)
-                finally:
-                    if aligner is not None and aligner._model is not None:
-                        aligner.close()
-            fa_thread = threading.Thread(target=_run_fa, daemon=True)
-            fa_thread.start()
+        if need_external_fa:
+            from backend.core.qwen_aligner import (
+                QwenAligner, is_qwen_aligner_available, align_segments,
+            )
+            if is_qwen_aligner_available():
+                def _run_fa():
+                    aligner = None
+                    try:
+                        aligner = QwenAligner()
+                        if aligner._model is not None:
+                            _fa_holder["data"] = align_segments(
+                                aligner, audio_path, results, language=detected_lang)
+                    except Exception as e:
+                        _fa_holder["_quality"] = "fallback"
+                        _log.warning("Qwen3-FA 并行对齐失败: %s", e)
+                    finally:
+                        if aligner is not None and aligner._model is not None:
+                            aligner.close()
+                fa_thread = threading.Thread(target=_run_fa, daemon=True)
+                fa_thread.start()
     elif filter_keywords and transcription_tier in ("standard", "precise"):
         _log.info("SenseVoice 声音分类开始 (tier=%s, 串行降级)", transcription_tier)
         from backend.core.sensevoice_runner import (
             run_sensevoice, is_sensevoice_available,
         )
         if is_sensevoice_available():
-            sv_events = run_sensevoice(audio_path, device="cpu", segments=results)
+            sv_events = run_sensevoice(audio_path, device="cpu", segments=_sv_target)
         else:
             _log.warning("SenseVoice 不可用，跳过声音分类")
 
-    # ── 等 Qwen ASR 流水线结束（在 SV+FA 启动之后）──
-    if qwen_thread:
-        qwen_thread.join()
-        _log.info("千ASR 消费者线程已结束")
-
-    # ── 等待并行线程 ──
+    # ── Wait for parallel threads ──
     if sv_thread:
         sv_thread.join()
         sv_events = _sv_holder.get("data")
     if fa_thread:
         fa_thread.join()
 
-    # ── Step 3: Qwen3-ASR 交叉验证（串行路径，非流水线模式下此处运行）──
-    if transcription_tier == "precise" and filter_keywords and not qwen_thread:
-        _log.info("Qwen3-ASR 交叉验证开始 (tier=%s)", transcription_tier)
-        from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
-        if is_qwen_asr_available():
-            qwen_chunks = run_qwen_asr(audio_path, results, language=detected_lang)
-        else:
-            _log.warning("Qwen3-ASR 不可用，跳过交叉验证")
-
-    # ── Step 4: Qwen3-FA alignment（先改时间戳）──
+    # ── Apply external FA timestamps (PyTorch path only) ──
     aligner_result = None
-    if use_parallel and fa_thread:
+    if fa_thread:
         fa_data = _fa_holder.get("data")
         if fa_data:
             from backend.core.qwen_aligner import apply_aligner_timestamps
@@ -417,7 +833,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
             results = apply_aligner_timestamps(results, aligner_result)
             _log.info("Qwen3-FA 对齐完成（并行）: %d 词", len(aligner_result))
             _fa_holder["_quality"] = "official"
-    elif filter_keywords and transcription_tier in ("standard", "precise"):
+    elif need_external_fa and filter_keywords and transcription_tier in ("standard", "precise"):
         from backend.core.qwen_aligner import (
             QwenAligner, is_qwen_aligner_available, apply_aligner_timestamps,
             align_segments,
@@ -443,8 +859,10 @@ def transcribe(audio_path: str, model_size: str = "medium",
                 if aligner is not None and aligner._model is not None:
                     aligner.close()
 
-    # P214: FA quality visibility — mark segments so downstream/user can see
-    if use_parallel and fa_thread:
+    # P214: FA quality visibility
+    if has_qwen_timestamps:
+        _fa_quality = "qwen_internal"
+    elif fa_thread:
         _fa_quality = _fa_holder.get("_quality", "fallback")
     elif aligner_result is not None:
         _fa_quality = "official" if aligner_result else "fallback"
@@ -455,15 +873,32 @@ def transcribe(audio_path: str, model_size: str = "medium",
     if _fa_quality == "fallback":
         _log.warning("⚠ 词级对齐未成功，字幕使用 Whisper 粗时间戳")
 
-    # ── Step 5: 应用 SenseVoice 标签（在 FA 对齐之后 —— P144 修复）──
+    # ── Apply SenseVoice tags to L1 source segments (before assembly) ──
     if sv_events:
-        _apply_sv_tags(results, sv_events)
+        _apply_sv_tags(_sv_target, sv_events)
 
-    # ── Step 6: Five-layer hallucination filter ──
+    # ── P268 L1 双信号交叉验证（在 Qwen 时间线上，不依赖 Whisper 段数）──
+    if filter_keywords and _which_primary == "qwen" and _qwen_l1_segments:
+        from backend.core.hallucination_filter import (
+            _layer1_dual_signal, _qwen_segments_as_alignment,
+        )
+        _l1_align = _qwen_segments_as_alignment(qwen_chunks) if _has_timestamp_segments(qwen_chunks) else None
+        for _qseg in _qwen_l1_segments:
+            if not getattr(_qseg, "filtered", False):
+                _layer1_dual_signal(_qseg, _l1_align, detected_lang)
+
+    # ── P254 组装骨架（L1 跑完之后才组装，互不依赖）──
+    if _which_primary == "qwen":
+        _assembled = _smart_assemble(_qwen_raw, whisper_segments=_whisper_segments, lang=detected_lang, primary_engine=_which_primary)
+        _propagate_l1_marks(_qwen_l1_segments, _assembled)
+        results = _assembled
+
+    # ── Five-layer hallucination filter (L2-L5, skip L1 if it already ran) ──
     if filter_keywords:
         results = filter_hallucinations(results, detected_lang,
                                         aligner_result=aligner_result,
-                                        qwen_chunks=qwen_chunks)
+                                        qwen_chunks=qwen_chunks,
+                                        skip_l1=(_which_primary == "qwen"))
 
     if not results:
         _log.error("未检测到任何语音内容")
