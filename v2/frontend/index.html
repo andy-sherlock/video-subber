@@ -334,12 +334,11 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="card-label">转录模式</div>
   <div class="row" style="margin-bottom:4px">
     <div class="toggle" id="tierToggle">
-      <button data-v="fast">快速</button>
       <button class="active" data-v="standard">标准（推荐）</button>
       <button data-v="precise">精确</button>
     </div>
   </div>
-  <div class="info-note" id="tierNote">快速：仅语音识别 · 标准：语音识别 + 声音分类过滤 · 精确：三模型交叉验证，内存占用最大</div>
+  <div class="info-note" id="tierNote">标准：AI 语音识别 + 声音分类过滤 · 精确：双引擎交叉验证，精度更高但占用更多内存</div>
 </div>
 
 <!-- ═══════════════ Region 4: Translation Mode ═══════════════ -->

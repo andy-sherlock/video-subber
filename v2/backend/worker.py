@@ -113,6 +113,7 @@ def _setup_file_log(job_id: str):
 
     root_log.addHandler(_file_handler_user)
     root_log.addHandler(_file_handler_debug)
+    _log.info("Worker Python: %s", sys.executable)
 
     # 架构留痕：stdout 被 JSON lines IPC 协议占用（见下方 sys.stdout = sys.stderr）。
     # V2.07 已把 transcriber_v2 / worker 内的关键进度 print() 替换为 _log.info，
@@ -295,6 +296,18 @@ def _crash_snapshot():
     }
 
 
+def _safe_crash_snapshot_json():
+    """Return a small, secret-free crash snapshot for debug logs."""
+    try:
+        return json.dumps(_crash_snapshot(), ensure_ascii=False, sort_keys=True)
+    except Exception as exc:
+        return json.dumps({"snapshot_error": str(exc)}, ensure_ascii=False)
+
+
+def _log_crash_snapshot():
+    logging.getLogger("worker").error("crash_snapshot: %s", _safe_crash_snapshot_json())
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python -m backend.worker <config.json>", file=sys.stderr)
@@ -336,7 +349,9 @@ def main():
     context_aware = config.get("contextAware", False)
     style = config.get("style", None)
     speaker_detect = config.get("speakerDetect", False)  # 实验性功能，默认关闭
-    transcription_tier = config.get("transcriptionTier", "standard")  # fast/standard/precise
+    transcription_tier = config.get("transcriptionTier", "standard")
+    if transcription_tier == "fast" or transcription_tier is None:
+        transcription_tier = "standard"
 
     # ── v2.05: Config schema 校验，防止静默降级 ──
     def _validate_config(cfg: dict):
@@ -350,7 +365,7 @@ def main():
             raise ValueError(f"config.subtitles 无效: {cfg['subtitles']}")
         if "speakerDetect" in cfg and not isinstance(cfg.get("speakerDetect"), (bool, type(None))):
             raise ValueError(f"config.speakerDetect 应为 bool，实际为 {type(cfg['speakerDetect']).__name__}")
-        if "transcriptionTier" in cfg and cfg["transcriptionTier"] not in ("fast", "standard", "precise", None):
+        if "transcriptionTier" in cfg and cfg["transcriptionTier"] not in ("fast", "standard", "precise", None):  # "fast" accepted for backward compat
             raise ValueError(f"config.transcriptionTier 无效: {cfg['transcriptionTier']}")
         if "outputMode" in cfg and cfg["outputMode"] not in ("srt", "burn", "mux", None):
             raise ValueError(f"config.outputMode 无效: {cfg['outputMode']}")
@@ -830,6 +845,7 @@ def main():
         _dur_str = f"合计={time.time() - _t_start:.0f}s (异常退出)"
         import traceback
         logging.getLogger("worker").error("异常退出: %s\n%s", e, traceback.format_exc())
+        _log_crash_snapshot()
         logging.getLogger("worker").info("步骤耗时: %s", _dur_str)
         emit("error", message=_friendly_error(str(e)), failed_segments=[])
 

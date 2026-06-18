@@ -697,6 +697,10 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
     dur = seg.end - seg.start
     units = count_speech_units(seg.text, source_lang)
 
+    if source_lang in ("zh", "ja", "ko") and units <= 3 and dur < 0.35:
+        seg.filter_reason = seg.filter_reason or "layer3_short_cjk_fragment"
+        return
+
     if dur < 0.1 and units > 2:
         seg.filtered = True
         seg.filter_reason = "layer3_impossible_duration"
@@ -717,7 +721,8 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
 
 
 def filter_hallucinations(segments: list, source_lang: str = "auto",
-                          aligner_result=None, qwen_chunks=None, skip_l1: bool = False) -> list:
+                          aligner_result=None, qwen_chunks=None,
+                          skip_l1: bool = False, skip_l2: bool = False) -> list:
     """Five-layer hallucination filter. Order: L1→L2→L4→L5→L3.
 
     Args:
@@ -759,7 +764,9 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
 
     surviving = [s for s in segments if not s.filtered]
     qwen_reliable = _qwen_is_reliable(qwen_chunks)
-    if qwen_reliable:
+    if skip_l2:
+        _log.info("L2 跳过: 单主引擎模式无第二份参考稿")
+    elif qwen_reliable:
         surviving, _ignore_stats = _layer2_cross_validate(
             surviving, source_lang, qwen_chunks=qwen_chunks)
 

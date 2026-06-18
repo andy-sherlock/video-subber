@@ -1,8 +1,54 @@
 # V3.06 进度日志
 
-**日期**：2026-06-13
-**版本**：V3.07 P247 安全阀完成 + P265 重组碎片化定位
-**上一版本**：V3.07 P256 L2 智能窗口边界完成（Mac 端）
+**日期**：2026-06-17
+**版本**：V3.07 问题状态全面核实 + 规划文件整理
+**上一版本**：V3.07 P247 安全阀完成 + P265 重组碎片化定位
+
+---
+
+## 2026-06-18 — 竞品对比落盘（JAV 场景专项）
+
+**分支**：l1-voice-timeline-and-standard-mode
+
+### 完成事项
+
+| 事项 | 状态 | 说明 |
+|------|------|------|
+| 外部项目对比 | ✅ | 对比 `SubForge / VideoCaptioner / MioSub / VideoLingo / SmartSub / pyVideoTrans / sub2api` 的公开 README 和功能说明 |
+| JAV 问题口径统一 | ✅ | 按用户澄清，将这次对比聚焦到 JAV 场景下的 `[?]/uncertain`、单字字幕、短促叫声、时间轴可信度 |
+| 新建长期对比文件 | ✅ | 新增 `competitor-comparison.md`，作为以后持续记录“我们 vs 其他产品”的专用文件 |
+| 乔布斯式减法分析 | ✅ | 明确本阶段不建议再加 ASR 模型，也不建议立刻走模型微调；优先做人声地图、短词并段、低分段返修 |
+
+### 本轮结论
+
+- 这批项目里 **VideoLingo** 最值得借：词级对齐、字幕分割、术语库、暂停恢复，都直接碰到我们当前痛点。
+- **SubForge** 值得借的是“低分段定点返修”，而不是再堆模型。
+- 公开资料里没看到谁明确靠“自训 / 微调 ASR 模型”解决 JAV 问题，主流做法还是 **换模型 + 对齐 + 分段 + 后处理**。
+- 对我们来说，当前更值得做的是 **减法**：把内部质量信号和用户问号继续分开，把短词和非人声孤立段继续收紧，而不是继续加链路。
+
+---
+
+## 2026-06-17 — 问题状态全面核实 + 规划文件整理
+
+**分支**：l1-voice-timeline-and-standard-mode
+
+### 完成事项
+
+| 事项 | 状态 | 说明 |
+|------|------|------|
+| 逐个核实所有待办问题的代码状态 | ✅ | 对照 git 历史和当前工作区代码，确认每个问题的真实修复情况 |
+| 更新 problems.md | ✅ | 重写遗留未修汇总：P181/P223/P245/P258/P260/P261 确认关闭；P271+P282 合并；P272/P237 确认仍待修 |
+| 更新 task_plan.md | ✅ | V3.07 待做表重新分类：已完成 16 项、待修 2 项、待观察 1 项、后续版本 5 项、已关闭 1 项 |
+| 更新全局 task_plan.md | ✅ | 同步最新状态 |
+
+### 核实结论
+
+- **P181**：commit `0a8b5fa` 早就修了，从遗留表移除
+- **P223**：核心问题（O(n²) 内存爆炸）被 P220 `align_segments()` 逐句对齐解决，关闭
+- **P237**：`_crash_snapshot()` 函数写好了但没接入异常处理，差一行闭环
+- **P271+P282**：合并为一个目录清理任务，V3.08 搬家时统一处理
+- **P273**：P274 修了 5 秒偏移，P275 Phase 1 人声地图数据已生成，Phase 2 接入待后续
+- **P276-P279、P281**：代码全部已修，在工作区未提交
 
 ---
 
@@ -936,3 +982,256 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 - 应提交：已验证代码改动、`task_plan.md`、`progress.md`、`problems.md`、`video-subtitle.md`、相关 `pipelines/bug-pipeline-*.md`。
 - 暂不提交：`.hex-skills/codegraph/index.db-shm`、`.hex-skills/codegraph/index.db-wal`、`v2/.hex-skills/`、`v2/v2/`。
 - 不确定报告文件先让用户确认，再决定是否提交。
+
+## 2026-06-16 — 标准模式真实重跑对比分析（P276 登记）
+
+### 对比对象
+- 最新标准模式 run：`79066a0965`，`transcriptionTier=standard`，日志在 `/Users/andy/.video-subber/logs/79066a0965/`。
+- 上一轮精确模式 run：`e5494b352d`，`transcriptionTier=precise`，日志在 `/Users/andy/.video-subber/logs/e5494b352d/`。
+
+### 量化结论
+| 指标 | 标准模式 `79066a0965` | 精确模式 `e5494b352d` |
+| --- | ---: | ---: |
+| transcript 段数 | 651 | 1099 |
+| SRT 条数 | 664 | 1099 |
+| `[?]` / uncertain | 87/651 = 13.4% | 846/1099 = 77.0% |
+| `<0.2s` SRT 短字幕 | 109 | 188 |
+| `<0.5s` SRT 短字幕 | 225 | 380 |
+| Qwen chunk segments 合计 | 1947 | 2776 |
+| 底稿文本字符数 | 3526 | 4903 |
+| 拉丁字母占比 | 17.2% | 0% |
+
+### 判断
+- 改善是真的：`[?]` 大幅下降，短字幕数量也下降，观看上更像句子。
+- 但不能判定准确率全面提高：标准模式少了 448 个 transcript 段，文本量少约 28%，还混入 `nine/love/want/Mom/Goodbye` 等英文和 `习 惯 相` 这类中文样文本。
+- 单字“好/吧”不是纯翻译问题。底稿中存在 `だ -> 吧`、`いだろう -> 吧`、`いい -> 好`、`good -> 好` 这类孤立段，翻译器只是把上游短词照着翻了。
+- 根因指向标准模式语言未锁定：`transcriber_v2.py` 在 Qwen 跑全片前仍是 `detected_lang=auto`，`qwen_asr_runner.py` 会把 `auto` 解析成 `None`，让 Qwen 自己猜语言；SenseVoice 语言推断发生在 Qwen 之后，太晚。
+
+### 已记录
+- 新增 P276：标准模式未先锁定语言，Qwen 日语长片底稿混入中文/英文/数字。
+- 下一步建议按 bug 流水线处理 P276，不直接把标准模式结果当封版证据。
+
+## 2026-06-16 — 标准模式/L1 问题拆分登记
+
+### 用户纠正
+- 用户指出：这次发现的不只是 P276 语言未锁定，还包括 SenseVoice、L1、语言判断、启动环境、标准模式路由等多个问题。
+- 结论：P276 只能作为“标准模式语言路由”的问题，不能吞掉全部根因。
+
+### 已拆分问题
+- P276：标准模式模型路由错误。标准版应该先用 Whisper 第一段当语言检测模型，再决定继续 Whisper 还是切 Qwen；不能把 `lang=auto` 直接交给 Qwen 跑完整片。
+- P277：启动环境不一致，worker 继承启动 uvicorn 的 Python；如果不是 `v2/.venv`，FunASR/SenseVoice 可能不可用。
+- P278：SenseVoice 日志缺失/误导，先打印“并行模式：SenseVoice...”再检查依赖，且缺少完成、人声地图、L1 输入数量等日志。
+- P279：标准模式是单主引擎，没有第二份稿子时仍可能进入 L2，质量报告被空参考稿干扰。
+- P280：已并入 P277/P278。“L1 人声地图真实 run 未落盘”不是独立根因，而是启动环境和 SenseVoice 日志的验收项。
+- P281：单字字幕/切句问题。单字“好/吧/十”不是单纯语言路由问题，而是缺少“说话区短切片 → ASR → 对齐 → 字幕重组”的流程。后续参考 WhisperJAV 思路：VAD 做粗人声候选，SenseVoice 做标签确认，两者都不直接删字幕。
+
+### 方案同步
+- 标准模式语言方案已按用户意见修正：先跑 Whisper 第一段拿语言；如果是 Qwen 擅长语言且置信度足够，再停止 Whisper、切 Qwen 跑全片；否则继续 Whisper。
+- `task_plan.md` 已同步拆出 P276-P279，并把 P280 归并到 P277/P278 验收标准；新增 P281 记录单字字幕/切句方案。
+
+## 2026-06-16 — P276/P277/P278/P279/P281 bug 流水线修复
+
+### 已修代码
+- P276：标准模式改为先用 Whisper 第一段判断语言，再决定继续 Whisper 或切 Qwen。若 Qwen 不可用或内存不足，不释放 Whisper，继续 Whisper 主引擎。
+- P277：服务端启动日志新增 `Server Python`；worker 文件日志新增 `Worker Python`，用于确认真实运行环境是否都是 `v2/.venv`。
+- P278：SenseVoice 日志改为先检查可用性，再打印启动/跳过；不可用时明确写 `funasr` 和人声地图跳过；线程无返回事件时 warning。
+- P279：标准模式调用过滤器时传 `skip_l2=True`，避免单主引擎继续跑 L2。
+- P281：新增短词/单字合并止血函数，日语短片段会并入相邻字幕，避免“だ/吧”这类独立短字幕。
+
+### 验证结果
+- `test/test_p276_standard_language_env.py`：7 passed。
+- 相关 ASR/L1/L2/时间戳回归：73 passed。
+- 目标文件 `py_compile` 通过。
+- 全量 `pytest test -q` 被当前 Codex/headless 环境阻塞：导入 `mlx_qwen3_asr` 时 `No Metal device available`。这不是本轮逻辑失败，但不能报全量绿灯。
+
+### 待真实重跑确认
+- 日志里必须看到 `Server Python` 和 `Worker Python` 都指向 `v2/.venv`。
+- 标准模式必须写出 Whisper 判到的语言、置信度、最终主引擎。
+- SenseVoice 必须写出启动/跳过/完成和 P275 人声地图摘要。
+- 标准模式必须写出 `L2 跳过`。
+- 真实字幕里继续统计单字字幕数量、`<0.5s` 短字幕数量、段数和文本量。
+
+### 后续
+- P282 环境和历史文件归档不在本轮代码修复里做。等真实重跑确认功能链路后，再单独列清单处理两个 `.venv`、历史报告、临时数据库和旧目录。
+
+## 2026-06-17 — 真实重跑前预飞检查与缓存清理
+
+### 代码检查
+- 运行 `./.venv/bin/python -m pytest test/test_p276_standard_language_env.py test/test_p273_qwen_ja_assembly.py test/test_p268_p269_pipeline.py test/test_p251_qwen_window_assign.py test/test_phase1d_qwen_health.py test/test_phase1d_integration.py test/test_p228_timestamp_fix.py -q`。
+- 结果：73 passed。
+- 运行 `./.venv/bin/python -m py_compile backend/transcriber_v2.py backend/worker.py backend/main.py backend/core/hallucination_filter.py backend/core/sensevoice_runner.py backend/worker_manager.py`。
+- 结果：通过。
+
+### 环境检查
+- `v2/.venv/bin/python` 能 import `funasr`，`backend.core.sensevoice_runner.is_sensevoice_available()` 返回 True，`faster_whisper` 可 import。
+- 在 Codex/headless 环境中导入 `mlx_qwen3_asr` 仍会报 `No Metal device available`，这是当前沙箱没有 Metal/GPU 的限制，真实前台 Mac 环境需通过真实 run 验证。
+- 发现旧服务使用错误命令：`cd v2 && ../.venv/bin/python -m uvicorn ...`，这是项目根 `.venv`，不是 `v2/.venv`。
+- 已停止旧错误服务和孤儿 uvicorn 进程，重新用正确命令启动：`cd /Users/andy/Andy-agent/video-subtitle/v2 && ./.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8766`。
+- 健康检查：`curl http://127.0.0.1:8766/api/health` 返回 `{"ok":true,"version":"3.07"}`。
+- 最终进程列表只剩正确服务命令；旧日志 tail 监控进程已清理。
+
+### 缓存清理
+- 为避免后端去重直接复用旧 done job，不只移动 `cache/`，也移动了旧 job 的 `meta.json`。
+- 已归档：
+  - `/Users/andy/.video-subber/jobs/79066a0965/cache` → `/Users/andy/.video-subber/cache-archive/2026-06-17-pretest/79066a0965/cache`
+  - `/Users/andy/.video-subber/jobs/79066a0965/meta.json` → `/Users/andy/.video-subber/cache-archive/2026-06-17-pretest/79066a0965/meta.json`
+  - `/Users/andy/.video-subber/jobs/e5494b352d/cache` → `/Users/andy/.video-subber/cache-archive/2026-06-17-pretest/e5494b352d/cache`
+  - `/Users/andy/.video-subber/jobs/e5494b352d/meta.json` → `/Users/andy/.video-subber/cache-archive/2026-06-17-pretest/e5494b352d/meta.json`
+- 保留原地：
+  - `/Users/andy/.video-subber/jobs/79066a0965/FJIN-141.srt`
+  - `/Users/andy/.video-subber/jobs/e5494b352d/FJIN-141.srt`
+  - `/Users/andy/.video-subber/logs/79066a0965/user.log`
+  - `/Users/andy/.video-subber/logs/79066a0965/debug.log`
+  - `/Users/andy/.video-subber/logs/e5494b352d/user.log`
+  - `/Users/andy/.video-subber/logs/e5494b352d/debug.log`
+
+### 测试时必须确认
+- 新 job 日志中应出现 `Worker Python`，并指向 `v2/.venv`。
+- 标准模式应输出 Whisper 判语言、置信度和最终主引擎。
+- SenseVoice 应输出启动/跳过/完成和 P275 人声地图摘要。
+- 标准模式应输出 `L2 跳过`。
+
+## 2026-06-18 — 启动 P272/P237/P275/P281 bug 修复流水线
+
+### 用户决策
+- 按当前顺序进入 bug 修复流水线：先修 P272，再补 P237，再做 P281 Phase 2 和 P275 Phase 2。
+- 运行环境问题拆成两层：V3.07 只固定真实测试启动环境，确保 server/worker 都跑 `v2/.venv`；P271+P282 目录清理、旧 `.venv` 归档、历史文件整理挪回 V3.08 搬家时统一做。
+
+### 已完成
+- 新建管道文件：`pipelines/bug-pipeline-2026-06-18-p272-p237-p275-p281.md`。
+- 完成流水线第 ① 步 investigate：确认 P272、P237、P275 Phase 2、P281 Phase 2、P277 验收补强的根因和修复边界。
+- 更新 `task_plan.md`：P276-P279 改为 6/17 真实重跑已验证；P281 拆为 Phase 1 止血完成和 Phase 2 待修；P275 Phase 2/P281 Phase 2 纳入当前待修。
+- 更新 `problems.md`：顶部待修清单改为 4 个 bug + 1 个验收补强；P271+P282 明确回到 V3.08。
+
+### 下一步
+- 流水线第 ② 步：双签审查（plan-eng-review + steve-jobs-perspective），只读第 ① 步结论，不动代码。
+
+## 2026-06-18 — 完成 P272/P237/P275/P281 bug 修复流水线
+
+### 已完成流水线
+- 已完成 `pipelines/bug-pipeline-2026-06-18-p272-p237-p275-p281.md` 的 ①-⑩ 步。
+- 前六步完成根因诊断、方案双签、影响面、diff 简化、设计一致性走查和安全审查。
+- 第 ⑦ 步按 TDD 修复代码，第 ⑧ 步跑验证，第 ⑨ 步做 Web QA，第 ⑩ 步做轻量链路验证。
+
+### 已修代码
+- P272：`_review_seam()` 写回前会拒绝“版本A/版本B/建议/原因”等 LLM 审查解释文字。
+- P237：worker 异常路径会写入安全 `crash_snapshot`，不记录 API Key、环境变量、prompt、字幕全文。
+- P281 Phase 2：短词合并接入 P275 人声地图；同一人声区内放宽合并，非人声区孤立短词标疑似。
+- P275 Phase 2：新增 `P275 人声地图质量` 日志，输出人声区、无字幕人声区、非人声短词、最长疑似漏字幕区间。
+- P277：新增 `v2/run-test.sh`，固定 `v2/.venv` 且无 `--reload`；环境大整理仍留 V3.08。
+
+### 验证结果
+- RED 测试先失败：7 failed, 11 passed，失败点对应 P272/P237/P281/P275/P277 缺口。
+- GREEN 后新增/扩展测试：18 passed。
+- 相关回归测试：99 passed。
+- 重点回归测试：91 passed。
+- 编译检查通过：`backend/transcriber_v2.py`、`backend/worker.py`、`backend/main.py`、`backend/core/hallucination_filter.py`、`backend/translation/orchestrator.py`。
+- 全量 `pytest test -q` 受当前 headless/模型环境阻塞：Metal GPU 不可用、`yt_dlp.__spec__ is None`、HuggingFace 网络/模型路径卡住。不能报全量绿灯。
+
+### Web QA
+- 8766 当前存在旧 Python 监听但不可访问，本轮未擅自杀进程。
+- 临时使用同样无 reload 命令在 8767 启动服务，健康接口返回 `{"ok":true,"version":"3.07"}`，首页返回 200。
+- 临时 8767 服务已关闭。
+
+### 待用户真实重跑验收
+- 下一轮真实测试前先处理 8766 旧监听，再用 `v2/run-test.sh` 启动服务。
+- 新 job 日志必须确认 `Server Python` 和 `Worker Python` 都指向 `v2/.venv/bin/python`。
+- 对比 6/17 job `28a951e756`：单字段、`<0.3s & <=2字` 超短段、`uncertain`、`P275 人声地图质量` 日志。
+
+## 2026-06-18 — 真实重跑前环境清场
+
+### 已完成
+- 清理旧监听：8766 上的旧 Python 服务 PID 49409 已停止；停止前 cwd 是 `v2`，但健康接口不可访问，属于旧服务/卡住服务。
+- 清理缓存：`/Users/andy/.video-subber/jobs` 下旧 `cache/` 和旧 `meta.json` 已移动到 `/Users/andy/.video-subber/cache-archive/2026-06-18-pretest-v307-fix/`。
+- 保留对比材料：原地保留旧 `.srt`、`.mp4`、`input.mp4` 和 `/Users/andy/.video-subber/logs` 日志文件。
+- 启动新服务：使用 `screen` 会话 `video-subtitle-v307-test` 托管服务，监听 `8766`。
+- 健康检查：`http://127.0.0.1:8766/api/health` 返回 `{"ok":true,"version":"3.07"}`。
+
+### 当前验证结论
+- 当前服务 cwd 是 `/Users/andy/Andy-agent/video-subtitle/v2`。
+- 当前服务加载 `v2/.venv` 下的依赖包。
+- 启动日志写入 `/Users/andy/.video-subber/server-run-test-2026-06-18.log`。
+- 本轮没有清理 `.hex-skills` / CodeGraph 索引文件；这些是代码记忆/索引用途，提交前只需排除即可。
+
+### 下一步真实测试要看
+- 新 job 日志第一屏必须出现 `Worker Python`，并指向 `v2/.venv/bin/python`。
+- 标准模式必须出现 Whisper 判语言、主引擎选择、SenseVoice 日志、`L2 跳过`。
+- 对比 6/17 job `28a951e756`：单字段、超短段、`uncertain`、`P275 人声地图质量`。
+
+## 2026-06-18 — FJIN-141 新旧三轮 SRT 对比
+
+### 对比对象
+- 6/15 导出：`/Users/andy/Downloads/Video-Subber/FJIN-141_上下文_20260616_142930.srt`
+- 6/16 导出：`/Users/andy/Downloads/Video-Subber/FJIN-141_上下文_20260617_114948.srt`
+- 6/17 导出：`/Users/andy/Downloads/Video-Subber/FJIN-141_上下文_20260618_104539.srt`，对应 job `28a951e756`
+- 6/18 本次：`/Users/andy/Downloads/Video-Subber/FJIN-141.srt`，对应 job `5c67f7a69b`
+
+### 结论
+- 本次文件大小从 46KB 降到 44KB，不等于质量整体变差。
+- Qwen 原始输出没有变：6/17 和 6/18 都是 25 个 chunk，合计 2776 个 raw segments。
+- SenseVoice 输出也没有变：两次都是 1088 个 segments。
+- 变化发生在过滤、短词合并和标疑似阶段：最终段数 971 → 922，少 49 段。
+- 正向变化：超短碎片减少，`<0.3s 且 <=2字` 从 114 降到 85。
+- 负向变化：`[?]` 从 91 增到 129，需要继续追 P275/P281/L3 标疑似策略。
+- P275 新质量日志生效：`人声区=15, 无字幕人声区=0, 非人声短词=80, 最长疑似漏字幕=None`。
+
+### 下一步观察
+- 文件大小只作为参考，不作为质量结论。
+- 继续重点看 `[?]` 反弹来源、非人声短词标疑似是否过严、L3 对 0.08s 短词是否仍然过敏。
+
+## 2026-06-18 — P283 问号噪音修复流水线
+
+### 已完成
+- 按 bug 修复流水线执行 P283：管道文件为 `pipelines/bug-pipeline-2026-06-18-p283-question-mark-noise.md`。
+- 根因确认：6/18 的 Qwen 原始输出和 SenseVoice 输出没有变差，`[?]` 反弹主要来自后处理把内部质量信号直接显示成用户问号。
+- 已修改 `v2/backend/transcriber_v2.py`：P281 非人声区孤立短词只保留 `filter_reason=voice_timeline_non_voice_short_fragment`，不再直接设置 `uncertain=True`。
+- 已修改 `v2/backend/core/hallucination_filter.py`：L3 对 `zh/ja/ko` 的超短碎片只记录内部原因，不再直接显示 `[?]`。
+
+### 验证
+- RED 测试先失败：`2 failed, 1 passed`，失败点对应 P281 和 L3 的旧问号行为。
+- GREEN 测试通过：`3 passed in 1.37s`。
+- 相关回归通过：`83 passed in 1.41s`。
+- 编译检查通过：`py_compile backend/transcriber_v2.py backend/core/hallucination_filter.py`。
+
+### 下一步真实重跑要看
+- 8766 服务已重启，当前由 `screen` 会话 `video-subtitle-v307-test` 托管，新监听 PID 为 `41198`。
+- 健康接口已确认：`{"ok":true,"version":"3.07"}`。
+- 已清理旧结果复用风险：job `5c67f7a69b` 的 `cache/` 和 `meta.json` 已移动到 `/Users/andy/.video-subber/cache-archive/2026-06-18-post-p283/`；原 `.srt`、视频和日志保留。
+- 重新跑 FJIN-141，重点对比 `[?]`、单字段、`<0.3s 且 <=2字`、`P275 人声地图质量`。
+- 预期：`[?]` 应明显低于 6/18 的 129/922，但 L4 明显重复和强风险仍然可以保留 `[?]`。
+
+## 2026-06-18 — P283 后 FJIN-141 真实重跑验收
+
+### 对比对象
+- 最新：job `23e2621360`，日志 `/Users/andy/.video-subber/logs/23e2621360/`，字幕 `/Users/andy/.video-subber/jobs/23e2621360/FJIN-141.srt`
+- 上一轮：job `5c67f7a69b`，P283 前 `[?]` 反弹版本
+- 更早对照：`28a951e756`、`79066a0965`、`e5494b352d`、`65b1f1b3db`
+
+### 机械统计
+- `[?]`：`23e2621360` 为 52/931，低于 `5c67f7a69b` 的 129/922，也远低于 `e5494b352d` 的 846/1099、`65b1f1b3db` 的 997/1157。
+- P275 人声地图：`人声区=15, 无字幕人声区=0, 非人声短词=80, 最长疑似漏字幕=None`。
+- L3 语速异常：从上一轮 45 条降到 17 条；L3 不可能时长从 8 条降到 1 条。
+- 翻译：929/929 条成功；最新字幕和翻译缓存未发现“版本A/版本B/建议/原因”等接缝审查污染。
+- 49:20-50:20 老问题窗口：最早 `65b1f1b3db` 存在约 5 秒系统性后移、大量 `[?]` 和瞬闪短段；最新 `23e2621360` 时间回到正确区间，问号消失，可读性明显提高。
+
+### 结论
+- P272/P275/P281/P283 这轮修复通过真实长视频验收。
+- P273 剩余问题不再是“有人声但没字幕”的阻塞问题，而是成人片素材里的短促叫声、重复声、极短字幕和正常无对白间隔。
+- 继续为 JAV 干扰项追 100% 完美会拖慢主线。当前接受残留，不再改生产代码。
+
+### 下一步
+- 选择性提交当前分支。提交时排除 `.db-shm/.db-wal`、`v2/v2/`、`.hex-skills` 临时索引等杂项。
+- 提交后合并主线。
+- 合并后进入 V3.08：`v2/` 搬家到 `v3/`，再做复杂度拆分和启动健康检查。
+
+## 2026-06-18 — 版本规划口径调整
+
+### 本轮决定
+- 用户确认：`P266` Mac 端 Whisper 换 `mlx-whisper` 前移到 `V3.07`，不再挂在 `V3.09`。
+- 执行顺序改为：先提交当前分支并合并主线，再开 `mlx-asr-library-swap` 分支完成换库和测试；换库完成后，`V3.07` 再算彻底收尾。
+- `P259` 不再单列成独立待办。原因是当前代码已经按语言设置 L3 阈值，这件事后面只在真实使用中被动观察，不专门安排一轮测试。
+
+### 已同步文件
+- `task_plan.md`
+- `problems.md`
+- `/Users/andy/task_plan.md`

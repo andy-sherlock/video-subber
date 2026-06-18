@@ -348,6 +348,19 @@ def _compute_chunk_size(llm) -> int:
 
 _SEAM_CONTEXT = 50
 _INDEXED_LINE_RE = re.compile(r"\[(\d+)\]\s*(.+)")
+_SEAM_REVIEW_COMMENT_MARKERS = (
+    "版本A", "版本B", "选A", "选B", "选择A", "选择B",
+    "更自然", "更符合", "建议", "原因", "解释", "因为",
+)
+
+
+def _looks_like_seam_review_comment(text: str) -> bool:
+    """Return True when an LLM returned review notes instead of subtitle text."""
+    normalized = (text or "").strip()
+    if not normalized:
+        return False
+    marker_hits = sum(1 for marker in _SEAM_REVIEW_COMMENT_MARKERS if marker in normalized)
+    return marker_hits >= 2
 
 
 def _generate_context_summary(
@@ -456,6 +469,8 @@ def _review_seam(
             idx = int(m.group(1))
             zh = m.group(2).strip()
             if overlap_start <= idx < overlap_end and zh:
+                if _looks_like_seam_review_comment(zh):
+                    continue
                 reviewed[idx] = zh
 
     return reviewed if reviewed else None

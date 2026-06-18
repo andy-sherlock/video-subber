@@ -1,5 +1,5 @@
 """V2 Web App — FastAPI backend."""
-import sys, json, uuid, asyncio, time, hashlib, threading
+import sys, json, uuid, asyncio, time, hashlib, threading, logging
 from pathlib import Path
 
 import uvicorn
@@ -29,6 +29,7 @@ JOBS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR = Path.home() / ".video-subber" / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 JOBS = {}
+_log = logging.getLogger(__name__)
 
 
 def _validate_job_path(job_id: str):
@@ -250,6 +251,7 @@ async def startup():
 
     # ── 3. Store main event loop for worker_manager reader threads ──
     worker_manager.set_main_loop(asyncio.get_running_loop())
+    _log.info("Server Python: %s", sys.executable)
 
     # ── 4. 同步 .version 缓存文件（供外部工具读取）──
     version_file = Path.home() / ".video-subber" / ".version"
