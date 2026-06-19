@@ -2,7 +2,7 @@
 
 **版本**：V3.07
 **日期**：2026-06-10
-**Git**：待提交（HARDEN Sprint 2 代码已完成，待 git commit）
+**Git**：Whisper 换库分支已合入 main（merge commit `c9824bb`，收尾记录 commit 待提交）
 **测试**：重点回归已通过；全量测试受本机 headless/模型环境限制，不能报全量绿灯
 **状态**：V3.07 主问题已收口，FJIN-141 真实重跑验收可接受；8766 当前由 `screen` 会话托管，使用 `v2/.venv`。2026-06-18 已在 `Whisper换库` 分支完成 P266 代码层换库：Mac Apple Silicon 走 `mlx-whisper`，Windows/其他平台继续走 `faster-whisper`；已下载 `mlx-community/whisper-large-v3-mlx` 权重到本机缓存。当前 Codex/headless 环境无 Metal/GPU，真实 MLX 转录需在普通 Mac 前台环境验收。P273 残留接受，不再继续为 JAV 场景干扰项追加修法
 
@@ -170,12 +170,12 @@
 |------|------|------|
 | ⏸ | P273 短字幕 / JAV 干扰项残留 | P283 后真实重跑 `23e2621360`：`[?]` 降到 52/931，P275 显示无字幕人声区为 0。仍有极短字幕、短促叫声、重复声和长 SRT 间隔，但不再作为 V3.07 阻塞项继续修 |
 
-### 待提交 / 合并
+### 提交 / 合并
 
 | 状态 | 事项 | 说明 |
 |------|------|------|
-| ⬜ | git commit 当前分支改动 | P275/P276-P279/P281/模式改造等改动在工作区未提交 |
-| ⬜ | ASR 分支合并主线 | 提交时排除 `.db-shm/.db-wal`、`v2/v2/` 等杂项 |
+| ✅ | Whisper 换库分支提交 | commit `a1c1758`，提交时排除了 `.hex-skills/` 和 `v2/v2/` |
+| ✅ | Whisper 换库分支合并主线 | merge commit `c9824bb`，使用 `--no-ff` 在 main 上留下明确合并提交 |
 | ⏳ | P266 Mac 端 Whisper 换 `mlx-whisper` | **代码层已完成，模型已下载，待真实 Mac 前台转录验收**。Mac Apple Silicon 走 `mlx-whisper`；Windows/其他平台继续走 `faster-whisper`。当前 Codex/headless 环境无 Metal/GPU，不能在沙盒内验证真实 MLX 推理 |
 
 ### 后续版本（不在 V3.07 范围内）

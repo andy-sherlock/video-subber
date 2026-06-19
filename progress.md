@@ -1360,3 +1360,15 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 - `curl http://127.0.0.1:8766/api/active-jobs` → `{"jobs":[]}`
 - `find ~/.video-subber/jobs/a2789ff719 -maxdepth 1 -type f` 只剩 `.srt`
 - 跟踪测试：`./.venv/bin/python -m pytest test/test_harden_v307_sprint2.py test/test_phase1d_qwen_health.py test/test_p160_layer2.py test/test_p160_stemmer.py -q` → `60 passed, 2 warnings`
+
+## 2026-06-19 — Whisper 换库分支合并主线
+
+### 完成事项
+- 已在 `Whisper换库` 分支提交：`a1c1758 feat(V3.07): Whisper 换库并修复双稿参考链路`。
+- 已切回 `main` 并使用 `git merge --no-ff Whisper换库` 合并，生成主线合并提交：`c9824bb merge: Whisper换库分支合入主线`。
+- 合并提交没有包含 `.hex-skills/codegraph/index.db` 和 `v2/v2/`；前者继续作为本地索引缓存，后者留到 V3.08 目录整理时处理。
+
+### 合并后验证
+- 命令：`cd v2 && .venv/bin/python -m pytest test/test_p266_mlx_whisper.py test/test_harden_v307_sprint2.py test/test_phase1d_qwen_health.py test/test_p160_layer2.py test/test_p160_stemmer.py -q`
+- 结果：`65 passed, 2 warnings`
+- 两个 warning 都是 FastAPI `on_event` 弃用提醒，不是本次 Whisper 换库或 P284 修复导致的失败。
