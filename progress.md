@@ -1235,3 +1235,128 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 - `task_plan.md`
 - `problems.md`
 - `/Users/andy/task_plan.md`
+
+## 2026-06-18 — 项目级索引缓存规则落地
+
+### 已完成
+- 已把 `.hex-skills/`、`v2/.hex-skills/`、`*.db-shm`、`*.db-wal` 加入 `.gitignore`。
+- 已把已跟踪的 `.hex-skills/codegraph/index.db` 从 git 索引中移除，但文件仍保留在本机。
+
+### 结论
+- 这类文件以后按“项目级本地缓存”处理：允许跨对话、跨分支复用，但不进入版本库。
+- 后续新对话如果读取 `video-subtitle` 项目，可以继续直接利用本地索引，不必把它当某个分支的代码成果。
+
+## 2026-06-18 — P266 Mac 端 Whisper 换 mlx-whisper
+
+### 完成事项
+- 新增 `v2/backend/core/whisper_runner.py`：Mac Apple Silicon 走 `mlx-whisper`，其他平台继续走 `faster-whisper`。
+- 修改 `v2/backend/transcriber_v2.py`：Whisper 调用改为统一入口 `transcribe_whisper()`，后续仍转成项目原有 `Segment` 字段。
+- 修改 `v2/backend/env_check.py`：Mac 端检测 `mlx_whisper` 包和 Hugging Face 缓存，不实际 import MLX，避免在 Codex/headless 环境触发 `No Metal device available`。
+- 修改 `v2/pyproject.toml`：新增 `mlx-whisper>=0.4.3`，仅限 `Darwin arm64` 安装；Windows 端仍保留 `faster-whisper==1.2.1`。
+- 新增 `v2/test/test_p266_mlx_whisper.py`：锁定 Mac/Windows 分流、MLX 输出字段转换、环境检测不触发 MLX 初始化。
+
+### 模型下载
+- 已安装 `mlx-whisper==0.4.3` 到 `v2/.venv`。
+- 已下载 `mlx-community/whisper-large-v3-mlx` 到本机 Hugging Face 缓存。
+- 权重文件：`/Users/andy/.cache/huggingface/hub/models--mlx-community--whisper-large-v3-mlx/blobs/05ff791ce3630fae47e7c51004e9666204d786246ec07cac6110af768099b40d`
+- 权重大小：`3083520416 bytes`。
+- 处理过下载问题：`huggingface-cli` 走台湾节点卡住，改用 `curl --http1.1 -C -` 断点续传；切香港节点后稳定到约 9-10MB/s。
+
+### 验证
+- RED：`test/test_p266_mlx_whisper.py` 先失败，缺少 `backend.core.whisper_runner`。
+- GREEN：`test/test_p266_mlx_whisper.py` 通过，`4 passed in 0.01s`。
+- 相关回归：`test_p266_mlx_whisper.py + test_standard_precise_mode.py + test_p276_standard_language_env.py + test_arch7_pipeline.py + test_phase1c_chunking.py + test_p251_qwen_window_assign.py`，`82 passed in 13.01s`。
+- 模型缓存验证：`snapshot_download('mlx-community/whisper-large-v3-mlx', local_files_only=True)` 能定位到本地 snapshot。
+
+### 当前边界
+- 当前 Codex/headless 环境没有 Metal/GPU 访问权限，直接 import `mlx_whisper` 会报 `No Metal device available`，因此不能在本沙盒内完成真实 MLX 转录。
+- 下一步需要在普通 Mac 前台环境跑一次真实短音频/真实视频，确认 `mlx-whisper` 能实际转录并输出时间戳。
+
+## 2026-06-19 — Whisper 换库分支 London VLOG 字幕回归只读诊断
+
+### 现象
+- job `a2789ff719` 前两句复现用户反馈：
+  - 第 1 条字幕把 `Hey Taylor what time is it` 和 `Oh gosh I don't` 合到一起，中文成品为「嘿泰勒，现在几点了？天哪，我」。
+  - 第 2 条 `clock` 再次被识别为 `claw`，中文成品为「真希望我有爪子」。
+
+### 查证
+- `cache/f82cadc4bac1/transcript.json` 中第 0 段英文源文本已经是 `Hey Taylor what time is it Oh gosh I don't`。
+- 第 1 段英文源文本已经是 `know I wish I had claw`。
+- 两段 `whisper_text` 都是空字符串。
+- 日志显示 Whisper 实际转录出 `643 段`，但 P247/P269 Refiner 进入 `single` 模式，`corrections=0 accepted=0 mode=single`。
+
+### 结论
+- 这不是翻译器把中文翻错，翻译器只是照着坏英文翻。
+- `clock/claw` 旧修复依赖 P247/P263+P264：让 LLM 同时看 Qwen 主稿和 Whisper 参考稿。现在 Qwen 主引擎组装结果没挂 `whisper_text`，LLM 没看到 `clock` 参考答案，所以旧问题复发。
+- 第一条边界问题来自 `_assemble_qwen_primary()` 只按 Qwen 词时间戳和停顿切句。`it` 到 `Oh` 的间隔约 `0.24s`，低于英文默认 `0.5s` 断句阈值，因此被合成同一条。
+- 已新增问题库 P284，后续按 bug 修复流水线处理。
+
+### 2026-06-19 追加机械统计
+- Qwen 日志原始小片段：`569+587+570+526+322=2574`。
+- Whisper 日志段数：`643`。
+- 最终字幕段数：`416`。
+- 最终 `transcript.json` 中 `with_whisper_text=0/416`，说明 Whisper 参考稿完全没有挂到最终字幕段上。
+- 最终 416 条中：`<0.5s` 短字幕 `31` 条，`<1s` 字幕 `94` 条，单词字幕 `35` 条，2 个词以内字幕 `60` 条。
+- 典型异常样例：`Let's pack I don't think this will me too`、单独 `long`、单独 `Cannot`、`Travel Bookstore You grand was`、单独 `You` 持续 15.04 秒、单独 `Lauren` 持续 5.92 秒。
+
+## 2026-06-19 — P284 英文 Whisper 参考稿链路修复
+
+### 完成事项
+- 按 bug 修复流水线新增管道文件：`pipelines/bug-pipeline-2026-06-19-p284-whisper-qwen-english.md`。
+- 新增 P284 回归测试：
+  - 英文 Qwen 主路径不能把 `Hey Taylor what time is it` 和 `Oh gosh I don't` 合到同一条。
+  - 英文 Qwen 主路径必须把 Whisper 文本写入 `whisper_text`，让 Refiner 恢复 dual。
+  - 日语 Qwen 主路径保持 P273 原有组装行为，不受英语修复影响。
+  - 短字幕合并时同步合并 `whisper_text`，避免参考稿在合并后丢失。
+- 修改 `v2/backend/transcriber_v2.py`：
+  - `_smart_assemble()` 中仅对 `lang == "en" and whisper_ok` 的 Qwen 主路径启用 Whisper 边界组装。
+  - 新增 `_assemble_qwen_on_whisper_boundaries()`，字幕正文来自 Qwen 词，参考稿来自 Whisper 段落。
+  - 新增 `_merge_whisper_text()`，短字幕合并时保留参考稿。
+
+### 验证
+- RED：旧代码下英文测试失败，第一条输出 `Hey Taylor what time is it Oh gosh I don't`。
+- GREEN：`./.venv/bin/python -m pytest test/test_p260_boundary_fix.py test/test_p268_p269_pipeline.py test/test_p273_qwen_ja_assembly.py -q` → `25 passed`。
+- 相关回归：`./.venv/bin/python -m pytest test/test_p260_boundary_fix.py test/test_p268_p269_pipeline.py test/test_p273_qwen_ja_assembly.py test/test_p276_standard_language_env.py test/test_phase1d_qwen_health.py test/test_phase1d_integration.py test/test_p251_qwen_window_assign.py test/test_p228_timestamp_fix.py -q` → `80 passed`。
+- Git 跟踪测试：`./.venv/bin/python -m pytest test/test_harden_v307_sprint2.py test/test_phase1d_qwen_health.py test/test_p160_layer2.py test/test_p160_stemmer.py -q` → `59 passed, 2 warnings`。
+- 全量 `pytest test -q` 未能完成：当前 Codex/headless 环境无 Metal/GPU，`mlx` 在收集 `test_p182_tail_flush.py` 时触发 `No Metal device available`。这属于运行环境限制，不是 P284 修改导致。
+
+### 当前边界
+- 代码层已修复。
+- 仍需在普通 Mac 前台环境重跑 London VLOG，确认真实成品第 1 条断句恢复，第 2 条 `clock/claw` 恢复。
+
+## 2026-06-19 — London VLOG 重跑前缓存清理
+
+### 完成事项
+- 按用户要求直接删除 `/Users/andy/.video-subber/jobs/a2789ff719/cache`。
+- 保留 job 根目录下的字幕和视频文件。
+- 保留 `/Users/andy/.video-subber/logs/a2789ff719/user.log` 和 `debug.log`。
+
+### 验证
+- 已确认 `cache/` 不存在。
+- 已确认 `London VLOG： Exploring the City, Markets, & Hidden Gems_video.srt` 仍存在。
+- 已确认 `user.log` 和 `debug.log` 仍存在。
+
+## 2026-06-19 — 旧完成卡片清理规则固化 + stale done 自愈
+
+### 现象
+- 用户点击“重新处理”无反应。
+- 页面仍恢复出旧的已完成卡片。
+
+### 根因
+- 前端 `startBtn` 点击事件在 `State.videoFile / localPath / sourceUrl` 全为空时直接 `return`，所以“重新处理”外观存在，但没有真实输入源时不会提交。
+- 只删 `cache/` 不够；旧 job 的 `meta.json`、成品文件和后端内存里的 `JOBS[job_id]` 仍可能让前端继续恢复“已完成”卡片。
+
+### 本轮处理
+- 按新规则清理 job `a2789ff719`：
+  - 保留 `video.srt`
+  - 保留 `user.log` / `debug.log`
+  - 删除 job 目录其余文件
+- 通过 `DELETE /api/jobs/a2789ff719` 清理后端完成记录。
+- 新增后端自愈：`get_job()` 发现内存里有 job，但磁盘 `meta.json` 已不存在且进程不活时，自动清掉内存脏状态并返回 404。
+- 重启本地 `8766` 服务，使前端刷新后不再恢复旧完成卡片。
+
+### 验证
+- `curl http://127.0.0.1:8766/api/jobs/a2789ff719` → `404 Not Found`
+- `curl http://127.0.0.1:8766/api/active-jobs` → `{"jobs":[]}`
+- `find ~/.video-subber/jobs/a2789ff719 -maxdepth 1 -type f` 只剩 `.srt`
+- 跟踪测试：`./.venv/bin/python -m pytest test/test_harden_v307_sprint2.py test/test_phase1d_qwen_health.py test/test_p160_layer2.py test/test_p160_stemmer.py -q` → `60 passed, 2 warnings`

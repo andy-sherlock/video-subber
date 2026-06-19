@@ -4,11 +4,16 @@
 **日期**：2026-06-10
 **Git**：待提交（HARDEN Sprint 2 代码已完成，待 git commit）
 **测试**：重点回归已通过；全量测试受本机 headless/模型环境限制，不能报全量绿灯
-**状态**：V3.07 主问题已收口，FJIN-141 真实重跑验收可接受；8766 当前由 `screen` 会话托管，使用 `v2/.venv`。按 2026-06-18 最新决定，先做选择性提交和合并主线，再开 `mlx-asr-library-swap` 分支完成 Mac 端 Whisper 换库；P273 残留接受，不再继续为 JAV 场景干扰项追加修法
+**状态**：V3.07 主问题已收口，FJIN-141 真实重跑验收可接受；8766 当前由 `screen` 会话托管，使用 `v2/.venv`。2026-06-18 已在 `Whisper换库` 分支完成 P266 代码层换库：Mac Apple Silicon 走 `mlx-whisper`，Windows/其他平台继续走 `faster-whisper`；已下载 `mlx-community/whisper-large-v3-mlx` 权重到本机缓存。当前 Codex/headless 环境无 Metal/GPU，真实 MLX 转录需在普通 Mac 前台环境验收。P273 残留接受，不再继续为 JAV 场景干扰项追加修法
 
 **补充记录（2026-06-18）**：已新增 `competitor-comparison.md`，完成外部项目对比与 JAV 场景借鉴整理。当前结论：先做人声地图、短词并段、低分段返修，不新增本地 ASR，不立刻走模型微调。
 
 **补充记录（2026-06-18 晚）**：P283 后重新跑 FJIN-141，job `23e2621360`。`[?]` 从上一轮 `129/922` 降到 `52/931`；P275 日志显示 `无字幕人声区=0`、`最长疑似漏字幕=None`；49:20-50:20 老问题窗口不再有 5 秒系统性后移和大面积 `[?]`。剩余问题主要是极短字幕、短促叫声、重复声和正常无对白间隔，作为成人片素材残留接受，不阻塞 V3.07 收尾。
+
+**补充记录（2026-06-18 夜）**：P266 Mac 端 Whisper 换 `mlx-whisper` 已完成代码适配和模型下载。新增 `backend/core/whisper_runner.py` 做平台分流：Mac `Darwin arm64` 使用 `mlx-whisper`，Windows/其他平台继续使用 `faster-whisper`。`mlx-community/whisper-large-v3-mlx` 已下载到 Hugging Face 本地缓存，权重大小 `3083520416 bytes`。相关测试 `82 passed`。真实 MLX 转录仍需脱离 Codex/headless 沙盒验证。
+
+**补充记录（2026-06-19）**：Whisper 换库分支真实跑 London VLOG 暴露 P284：Qwen 主引擎组装结果没有挂回 Whisper 参考稿，导致 P247/P263+P264 的双稿裁判没有启动；`clock/claw` 旧问题复发，且第一句因 Qwen 停顿切句把 `Oh gosh I don't` 合入前一句。已按 bug 修复流水线完成代码修复：英语 Qwen 主路径改用 Whisper 边界并回填 `whisper_text`，短字幕合并时同步保留参考稿；相关回归 `80 passed`，全量测试受 Codex/headless Metal 限制仍需普通 Mac 前台真实转录验收。
+**补充记录（2026-06-19 晚）**：London VLOG 重跑前缓存清理规则已固定：以后用户说“清缓存”时，默认保留 `user.log`、`debug.log` 和 `.srt` 对比材料，删除 job 目录其余文件，并通过清掉 `meta.json` + 完成记录让前端刷新后不再恢复旧已完成卡片。本轮同时修复了后端 stale done 自愈：`get_job()` 发现 `meta.json` 已不存在且进程不活时，会自动清掉内存里的旧任务状态并返回 404。
 
 ---
 
@@ -108,6 +113,7 @@
 | P254 | 转录智能路由 | 🟡 HIGH | 基于源语言自动切换主副引擎。英语/日/韩→Qwen 主+Whisper 副，冷门→Whisper 主。换库后 Qwen 可独立检测语言+分块+出时间戳 |
 | P247 | ASR 分歧裁决 | ✅ 已修 | Plan C 单段隔离安全阀 + P263/P264 双稿裁判重构。FJIN-141 实测 843→0 [?] |
 | P237 | 黑匣子日志 | 🔴 P0 | 系统日志只有流水账无状态快照。加 `checkpoint()` + `psutil` 定期拍内存/进程/线程/队列快照 |
+| P284 | Whisper 参考稿丢失导致 `clock/claw` 回归 | ✅ 已修代码，待真实重跑 | 英语 Qwen 主路径改用 Whisper 边界并回填 `whisper_text`；短字幕合并保留参考稿；相关回归 `80 passed`。待普通 Mac 前台环境重跑 London VLOG 验收 |
 
 **换库后的两档模式（2026-06-12 最终定稿）**：
 
@@ -170,7 +176,7 @@
 |------|------|------|
 | ⬜ | git commit 当前分支改动 | P275/P276-P279/P281/模式改造等改动在工作区未提交 |
 | ⬜ | ASR 分支合并主线 | 提交时排除 `.db-shm/.db-wal`、`v2/v2/` 等杂项 |
-| ⬜ | P266 Mac 端 Whisper 换 `mlx-whisper` | **前移到 V3.07**。合并主线后新开 `mlx-asr-library-swap` 分支；换完做真实测试，再把 V3.07 算正式收尾 |
+| ⏳ | P266 Mac 端 Whisper 换 `mlx-whisper` | **代码层已完成，模型已下载，待真实 Mac 前台转录验收**。Mac Apple Silicon 走 `mlx-whisper`；Windows/其他平台继续走 `faster-whisper`。当前 Codex/headless 环境无 Metal/GPU，不能在沙盒内验证真实 MLX 推理 |
 
 ### 后续版本（不在 V3.07 范围内）
 

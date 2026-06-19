@@ -20,7 +20,7 @@ import threading
 import unicodedata
 from collections import Counter, defaultdict
 import numpy as np
-from faster_whisper import WhisperModel
+from backend.core.whisper_runner import transcribe_whisper
 from backend.core.vad_filter import compute_speech_ratio_via_vad
 from backend.core.hallucination_filter import filter_hallucinations, _has_timestamp_segments, _qwen_is_reliable
 
@@ -376,6 +376,20 @@ def _is_short_fragment(seg, lang):
     return duration < 0.25 and len(text.split()) <= 1
 
 
+def _merge_whisper_text(target, source, joiner, prepend=False):
+    target_text = (getattr(target, "whisper_text", "") or "").strip()
+    source_text = (getattr(source, "whisper_text", "") or "").strip()
+    if not source_text:
+        return
+    if target_text:
+        if prepend:
+            target.whisper_text = f"{source_text}{joiner}{target_text}".strip()
+        else:
+            target.whisper_text = f"{target_text}{joiner}{source_text}".strip()
+    else:
+        target.whisper_text = source_text
+
+
 def merge_short_subtitle_fragments(segments, lang, max_gap=1.0,
                                    voice_timeline=None, voice_region_gap=2.0):
     """Merge tiny standalone subtitle fragments into nearby segments."""
@@ -396,6 +410,7 @@ def merge_short_subtitle_fragments(segments, lang, max_gap=1.0,
             ):
                 prev = merged[-1]
                 prev.text = f"{prev.text}{joiner}{seg.text}".strip()
+                _merge_whisper_text(prev, seg, joiner)
                 prev.end = max(prev.end, seg.end)
                 prev.uncertain = getattr(prev, "uncertain", False) or getattr(seg, "uncertain", False)
                 i += 1
@@ -409,6 +424,7 @@ def merge_short_subtitle_fragments(segments, lang, max_gap=1.0,
             ):
                 nxt = segments[i + 1]
                 nxt.text = f"{seg.text}{joiner}{nxt.text}".strip()
+                _merge_whisper_text(nxt, seg, joiner, prepend=True)
                 nxt.start = min(seg.start, nxt.start)
                 nxt.uncertain = getattr(nxt, "uncertain", False) or getattr(seg, "uncertain", False)
                 i += 1
@@ -735,6 +751,10 @@ def _assemble_whisper_primary(qwen_words, whisper_segments, lang):
     return segments
 
 
+def _assemble_qwen_on_whisper_boundaries(qwen_words, whisper_segments, lang):
+    return _assemble_whisper_primary(qwen_words, whisper_segments, lang)
+
+
 def _assemble_emergency_fallback(qwen_words, whisper_segments, lang, total_end):
     segments = []
 
@@ -790,6 +810,9 @@ def _smart_assemble(qwen_chunks, whisper_segments, lang, primary_engine):
         primary_engine = "qwen" if qwen_ok else "dual_failed"
 
     if primary_engine == "qwen":
+        if lang == "en" and whisper_ok:
+            return _assemble_qwen_on_whisper_boundaries(
+                qwen_words, whisper_segments, lang)
         return _assemble_qwen_primary(qwen_words, whisper_segments, lang)
     elif primary_engine == "whisper":
         return _assemble_whisper_primary(qwen_words, whisper_segments, lang)
@@ -860,25 +883,11 @@ def transcribe(audio_path: str, model_size: str = "medium",
         _log.info("加载 Whisper %s 模型…", model_size)
         if progress_callback:
             progress_callback(-1)
-        model = WhisperModel(model_size, device="auto", compute_type="auto")
-
-        vad_kwargs = {}
-        if vad_threshold > 0:
-            vad_kwargs = {
-                "vad_filter": True,
-                "vad_parameters": {
-                    "threshold": vad_threshold,
-                    "min_speech_duration_ms": 250,
-                    "min_silence_duration_ms": 100,
-                },
-            }
-
-        segments_iter, info = model.transcribe(
-            audio_path, beam_size=5, language=lang,
-            condition_on_previous_text=True,
-            log_prob_threshold=-1.0,
-            word_timestamps=True,
-            **vad_kwargs
+        whisper_output, info = transcribe_whisper(
+            audio_path,
+            model_size=model_size,
+            language=lang,
+            vad_threshold=vad_threshold,
         )
         _log.info("检测语言: %s (概率 %.2f)", info.language, info.language_probability)
         detected_lang = info.language if info.language else source_lang
@@ -894,8 +903,6 @@ def transcribe(audio_path: str, model_size: str = "medium",
             if _standard_primary == "qwen":
                 from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
                 if use_qwen and filter_keywords and is_qwen_asr_available():
-                    del segments_iter
-                    del model
                     gc.collect()
                     _log.info("标准模式: 语言适合 Qwen，停止 Whisper，切换 Qwen")
                     _log.info("标准模式: Qwen 使用锁定语言=%s", detected_lang)
@@ -907,7 +914,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
 
         # ── Whisper segment iteration ──
         if use_whisper or _standard_primary == "whisper":
-            for seg in segments_iter:
+            for seg in whisper_output:
                 text = seg.text.strip()
                 n_total += 1
 
@@ -917,7 +924,7 @@ def transcribe(audio_path: str, model_size: str = "medium",
                     end=round(seg.end, 2),
                     text=text,
                 )
-                if hasattr(seg, "words") and seg.words:
+                if getattr(seg, "words", None):
                     s.words = []
                     for w in seg.words:
                         if isinstance(w, dict):
@@ -942,7 +949,6 @@ def transcribe(audio_path: str, model_size: str = "medium",
                     _log.info("Whisper 进度: %d%% (音频 %ds/%ds, 已识别 %d 段)",
                               pct, int(seg.end), int(_audio_duration), n_total)
 
-            del model
             gc.collect()
             _log.info("Whisper 模型已释放")
     else:
