@@ -591,6 +591,8 @@ def _persist_job_status(job_id: str, status: str):
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             meta["status"] = status
+            if status in ("queued", "running", "done"):
+                meta.pop("error", None)
             meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
             _update_hash_index(job_id, status)
         except Exception:
@@ -794,10 +796,18 @@ def get_active_jobs():
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str):
     j = JOBS.get(job_id)
+    safe_dir = _validate_job_path(job_id)
+    if not safe_dir:
+        return JSONResponse({"error": "无效的任务编号"}, status_code=400)
+    if j:
+        meta_path = safe_dir / "meta.json"
+        if not meta_path.exists() and not worker_manager.is_alive(job_id):
+            JOBS.pop(job_id, None)
+            _cleanup_hash_index(job_id)
+            return JSONResponse({"error": "未找到该任务"}, status_code=404)
+        j["process_alive"] = worker_manager.is_alive(job_id)
+        return j
     if not j:
-        safe_dir = _validate_job_path(job_id)
-        if not safe_dir:
-            return JSONResponse({"error": "无效的任务编号"}, status_code=400)
         meta_path = safe_dir / "meta.json"
         if meta_path.exists():
             try:
@@ -817,8 +827,6 @@ def get_job(job_id: str):
             except Exception:
                 pass
         return JSONResponse({"error": "未找到该任务"}, status_code=404)
-    j["process_alive"] = worker_manager.is_alive(job_id)
-    return j
 
 
 @app.get("/api/jobs/{job_id}/download/video")

@@ -8,6 +8,8 @@
 
 **版本口径补充（2026-06-18）**：`P266` Mac 端 Whisper 换 `mlx-whisper` 已前移到 `V3.07` 收尾线；`P259` 跨语言 L3 阈值不再单列独立待办，后续只在真实使用中观察。
 
+**P266 执行记录（2026-06-18 夜）**：Mac Apple Silicon 的 Whisper 后端已从直接调用 `faster-whisper` 改为平台分流：Mac 使用 `mlx-whisper`，Windows/其他平台继续使用 `faster-whisper`。已下载 `mlx-community/whisper-large-v3-mlx` 到本机 Hugging Face 缓存，权重大小 `3083520416 bytes`。当前 Codex/headless 环境不能访问 Metal/GPU，真实 MLX 转录需在普通 Mac 前台环境再跑一次确认。
+
 **一句话定义**：「拖进去，等一会，就能看懂。」
 
 ---

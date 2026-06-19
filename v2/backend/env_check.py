@@ -1,4 +1,5 @@
 """Environment checks: ffmpeg, whisper, resemblyzer."""
+import importlib.util
 import subprocess, shutil, os, glob, sys
 from pathlib import Path
 
@@ -50,6 +51,24 @@ def check_whisper() -> dict:
     """Check if any Whisper model is cached locally.
     Returns: {installed, models: [str]}
     """
+    if sys.platform == "darwin" and platform_machine() == "arm64":
+        if importlib.util.find_spec("mlx_whisper") is None:
+            return {"installed": False, "models": [], "backend": "mlx"}
+        models = _cached_whisper_models()
+        return {"installed": True, "models": models, "backend": "mlx"}
+    return {"installed": len(_cached_whisper_models()) > 0,
+            "models": _cached_whisper_models(), "backend": "faster"}
+
+
+def platform_machine() -> str:
+    try:
+        import platform
+        return platform.machine()
+    except Exception:
+        return ""
+
+
+def _cached_whisper_models() -> list:
     cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
     models = []
     if os.path.exists(cache_dir):
@@ -65,7 +84,7 @@ def check_whisper() -> dict:
             for m in ["tiny", "base", "small", "medium", "large"]:
                 if m in name and m not in models:
                     models.append(m if m != "large" else "large-v3")
-    return {"installed": len(models) > 0, "models": list(set(models))}
+    return list(set(models))
 
 
 def check_resemblyzer() -> dict:

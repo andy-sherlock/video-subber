@@ -4,6 +4,7 @@ Run: cd v2 && .venv/bin/python -m pytest test/test_harden_v307_sprint2.py -v
 """
 import sys
 import logging
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -25,6 +26,13 @@ def _make_seg(id=0, start=0.0, end=1.0, text="hello", l2_status=None):
     if l2_status is not None:
         s.l2_status = l2_status
     return s
+
+
+class _FakeWhisperSeg:
+    def __init__(self, start, end, text):
+        self.start = start
+        self.end = end
+        self.text = text
 
 
 # ═══════════════════════════════════════════════════════════
@@ -109,6 +117,41 @@ class TestP244GetJobPathTraversal(unittest.TestCase):
         from backend.main import get_job
         src = inspect.getsource(get_job)
         self.assertIn("_validate_job_path", src)
+
+    def test_get_job_prunes_stale_done_job_when_meta_missing(self):
+        import backend.main as main
+
+        old_jobs_dir = main.JOBS_DIR
+        old_jobs = dict(main.JOBS)
+        old_global = dict(main.GLOBAL_HASH_INDEX)
+        old_reverse = dict(main.JOB_ID_TO_HASH)
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                main.JOBS_DIR = Path(td)
+                jid = "stale-done-job"
+                tk = "stale-task-key"
+                main.JOBS.clear()
+                main.GLOBAL_HASH_INDEX.clear()
+                main.JOB_ID_TO_HASH.clear()
+                main.JOBS[jid] = {"id": jid, "status": "done", "result_srt": str(Path(td) / jid / "out.srt")}
+                main.GLOBAL_HASH_INDEX[tk] = {"job_id": jid, "status": "done", "config": {}, "file_hash": "x"}
+                main.JOB_ID_TO_HASH[jid] = tk
+
+                response = main.get_job(jid)
+
+                self.assertFalse(isinstance(response, dict))
+                self.assertEqual(response.status_code, 404)
+                self.assertNotIn(jid, main.JOBS)
+                self.assertNotIn(jid, main.JOB_ID_TO_HASH)
+                self.assertNotIn(tk, main.GLOBAL_HASH_INDEX)
+        finally:
+            main.JOBS_DIR = old_jobs_dir
+            main.JOBS.clear()
+            main.JOBS.update(old_jobs)
+            main.GLOBAL_HASH_INDEX.clear()
+            main.GLOBAL_HASH_INDEX.update(old_global)
+            main.JOB_ID_TO_HASH.clear()
+            main.JOB_ID_TO_HASH.update(old_reverse)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -244,6 +287,137 @@ class TestP214FAQualityVisibility(unittest.TestCase):
         )
         self.assertIn("_fa_quality", src_lines,
                       "transcribe() must set seg._fa_quality on result segments")
+
+
+# ═══════════════════════════════════════════════════════════
+# P284: English Qwen primary must keep Whisper boundaries + references
+# ═══════════════════════════════════════════════════════════
+
+class TestP284EnglishWhisperReference(unittest.TestCase):
+    def test_english_qwen_primary_uses_whisper_boundaries_and_reference_text(self):
+        from backend.transcriber_v2 import _smart_assemble
+
+        qwen_chunks = [{
+            "text": "Hey Taylor what time is it Oh gosh I don't know I wish I had claw",
+            "t_start": 0.0,
+            "t_end": 3.4,
+            "segments": [
+                {"text": "Hey", "start": 0.00, "end": 0.15},
+                {"text": "Taylor", "start": 0.16, "end": 0.40},
+                {"text": "what", "start": 0.45, "end": 0.60},
+                {"text": "time", "start": 0.61, "end": 0.78},
+                {"text": "is", "start": 0.79, "end": 0.90},
+                {"text": "it", "start": 0.91, "end": 1.05},
+                {"text": "Oh", "start": 1.29, "end": 1.40},
+                {"text": "gosh", "start": 1.41, "end": 1.65},
+                {"text": "I", "start": 1.66, "end": 1.75},
+                {"text": "don't", "start": 1.76, "end": 2.00},
+                {"text": "know", "start": 2.01, "end": 2.20},
+                {"text": "I", "start": 2.21, "end": 2.30},
+                {"text": "wish", "start": 2.31, "end": 2.50},
+                {"text": "I", "start": 2.51, "end": 2.60},
+                {"text": "had", "start": 2.61, "end": 2.76},
+                {"text": "claw", "start": 2.77, "end": 3.10},
+            ],
+        }]
+        whisper_segs = [
+            _FakeWhisperSeg(0.0, 1.18, "Hey Taylor what time is it?"),
+            _FakeWhisperSeg(1.20, 3.40, "Oh gosh I don't know I wish I had clock"),
+        ]
+
+        result = _smart_assemble(qwen_chunks, whisper_segs, "en", "qwen")
+
+        self.assertGreaterEqual(len(result), 2)
+        self.assertEqual(result[0].text, "Hey Taylor what time is it")
+        self.assertNotIn("Oh", result[0].text)
+        self.assertEqual(result[0].whisper_text, "Hey Taylor what time is it?")
+        self.assertIn("claw", result[1].text)
+        self.assertIn("clock", result[1].whisper_text)
+
+    def test_japanese_qwen_primary_keeps_existing_assembly_path(self):
+        from backend.transcriber_v2 import _smart_assemble
+
+        qwen_chunks = [{
+            "text": "何するの やめて",
+            "t_start": 0.0,
+            "t_end": 1.2,
+            "segments": [
+                {"text": "何するの", "start": 0.0, "end": 0.6},
+                {"text": "やめて", "start": 0.8, "end": 1.2},
+            ],
+        }]
+        whisper_segs = [
+            _FakeWhisperSeg(0.0, 0.7, "何するの"),
+            _FakeWhisperSeg(0.7, 1.3, "やめて"),
+        ]
+
+        result = _smart_assemble(qwen_chunks, whisper_segs, "ja", "qwen")
+
+        self.assertEqual([s.text for s in result], ["何するのやめて"])
+
+    def test_short_fragment_merge_keeps_reference_text(self):
+        from backend.transcriber_v2 import Segment, merge_short_subtitle_fragments
+
+        first = Segment(0, 0.0, 0.2, "Oh")
+        first.whisper_text = "Oh"
+        second = Segment(1, 0.3, 3.0, "gosh I had claw")
+        second.whisper_text = "gosh I had clock"
+
+        result = merge_short_subtitle_fragments([first, second], "en")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].text, "Oh gosh I had claw")
+        self.assertEqual(result[0].whisper_text, "Oh gosh I had clock")
+
+    def test_whisper_text_switches_refiner_to_dual_conflict_prompt(self):
+        from backend.worker import _build_refiner_prompt, _choose_refiner_mode
+
+        seg = _make_seg(id=3, start=0.0, end=2.0, text="I wish I had claw")
+        seg.whisper_text = "I wish I had clock"
+
+        mode = _choose_refiner_mode([seg])
+        user_prompt, _system_prompt = _build_refiner_prompt([seg], mode)
+
+        self.assertEqual(mode, "dual")
+        self.assertIn("[CONFLICT seg_id: 3]", user_prompt)
+        self.assertIn("claw", user_prompt)
+        self.assertIn("clock", user_prompt)
+
+
+class TestJobStatusPersistence(unittest.TestCase):
+    """Completed reruns must not keep stale error text in meta.json."""
+
+    def test_done_status_clears_stale_error(self):
+        import json
+        import backend.main as main
+
+        old_jobs_dir = main.JOBS_DIR
+        old_global = dict(main.GLOBAL_HASH_INDEX)
+        old_reverse = dict(main.JOB_ID_TO_HASH)
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                main.JOBS_DIR = Path(td)
+                jid = "job-with-old-error"
+                job_dir = Path(td) / jid
+                job_dir.mkdir()
+                meta_path = job_dir / "meta.json"
+                meta_path.write_text(
+                    json.dumps({"status": "error", "error": "old crash"},
+                               ensure_ascii=False),
+                    encoding="utf-8",
+                )
+
+                main._persist_job_status(jid, "done")
+
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                self.assertEqual(meta["status"], "done")
+                self.assertNotIn("error", meta)
+        finally:
+            main.JOBS_DIR = old_jobs_dir
+            main.GLOBAL_HASH_INDEX.clear()
+            main.GLOBAL_HASH_INDEX.update(old_global)
+            main.JOB_ID_TO_HASH.clear()
+            main.JOB_ID_TO_HASH.update(old_reverse)
 
 
 if __name__ == "__main__":

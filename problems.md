@@ -23,11 +23,11 @@
 |---|------|------|------|------|
 | — | P273 | `transcriber_v2.py` | 短字幕、短促叫声、重复声、长 SRT 间隔残留 | P283 后 job `23e2621360` 已降到 52/931 个 `[?]`，且 P275 显示无字幕人声区为 0。成人片干扰项太多，继续追 100% 完美会伤害主线进度；V3.07 不再追加修法 |
 
-### V3.07 当前待做（1 个）
+### V3.07 当前待验收（1 个）
 
 | # | 编号 | 定位 | 问题 |
 |---|------|------|------|
-| — | P266 | `transcriber_v2.py:253` | **Mac 端 Whisper 换 `mlx-whisper`**。用户已决定把它前移到 `V3.07`：当前分支提交并合并主线后，单独开 `mlx-asr-library-swap` 分支完成换库和测试 |
+| — | P266 | `transcriber_v2.py` + `backend/core/whisper_runner.py` | **Mac 端 Whisper 换 `mlx-whisper`**。代码层已完成：Mac Apple Silicon 使用 `mlx-whisper`，Windows/其他平台继续使用 `faster-whisper`。已下载 `mlx-community/whisper-large-v3-mlx` 权重到本机缓存（`3083520416 bytes`）。当前 Codex/headless 环境无 Metal/GPU，真实 MLX 转录需在普通 Mac 前台环境验收 |
 
 ### 架构债（V3.08 搬家时一起处理）
 
@@ -6086,3 +6086,50 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 6. 更新项目文档：写清当前唯一启动方式、当前唯一开发环境、哪些目录是历史材料。
 
 **状态**：⏳ V3.08 搬家时统一处理；V3.07 仅保留 P277 运行环境固定验收
+
+---
+
+## P284 | 2026-06-19 | 🔴 P0 Whisper 换库分支没有把 Whisper 参考稿挂回 Qwen 结果，导致英文边界和 `clock/claw` 回归
+
+**问题**：`Whisper换库` 分支真实跑 London VLOG，成品前两句出现两个回归：
+1. 第一条字幕应为 `Hey Taylor, what time is it?`，实际变成 `Hey Taylor what time is it Oh gosh I don't`，中文成品为「嘿泰勒，现在几点了？天哪，我」。
+2. 第二条 `I wish I had a clock` 再次被 Qwen 听成 `I wish I had claw`，中文成品为「真希望我有爪子」。
+
+**证据**：
+- job：`/Users/andy/.video-subber/jobs/a2789ff719/`
+- 成品 SRT：`London VLOG： Exploring the City, Markets, & Hidden Gems_video.srt` 第 1-2 条已复现该问题。
+- `cache/f82cadc4bac1/transcript.json` 第 0 段文本为 `Hey Taylor what time is it Oh gosh I don't`，第 1 段文本为 `know I wish I had claw`，两段 `whisper_text` 都是空字符串。
+- 日志显示 `precise 模式: en → Qwen3-ASR 主引擎`，Whisper 本身有输出 `643 段`，但 P269 Refiner 进入 `single` 模式，`corrections=0 accepted=0 mode=single`。
+- 机械统计补充：Qwen 日志原始小片段为 `569+587+570+526+322=2574`，Whisper 为 `643` 段，最终 `transcribe() 结束: 返回 416 段`；最终 `transcript.json` 有 `416` 条，其中 `with_whisper_text=0`，说明 Whisper 参考稿完全没有挂到最终字幕段上。
+- 质量统计补充：最终 `416` 条里，`<0.5s` 的短字幕有 `31` 条，`<1s` 的字幕有 `94` 条，单词字幕 `35` 条，2 个词以内字幕 `60` 条；样例包括 `long`、`Cannot`、`sleigh`、`shall you`、`You`、`Lauren` 等。
+
+**原因**：这不是翻译阶段出错。翻译只是照着已经错误的英文源文本翻译。直接原因是 Qwen 主引擎组装结果没有带上 Whisper 参考稿：
+1. `_assemble_qwen_primary()` 只按 Qwen 词级时间戳和停顿切句，未给输出段填 `whisper_text`。
+2. 英文停顿阈值为 `0.5s`。这段音频里 `it` 到 `Oh` 的间隔约 `0.24s`，所以被拼进同一条字幕。
+3. 因为 `whisper_text` 为空，`worker.py` 的 `_choose_refiner_mode()` 判定没有可用 Whisper 参考稿，转入 single 模式。
+4. single 模式没有 `clock` 这个参考答案，只看 Qwen 单稿，无法稳定把 `claw` 改回 `clock`。
+
+**和旧修复的关系**：`clock/claw` 当时是靠 P247/P263+P264 修的。修法不是让 Qwen 自己听对，而是让 LLM 同时看到主稿 Qwen 和参考稿 Whisper：Qwen 写 `claw`，Whisper 写 `clock`，结合上一句 `what time is it`，LLM 应选择 `clock`。这次回归是该参考稿链路断了，不是 LLM 审查逻辑本身主动改错。
+
+**和 P273 日语成人视频修正的关系**：有关系，但不是“日语规则直接污染英文”。P273/P268 那次把 Qwen 主引擎组装改成 `_assemble_qwen_primary()`，重点解决日语断句和 FJIN-141 时间线问题；这个函数新增时默认 `seg.whisper_text = ""`，没有把 Whisper 参考文本按时间重叠挂回输出段。英文 vlog 刚好依赖这条参考稿来修 `clock/claw`，所以旧问题复发。
+
+**解决方向**：
+1. Qwen 主引擎输出段也要按时间重叠挂上 Whisper 参考文本，至少让 Refiner 能进入 dual 模式。
+2. 英文边界不能只靠 `0.5s` 停顿；可以优先借 Whisper 句子边界，或在 Qwen 断句里增加英语问句/标点/Whisper 边界辅助。
+3. 补回归测试：输入 Qwen `claw` + Whisper `clock`，断言 `_choose_refiner_mode()` 走 dual，并且 prompt 中出现 `[CONFLICT]`。
+4. 补边界测试：`Hey Taylor what time is it / Oh gosh I don't know` 不应被合成同一条字幕。
+
+**修复记录（2026-06-19）**：
+1. 在 `_smart_assemble()` 中新增英语专用分支：`lang == "en"` 且 Whisper 可用时，Qwen 主引擎结果改用 Whisper 边界组装。
+2. 新增 `_assemble_qwen_on_whisper_boundaries()`，复用现有 Whisper 边界组装逻辑：字幕正文优先来自 Qwen 词，`whisper_text` 来自 Whisper 段落。
+3. 修复短字幕合并时参考稿丢失：`merge_short_subtitle_fragments()` 合并正文时同步合并 `whisper_text`。
+4. 补 P284 回归测试：英文第一句不能把 `Oh gosh` 合进上一句；`claw/clock` 必须让 Refiner 进入 dual；日语 Qwen 主路径保持原 P273 行为。
+
+**验证（2026-06-19）**：
+- RED 已复现：旧代码下英文 Qwen 主路径输出 `Hey Taylor what time is it Oh gosh I don't`。
+- GREEN 已通过：`./.venv/bin/python -m pytest test/test_p260_boundary_fix.py test/test_p268_p269_pipeline.py test/test_p273_qwen_ja_assembly.py -q` → `25 passed`。
+- 相关回归已通过：`./.venv/bin/python -m pytest test/test_p260_boundary_fix.py test/test_p268_p269_pipeline.py test/test_p273_qwen_ja_assembly.py test/test_p276_standard_language_env.py test/test_phase1d_qwen_health.py test/test_phase1d_integration.py test/test_p251_qwen_window_assign.py test/test_p228_timestamp_fix.py -q` → `80 passed`。
+- Git 跟踪测试已通过：`./.venv/bin/python -m pytest test/test_harden_v307_sprint2.py test/test_phase1d_qwen_health.py test/test_p160_layer2.py test/test_p160_stemmer.py -q` → `59 passed, 2 warnings`。
+- 全量 `pytest test -q` 在当前 Codex/headless 环境收集阶段被 Metal/GPU 限制挡住：`mlx` 报 `No Metal device available`，不是本次 P284 改动导致。
+
+**状态**：✅ 代码已修；⏳ 待普通 Mac 前台环境重跑 London VLOG，确认真实成品前两句和 `clock/claw` 均恢复。

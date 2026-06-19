@@ -20,3 +20,7 @@ vs/
 test/
 CLAUDE.md
 credentials_plaintext.json
+.hex-skills/
+v2/.hex-skills/
+*.db-shm
+*.db-wal

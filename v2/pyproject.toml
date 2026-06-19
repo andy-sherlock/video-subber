@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn[standard]==0.47.0",
     "python-multipart==0.0.29",
     "faster-whisper==1.2.1",
+    "mlx-whisper>=0.4.3; platform_system == 'Darwin' and platform_machine == 'arm64'",
     "deep-translator==1.11.4",
     "resemblyzer==0.1.4",
     "librosa==0.11.0",
