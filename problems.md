@@ -6406,3 +6406,29 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 **修法**：加 try/except，失败时返回 0.0 并记录日志。
 
 **状态**：✅ 已修（2026-06-21，版本收尾双签 diff 发现并修复）
+
+## P296 | 2026-06-21 | V3.08复杂度拆分 | transcribe Phase C Qwen并行线程闭包 late-binding 竞态
+
+**问题**：精确模式下，`transcribe()` 在 Phase C 启动 Qwen 并行线程，闭包 `_run_qwen` 捕获 `detected_lang`。该线程与随后的 Whisper 全量转录并发运行，而 Whisper 完成后会把 `detected_lang` 从 `source_lang`（通常 `auto`）重新赋值为检测到的语言。线程执行 `run_qwen_asr(audio_path, language=detected_lang)` 时读到的值取决于时序——可能是 `auto`，也可能是 Whisper 检测出的语言。Qwen ASR 对 `auto` vs 指定语言的识别结果可能不同，所以这是一个会影响输出的真实竞态。
+
+**原因**：闭包对外层可变变量是引用捕获（late-binding），而该变量在线程存活期间被另一路径重新赋值。原代码（V3.07 及更早）就有此行为，非本次重构引入。
+
+**涉及文件**：
+- `v3/backend/transcriber_v2.py` transcribe() Phase C（`_run_qwen` 闭包）
+
+**修法**：尚未修。可选方案：① 在启动线程前先把语言探测做完、传一个稳定的语言值给线程；② 用 `threading.Event` 让 Qwen 线程等 Whisper 语言探测出结果再开跑；③ 显式快照 `_lang = detected_lang` 后让闭包捕获快照（但这会固定为 auto，需确认是否是期望行为）。需单独走 bug 修复流水线判断哪个方案对。
+
+**状态**：⏸ 未修（2026-06-21 V3.08 复杂度拆分时发现。本轮是纯重构不改行为，刻意保留此竞态——`_should_parallel_qwen` 只抽走布尔条件，闭包和 late-binding 留在 transcribe 内联。用户拍板单独登记，留给后续 bug 流水线处理）
+
+## P297 | 2026-06-21 | V3.08复杂度拆分 | .gitignore 的 `test/` 把整个测试套件排除出版本控制
+
+**问题**：`.gitignore` 第 14 行 `test/`（无前导斜杠）匹配任意层级的 `test/` 目录，包括活跃代码的 `v3/test/`。结果整个测试套件（615 个测试）从未被 git 跟踪——`git ls-files v3/test/` 返回 0。任何对测试文件的修改（如本轮 V3.08 为配合重构更新的 6 个源码检查测试）都不会进入提交，团队/未来检出的代码里没有测试。
+
+**原因**：V3.08 搬家清理时为解决快照目录 pytest 撞名（P271），加了过宽的 `test/` 忽略规则，误伤了 `v3/test/`。
+
+**涉及文件**：
+- `.gitignore:14`
+
+**修法**：把 `.gitignore:14` 的 `test/` 改成 `/test/`（前导斜杠锚定到仓库根，只忽略根目录的旧 `test/`，不再误伤 `v3/test/`）。`git check-ignore -v v3/test/test_p266_mlx_whisper.py` 确认 v3/test 不再被忽略；`git add v3/test/` 把 65 个测试文件首次纳入版本控制。根 `test/`（旧测试视频）仍被忽略。
+
+**状态**：✅ 已修（2026-06-22，V3.08 HARDEN 阶段。`test/`→`/test/`；65 个测试文件首次纳入版本控制；cso 安全审查确认无密钥泄露；615 测试零退化）

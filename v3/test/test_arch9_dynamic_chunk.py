@@ -1,0 +1,146 @@
+"""Tests for ARCH ⑨: Dynamic chunk size — read context window from LiteLLM cache.
+
+Run: cd v2 && .venv/bin/python -m pytest test/test_arch9_dynamic_chunk.py -v
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import unittest
+from unittest.mock import MagicMock, patch
+
+
+def _make_llm(model="test-model"):
+    """Create a minimal mock LLM with a _model attr + max_input_tokens property."""
+    llm = MagicMock()
+    llm._model = model
+    return llm
+
+
+# ═══════════════════════════════════════════════════════════
+# max_input_tokens property
+# ═══════════════════════════════════════════════════════════
+
+class TestMaxInputTokens(unittest.TestCase):
+
+    def setUp(self):
+        from backend import main
+        self.cache = main._MODEL_CONTEXT_CACHE
+
+    def tearDown(self):
+        self.cache.clear()
+
+    def _lookup(self, model: str) -> int:
+        """Replicate the lookup logic from LLMBackend.max_input_tokens."""
+        if not self.cache:
+            return 32768
+        if model in self.cache:
+            val = self.cache[model]
+            if val > 0:
+                return val
+        for key, val in self.cache.items():
+            if val > 0 and key.endswith("/" + model):
+                return val
+        return 32768
+
+    def test_reads_from_context_cache(self):
+        """When model name suffix-matches a cache entry, return its value."""
+        self.cache["deepseek/deepseek-chat"] = 131072
+        self.assertEqual(self._lookup("deepseek-chat"), 131072)
+
+    def test_suffix_match_across_providers(self):
+        """gpt-4o should match openai/gpt-4o in cache."""
+        self.cache["openai/gpt-4o"] = 128000
+        self.assertEqual(self._lookup("gpt-4o"), 128000)
+
+    def test_exact_match_preferred(self):
+        """Exact key match takes priority over suffix match."""
+        self.cache["gemini-2.0-flash"] = 1048576
+        self.cache["google/gemini-2.0-flash"] = 999999
+        self.assertEqual(self._lookup("gemini-2.0-flash"), 1048576)
+
+    def test_no_match_defaults_32k(self):
+        """Model not in cache returns default 32768."""
+        self.assertEqual(self._lookup("totally-unknown-model-xyz"), 32768)
+
+    def test_cache_has_zero_value_falls_back(self):
+        """0 in cache is treated as unknown — fall back to default."""
+        self.cache["some/model"] = 0
+        self.assertEqual(self._lookup("model"), 32768)
+
+    def test_empty_cache_defaults_32k(self):
+        """Fresh empty cache — all models get 32K default."""
+        self.assertEqual(self._lookup("gpt-4o"), 32768)
+
+    def test_empty_model_name_defaults_32k(self):
+        """Empty model name."""
+        self.cache["openai/gpt-4o"] = 128000
+        self.assertEqual(self._lookup(""), 32768)
+
+
+# ═══════════════════════════════════════════════════════════
+# _compute_chunk_size
+# ═══════════════════════════════════════════════════════════
+
+class TestComputeChunkSize(unittest.TestCase):
+
+    def setUp(self):
+        from backend.translation.orchestrator import _compute_chunk_size
+        self._compute = _compute_chunk_size
+
+    # P253: fatigue-aware formula (ctx * 0.30 - 2000) // 8, clamp [200, 1200]
+
+    def test_32k_context_returns_978(self):
+        """(32768*0.30 - 2000)//8 = 978"""
+        llm = _make_llm()
+        llm.max_input_tokens = 32768
+        self.assertEqual(self._compute(llm), 978)
+
+    def test_64k_context_capped_at_1200(self):
+        """(65536*0.30 - 2000)//8 = 2207 → cap 1200"""
+        llm = _make_llm()
+        llm.max_input_tokens = 65536
+        self.assertEqual(self._compute(llm), 1200)
+
+    def test_128k_context_capped_at_1200(self):
+        """128K → cap 1200"""
+        llm = _make_llm()
+        llm.max_input_tokens = 128000
+        self.assertEqual(self._compute(llm), 1200)
+
+    def test_200k_context_capped_at_1200(self):
+        """200K → cap 1200"""
+        llm = _make_llm()
+        llm.max_input_tokens = 200000
+        self.assertEqual(self._compute(llm), 1200)
+
+    def test_8k_context_clamped_to_200_floor(self):
+        """(8192*0.30 - 2000)//8 = 57 → clamp 200"""
+        llm = _make_llm()
+        llm.max_input_tokens = 8192
+        self.assertEqual(self._compute(llm), 200)
+
+    def test_20k_context_returns_500(self):
+        """(20000*0.30 - 2000)//8 = 500"""
+        llm = _make_llm()
+        llm.max_input_tokens = 20000
+        self.assertEqual(self._compute(llm), 500)
+
+
+# ═══════════════════════════════════════════════════════════
+# Integration: _translate_whole_with_markers uses _compute_chunk_size
+# ═══════════════════════════════════════════════════════════
+
+class TestChunkSizeIntegration(unittest.TestCase):
+
+    def test_translate_function_uses_compute_chunk_size(self):
+        """_translate_whole_with_markers body references _compute_chunk_size."""
+        from backend.translation.orchestrator import _translate_whole_with_markers
+        import inspect
+        src = inspect.getsource(_translate_whole_with_markers)
+        self.assertIn("_compute_chunk_size", src)
+
+
+if __name__ == "__main__":
+    unittest.main()

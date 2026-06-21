@@ -236,7 +236,7 @@
 | ✅ | P271+P282 清理旧目录和环境 | 已清理：根目录 .venv(1.7G)、v3.05/.venv(1.2G)、.git.*、.hex-skills×2、egg-info×2、v2/v2 嵌套、快照 test 目录。垃圾暂存 `_trash/`(2.9G) |
 | ✅ | 路径引用更新 | CLAUDE.md、.gitignore、run-test.sh 已更新。代码内部无硬编码 v2/ 路径 |
 | ✅ | 测试确认零退化 | 614 passed, 1 skipped, 0 failed（与 V3.07 发布时一致） |
-| ⬜ | Git commit | 单独一个 commit，消息 "V3.08: 目录整理 v2/→v3/" |
+| ✅ | Git commit | `9a016be` "V3.08: 目录整理 v2/→v3/ + 清理 2.9G 冗余文件" |
 
 **为什么拆出来**：搬家有风险。不和 V3.07 的 bug 修混在一起。V3.07 全部修完 commit 之后再搬家。搬家坏了——回滚 V3.08 即可，V3.07 不受影响。
 
@@ -244,10 +244,30 @@
 
 > 纯重构——不改行为、不增删功能、不换算法。每个函数拆之前跑测试确认基线，拆完跑测试确认零退化。
 
+#### 🔒 本轮开发线 DECIDE 锁定（2026-06-21 · Feature Freeze 生效）
+
+> 乔布斯减法：15 件事一轮做完是许愿池。本轮**只杀一条龙**——拆 transcribe()，顺手擦同文件脏代码。其余全部 No。
+>
+> 测试基线（拆前）：**614 passed, 1 skipped, 0 failed**（97s，真机复现成功）
+
+| 范围 | 内容 |
+|------|------|
+| ✅ **本轮主任务（已完成）** | 拆 `transcribe()` **41→10**，抽出 16 个职责 helper（全部 ≤10）。纯搬运、零行为变更、**615 测试全绿**（基线 614 passed + 1 个原静默跳过的测试改为真断言通过） |
+| ✅ 顺手擦（实际只 1 项安全） | 删空壳 `_assemble_qwen_on_whisper_boundaries`（内联其直通目标）。另两项剥离：`__import__('time')` 在别的文件、`_is_repetition_pattern` 两套是不同算法（合并=改行为，非纯重构） |
+| ✅ 配套测试更新（用户批准 Option A） | 6 个「源码文本检查测试」改为检查模块/对应 helper（意图不变，行为可证明未变）：`_fa_quality`×2、`release_whisper_model`、probe 顺序、SV/Qwen 顺序×2 |
+| 📝 本轮发现登记 | P296（Phase C 闭包 late-binding 竞态，刻意保留）、P297（.gitignore `test/` 把整个测试套件排除出版本控制） |
+| ⏸ 本轮推迟 | 另外 5 个函数（sensevoice/layer2/qwen_asr/orchestrator/build_ass） |
+| ⏸ 本轮推迟 | 间隔合并提取、RefinerWindow→namedtuple、确认对话框、更新设计图、`__import__('time')`、统一 `_is_repetition_pattern`（需先判是否会改行为） |
+| 🚫 剥离出本轮 | **第三部分启动健康检查（FEATURE 不与纯重构同版本）** |
+
+**拆出的 16 个 helper**（按职责）：`_vad_speech_gate`、`_whisper_words_to_dicts`、`_whisper_output_to_segments`、`_collect_qwen_chunks`、`_resolve_routing`(+`_Routing`)、`_should_parallel_qwen`、`_run_standard_language_router`、`_run_full_whisper`、`_start_sv_thread`、`_start_fa_thread`、`_dispatch_sv_fa`、`_await_sv_fa_threads`、`_serial_fa_align_and_apply`、`_apply_fa_timestamps`、`_annotate_fa_quality`、`_run_sensevoice_and_fa`、`_infer_standard_language`、`_make_voice_timeline`、`_run_l1_dual_signal`、`_assemble_and_merge`、`_apply_five_layer_filter`、`_finalize_segments`
+
+**铁律执行情况**：拆 = 搬，逐字搬零逻辑变更。唯一"改测试"是 6 个源码文本检查测试（检查代码结构非行为），经用户批准（Option A）后更新以跟随重构。
+
 | # | 文件 | 函数 | 复杂度 | 状态 |
 |---|------|------|--------|------|
-| 1 | [transcriber_v2.py](v3/backend/transcriber_v2.py) | `transcribe` | 41 🔴 | ⬜ |
-| 2 | [sensevoice_runner.py](v3/backend/core/sensevoice_runner.py) | `run_sensevoice` | 22 | ⬜ |
+| 1 | [transcriber_v2.py](v3/backend/transcriber_v2.py) | `transcribe` | 41→**10** ✅ | ✅ 2026-06-21 拆分完成，615 测试零退化 |
+| 2 | [sensevoice_runner.py](v3/backend/core/sensevoice_runner.py) | `run_sensevoice` | 22 | ⬜ 推迟下轮 |
 | 3 | [hallucination_filter.py](v3/backend/core/hallucination_filter.py) | `_layer2_cross_validate` | 19 | ⬜ |
 | 4 | [qwen_asr_runner.py](v3/backend/core/qwen_asr_runner.py) | `run_qwen_asr` | 19 | ⬜ |
 | 5 | [orchestrator.py](v3/backend/translation/orchestrator.py) | `translate_with_orchestrator` | 17 | ⬜ |

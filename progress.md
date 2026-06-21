@@ -1,7 +1,35 @@
 # V3.08 进度日志
 
 **日期**：2026-06-21
-**版本**：V3.08（搬家完成，复杂度拆分待做）
+**版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
+
+## 2026-06-21 V3.08 开发线：拆分 transcribe() 复杂度 41→10
+
+**流水线**：开发线 DECIDE → BUILD（HARDEN 待跑）。管道文件 `pipelines/dev-pipeline-2026-06-21-v308-transcribe-split.md`
+
+### DECIDE
+- planning-with-files-zh 恢复上下文 + 测试基线：真机复现 **614 passed, 1 skipped, 0 failed**（97s）
+- steve-jobs-perspective 减法：15 件事砍到「本轮只杀一条龙」=拆 transcribe；启动健康检查（FEATURE）剥离出本轮，不与纯重构同版本
+
+### BUILD（核心成果）
+| 指标 | 结果 |
+|------|------|
+| transcribe 复杂度 | **41 → 10**（radon），降 76% |
+| 抽出 helper | 16+ 个职责函数，全部 ≤10 |
+| 测试 | **615 passed, 0 failed, 0 skipped**（零退化；1 个原静默跳过的测试改为真断言通过）|
+| 顺手擦 | 删空壳 `_assemble_qwen_on_whisper_boundaries` |
+
+### 拆分方法（逐块搬运 + 每步验证）
+按职责把 transcribe 的 20 个阶段块逐个搬进 helper：VAD gate → Whisper段迭代 → 等Qwen路由 → SV+FA派发/等待/应用/质量(再子拆5叶子) → 语言推断 → 人声地图 → L1交叉验证 → 组装合并 → 五层过滤 → 收尾。每搬一块跑一次快速子集，全搬完跑全量。
+
+### 关键决策与发现
+- **6 个源码文本检查测试**随重构更新（用户批准 Option A）：它们检查字符串是否在 transcribe 源码里（非行为测试），抽函数必撞红。改为检查模块/对应 helper，意图保留、行为可证明未变。
+- **P296**：Phase C Qwen 并行线程闭包 late-binding 竞态（原代码就有），刻意保留不动，单独登记。
+- **P297**：`.gitignore:14 test/` 把整个 `v3/test/` 排除出版本控制——测试套件从未被 git 跟踪。重大旁支发现，待用户决策。
+
+### 待办
+- HARDEN（/review 扫 diff + 设计一致性走查）未跑
+- 提交前需先解决 P297，否则 6 个测试改动进不了 commit
 
 ## 2026-06-21 V3.08 搬家 + 清理
 
@@ -1578,3 +1606,20 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 **待办**：⑨⑩ 端到端验收需 Mac 前台 GPU + DeepSeek API，用 MIDA-659.ts 跑标准+精准模式，看 `P291 Refiner 完成` 日志 pass2>0、`[?]` 数量、碎片句是否变通顺、进度条窗口进度。
 
 **预存 flake（与 P291 无关，单独标记）**：`test_p201_qwen_aligner_check::test_returns_false_when_model_not_downloaded` 在全量套件里因 `sys.modules` mock 被加载真实 qwen 的测试污染而失败，单独跑通过。建议后续加测试隔离（reload 后恢复 mock）。
+
+## 2026-06-22 V3.08 transcribe() 拆分 + P297 修复（HARDEN 七步全绿）
+
+**本轮范围**：纯重构 `transcribe()` 上帝函数（412 行 → 115 行编排）；修复 P297（.gitignore 误伤测试套件）。零行为变更。
+
+**HARDEN 七步**：
+- ① /review + 对抗子审查：clean。对抗审查逐一核验 5 类「提取函数」重构风险（变量重绑定、别名语义、闭包时序、局变传回、执行顺序），结论 NO BEHAVIORAL DIFFERENCE。关键支柱：`apply_aligner_timestamps` 原地改+返回同对象，三别名（_sv_target/_fa_target/results）不分叉（已记 learning）。
+- ② 设计一致性走查（走查 2.0）：14 阶段（A→T）一一对应；Q4 所有「等待」皆真数据依赖无假串行；Q5 results 数据链经手函数前后逐一对应无增减。重构顺手删掉一处「互不依赖」误导注释。
+- ③ cso 安全审查（聚焦 diff）：clean。重构无新增 subprocess/eval/shell；65 个新纳入测试文件无真实密钥；敏感文件仍被忽略。
+- ④ ln-021-codegraph：无循环依赖；22 个新 helper 调用链完整（无一进 unused 列表，抽查 2 个 conf=exact）。
+- ⑤ verification：615 passed, 0 failed（100.94s）。
+- ⑥ QA(Web)：跳过（本次是 CLI 转录链路，不涉前端）。
+- ⑦ 端到端实测：trump 英文 18s 真实音频走完整 standard 链路，输出 5 段连贯字幕；日志确认 Phase A→T 各 helper 按序真实触发。
+
+**改动文件**：`.gitignore`（test/→/test/）；`v3/backend/transcriber_v2.py`（拆 22 helper + _Routing dataclass，删空壳 _assemble_qwen_on_whisper_boundaries）；`v3/test/`（65 文件首次纳入版本控制）。
+
+**待提交**：HARDEN 全绿，改动在工作区未 commit。P296（闭包竞态）仍刻意保留待后续 bug 流水线。
