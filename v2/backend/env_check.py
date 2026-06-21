@@ -55,9 +55,9 @@ def check_whisper() -> dict:
         if importlib.util.find_spec("mlx_whisper") is None:
             return {"installed": False, "models": [], "backend": "mlx"}
         models = _cached_whisper_models()
-        return {"installed": True, "models": models, "backend": "mlx"}
-    return {"installed": len(_cached_whisper_models()) > 0,
-            "models": _cached_whisper_models(), "backend": "faster"}
+        return {"installed": len(models) > 0, "models": models, "backend": "mlx"}
+    models = _cached_whisper_models()
+    return {"installed": len(models) > 0, "models": models, "backend": "faster"}
 
 
 def platform_machine() -> str:

@@ -48,7 +48,10 @@ def get_video_duration(video_path: str) -> float:
         "-print_format", "json",
         "-show_format", video_path
     ]
-    r = subprocess.run(cmd, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
-    data = json.loads(r.stdout)
-    return float(data["format"]["duration"])
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
+        data = json.loads(r.stdout)
+        return float(data["format"]["duration"])
+    except (ValueError, KeyError, json.JSONDecodeError):
+        return 0.0

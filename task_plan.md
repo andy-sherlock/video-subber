@@ -14,6 +14,8 @@
 
 **补充记录（2026-06-19）**：Whisper 换库分支真实跑 London VLOG 暴露 P284：Qwen 主引擎组装结果没有挂回 Whisper 参考稿，导致 P247/P263+P264 的双稿裁判没有启动；`clock/claw` 旧问题复发，且第一句因 Qwen 停顿切句把 `Oh gosh I don't` 合入前一句。已按 bug 修复流水线完成代码修复：英语 Qwen 主路径改用 Whisper 边界并回填 `whisper_text`，短字幕合并时同步保留参考稿；相关回归 `80 passed`，全量测试受 Codex/headless Metal 限制仍需普通 Mac 前台真实转录验收。
 **补充记录（2026-06-19 晚）**：London VLOG 重跑前缓存清理规则已固定：以后用户说“清缓存”时，默认保留 `user.log`、`debug.log` 和 `.srt` 对比材料，删除 job 目录其余文件，并通过清掉 `meta.json` + 完成记录让前端刷新后不再恢复旧已完成卡片。本轮同时修复了后端 stale done 自愈：`get_job()` 发现 `meta.json` 已不存在且进程不活时，会自动清掉内存里的旧任务状态并返回 404。
+**补充记录（2026-06-19 深夜）**：后台任务监控显示当前唯一 `running` 任务是 `48b739a158`（`MIDA-659.ts`）。日志停在 `21:41:38 加载 Whisper large-v3 模型…`，连续轮询 15 秒无任何推进；`checkpoint.json` 仍停在 `extract_audio`，说明这条任务目前更像“状态没收回来或启动后卡死”，不是稳定运行中。另有 3 个 URL 任务（`2049795afe`、`05cbec0727`、`01bdd52151`）已确认只是测试链接 `https://www.youtube.com/watch?v=abc` 被 `yt-dlp` 判定为截断，不属于主转录链路回归。
+**补充记录（2026-06-19 深夜 P285）**：重新测试后新任务 `a58b786e34` 复现同一问题。旧任务 `48b739a158` 未正常完成，目录只剩 `config.json`；新任务为 `standard` 标准模式，但 worker `59930` 在 `加载 Whisper large-v3 模型…` 后持续高 CPU/高内存，未进入 Qwen。根因已登记为 P285：标准模式本应只让 Whisper 跑第一段做语言判断，当前代码却把 8191 秒完整音频传给 `mlx_whisper.transcribe(..., word_timestamps=True)`，导致前端长时间停在“正在启动语音识别…”。已按 bug 修复流水线完成代码修复：Mac/MLX 标准模式现在先抽短音频做语言探测，适合 Qwen 时不再完整调用 Whisper；目标测试 `25 passed`，待普通 Mac 前台环境用 `MIDA-659.ts` 做真实标准模式验收。
 
 ---
 
@@ -113,7 +115,7 @@
 | P254 | 转录智能路由 | 🟡 HIGH | 基于源语言自动切换主副引擎。英语/日/韩→Qwen 主+Whisper 副，冷门→Whisper 主。换库后 Qwen 可独立检测语言+分块+出时间戳 |
 | P247 | ASR 分歧裁决 | ✅ 已修 | Plan C 单段隔离安全阀 + P263/P264 双稿裁判重构。FJIN-141 实测 843→0 [?] |
 | P237 | 黑匣子日志 | 🔴 P0 | 系统日志只有流水账无状态快照。加 `checkpoint()` + `psutil` 定期拍内存/进程/线程/队列快照 |
-| P284 | Whisper 参考稿丢失导致 `clock/claw` 回归 | ✅ 已修代码，待真实重跑 | 英语 Qwen 主路径改用 Whisper 边界并回填 `whisper_text`；短字幕合并保留参考稿；相关回归 `80 passed`。待普通 Mac 前台环境重跑 London VLOG 验收 |
+| P284 | Whisper 参考稿丢失导致 `clock/claw` 回归 | ✅ 已修并验收 | 英语 Qwen 主路径改用 Whisper 边界并回填 `whisper_text`；短字幕合并保留参考稿。2026-06-21 清缓存重跑 London VLOG 验收：clock/claw 正常，Hey Taylor 断句正确 |
 
 **换库后的两档模式（2026-06-12 最终定稿）**：
 
@@ -157,12 +159,23 @@
 
 | 状态 | 事项 | 说明 |
 |------|------|------|
-| ✅ | P272 翻译接缝审查污染字幕 | 已加 `_review_seam()` 输出防线，拒绝“版本A/版本B/建议/原因”等解释文字写回字幕；新增回归测试 |
+| ✅ | P272 翻译接缝审查污染字幕 | 已加 `_review_seam()` 输出防线，拒绝”版本A/版本B/建议/原因”等解释文字写回字幕；新增回归测试 |
 | ✅ | P237 黑匣子日志闭环 | 已在异常路径写入安全 `crash_snapshot`，不记录 API Key、环境变量、字幕全文；新增回归测试 |
 | ✅ | P281 Phase 2 人声地图接入字幕重组 | `merge_short_subtitle_fragments()` 已接入 `voice_timeline`；同一人声区内更宽松合并，非人声区孤立短词只保留内部原因，不再直接显示 `[?]` |
 | ✅ | P275 Phase 2 人声地图接入质量判断 | 已新增 `P275 人声地图质量` 日志：人声区、无字幕人声区、非人声短词、最长疑似漏字幕区间 |
 | ✅ | P277 固定运行环境验收补强 | 已新增 `v2/run-test.sh`：固定 `v2/.venv` 且不带 `--reload`；V3.08 再做环境大整理 |
 | ✅ | P283 问号噪音修复 | 已把内部质量信号和用户可见问号分开：P281 非人声短词、L3 CJK 短碎片不再默认显示 `[?]` |
+
+### 已修并通过 2026-06-21 真实视频验收
+
+| 状态 | 事项 | 说明 |
+|------|------|------|
+| ✅ | P284 Whisper 参考稿丢失（clock/claw） | 清缓存重跑 London VLOG：clock/claw 正确，Hey Taylor 断句正常 |
+| ✅ | P285 标准模式整条音频传给 Whisper | job `16a692d74e`：Whisper 4秒探语言后释放，Qwen 接手，全程不再卡住 |
+| ✅ | P287 Qwen 主引擎 whisper_text 未回填 | job `98ac3271c2`：精准模式 786/1022 段带 whisper_text |
+| ✅ | P289 L2 交叉验证左右输入未互换 | job `98ac3271c2`：[?]率从 95.2% 降到 38.4%，剩余均为真实重复叫声 |
+| ✅ | P291 Refiner 整段一次性发 LLM | job `98ac3271c2`：9窗口共 238 处修正，不再 corrections=0 |
+| ✅ | P266 Mac 端 Whisper 换 mlx-whisper | 标准模式短探测 MLX 正常（4秒，日语概率0.92）|
 
 ### 接受残留（1 个）
 
@@ -176,7 +189,7 @@
 |------|------|------|
 | ✅ | Whisper 换库分支提交 | commit `a1c1758`，提交时排除了 `.hex-skills/` 和 `v2/v2/` |
 | ✅ | Whisper 换库分支合并主线 | merge commit `c9824bb`，使用 `--no-ff` 在 main 上留下明确合并提交 |
-| ⏳ | P266 Mac 端 Whisper 换 `mlx-whisper` | **代码层已完成，模型已下载，待真实 Mac 前台转录验收**。Mac Apple Silicon 走 `mlx-whisper`；Windows/其他平台继续走 `faster-whisper`。当前 Codex/headless 环境无 Metal/GPU，不能在沙盒内验证真实 MLX 推理 |
+| ✅ | P266 Mac 端 Whisper 换 `mlx-whisper` | **2026-06-21 真实验收通过**。标准模式短探测 MLX 正常工作（4秒，日语概率0.92）。Mac Apple Silicon 走 `mlx-whisper`；Windows/其他平台继续走 `faster-whisper` |
 
 ### 后续版本（不在 V3.07 范围内）
 
@@ -239,6 +252,19 @@
 | 4 | [qwen_asr_runner.py](v2/backend/core/qwen_asr_runner.py) | `run_qwen_asr` | 19 | ⬜ |
 | 5 | [orchestrator.py](v2/backend/translation/orchestrator.py) | `translate_with_orchestrator` | 17 | ⬜ |
 | 6 | [subtitle_style.py](v2/backend/subtitle_style.py) | `build_ass_styled` | 16 | ⬜ |
+
+**V3.07 双签 diff 遗留项（2026-06-21 版本收尾审查发现，归入 V3.08 一起做）**：
+
+| # | 类型 | 内容 | 来源 |
+|---|------|------|------|
+| 1 | P1 代码质量 | 删空壳函数 `_assemble_qwen_on_whisper_boundaries`（直接调 `_assemble_whisper_primary`） | 副审 elon-musk |
+| 2 | P1 代码质量 | `translate_raw_json` 中 `__import__('time')` 改正常 import | 副审 elon-musk |
+| 3 | P1 代码质量 | `_is_repetition_pattern` 在 transcriber_v2 和 hallucination_filter 各有一套，统一 | 副审 elon-musk |
+| 4 | P1 代码质量 | 间隔合并（interval merging）逻辑重复 3 处，提取公共函数 | 副审 elon-musk |
+| 5 | P2 架构建议 | `_build_smart_boundaries` + `_extract_qwen_sentences` 共 90 行，可考虑简化为固定窗口 | 副审 elon-musk |
+| 6 | P2 架构建议 | Refiner `RefinerWindow` 类可简化为 namedtuple | 副审 elon-musk |
+| 7 | P2 架构建议 | "重新处理"按钮从禁用改为始终可点，建议加确认对话框 | 副审 elon-musk |
+| 8 | 设计图更新 | 走查发现 4 处代码比设计图多（VAD检测/SV语言推断/人声地图/短字幕合并），更新设计图 | 走查 2.0 |
 
 **执行规则**：
 - `transcribe()`（复杂度 41）优先——一个函数干了 6 件事（模型加载/Whisper 转录/Qwen 交叉验证/SenseVoice 声音分类/FA 对齐/结果合并）

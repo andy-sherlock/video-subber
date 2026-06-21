@@ -14,13 +14,17 @@ FA source: Mac (MLX) = Qwen internal; Windows (PyTorch) = external Qwen3-FA.
 Speaker detection (resemblyzer) runs after filtering in both modes.
 """
 import bisect
-import gc
 import logging
 import threading
 import unicodedata
 from collections import Counter, defaultdict
 import numpy as np
-from backend.core.whisper_runner import transcribe_whisper
+from backend.core.whisper_runner import (
+    detect_language_with_whisper,
+    transcribe_whisper,
+    release_model as release_whisper_model,
+    should_parallel_asr,
+)
 from backend.core.vad_filter import compute_speech_ratio_via_vad
 from backend.core.hallucination_filter import filter_hallucinations, _has_timestamp_segments, _qwen_is_reliable
 
@@ -692,6 +696,17 @@ def _assemble_qwen_primary(qwen_words, whisper_segments, lang):
 
     if buf:
         segments.append(_words_to_segment(buf, len(segments), joiner))
+
+    for seg in segments:
+        if whisper_segments:
+            overlapping = [
+                ws.text for ws in whisper_segments
+                if ws.start < seg.end and ws.end > seg.start
+            ]
+            seg.whisper_text = " ".join(overlapping) if overlapping else ""
+        else:
+            seg.whisper_text = ""
+
     return segments
 
 
@@ -827,7 +842,8 @@ def transcribe(audio_path: str, model_size: str = "medium",
                filter_keywords: bool = True,
                speaker_detect: bool = True,
                transcription_tier: str = "standard",
-               progress_callback=None) -> list:
+               progress_callback=None,
+               cache_dir: str = None) -> list:
     """Transcribe audio, return list of Segment."""
     _log.info("transcribe() 开始: audio=%s model=%s lang=%s",
               audio_path, model_size, source_lang)
@@ -858,6 +874,8 @@ def transcribe(audio_path: str, model_size: str = "medium",
     results = []
     n_total = 0
     _standard_primary = None
+    whisper_output = []
+    info = None
 
     # ═══════════════════════════════════════════════════════════════
     # Qwen-ASR: start early. In precise mode, runs in a parallel
@@ -866,20 +884,53 @@ def transcribe(audio_path: str, model_size: str = "medium",
     # ═══════════════════════════════════════════════════════════════
     qwen_thread = None
     _qwen_holder = {}
-    if use_qwen and filter_keywords and use_whisper:
+    if use_qwen and filter_keywords and use_whisper and should_parallel_asr():
         from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
         if is_qwen_asr_available():
             def _run_qwen():
                 _qwen_holder["data"] = run_qwen_asr(
-                    audio_path, language=detected_lang)
+                    audio_path, language=detected_lang,
+                    cache_dir=cache_dir)
             qwen_thread = threading.Thread(target=_run_qwen, daemon=True)
             qwen_thread.start()
             _log.info("Qwen3-ASR 独立线程已启动（与 Whisper 并行）")
 
     # ═══════════════════════════════════════════════════════════════
-    # Whisper: full engine in precise mode; language router in standard mode.
+    # Whisper: short language probe in standard mode, full engine in precise mode.
     # ═══════════════════════════════════════════════════════════════
-    if use_whisper or use_standard_router:
+    if use_standard_router:
+        _log.info("标准模式: Whisper 短音频语言探测开始 (%s)", model_size)
+        if progress_callback:
+            progress_callback(-1)
+        info = detect_language_with_whisper(
+            audio_path,
+            model_size=model_size,
+            language=lang,
+        )
+        _log.info("检测语言: %s (概率 %.2f)", info.language, info.language_probability)
+        detected_lang = info.language if info.language else source_lang
+        lang_probability = info.language_probability or 0.0
+
+        _standard_primary = choose_standard_primary_engine(
+            detected_lang, lang_probability)
+        _log.info(
+            "标准模式: Whisper 检测语言=%s 概率=%.2f，主引擎=%s",
+            detected_lang, lang_probability, _standard_primary)
+
+        if _standard_primary == "qwen":
+            from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
+            if use_qwen and filter_keywords and is_qwen_asr_available():
+                release_whisper_model()
+                _log.info("标准模式: 语言适合 Qwen，停止 Whisper，切换 Qwen")
+                _log.info("标准模式: Qwen 使用锁定语言=%s", detected_lang)
+                _qwen_holder["data"] = run_qwen_asr(
+                    audio_path, language=detected_lang,
+                    cache_dir=cache_dir)
+            else:
+                _log.warning("标准模式: Qwen3-ASR 不可用或内存不足，继续 Whisper 主引擎")
+                _standard_primary = "whisper"
+
+    if use_whisper or _standard_primary == "whisper":
         _log.info("加载 Whisper %s 模型…", model_size)
         if progress_callback:
             progress_callback(-1)
@@ -890,67 +941,46 @@ def transcribe(audio_path: str, model_size: str = "medium",
             vad_threshold=vad_threshold,
         )
         _log.info("检测语言: %s (概率 %.2f)", info.language, info.language_probability)
-        detected_lang = info.language if info.language else source_lang
-        lang_probability = info.language_probability or 0.0
-
-        if use_standard_router:
-            _standard_primary = choose_standard_primary_engine(
-                detected_lang, lang_probability)
-            _log.info(
-                "标准模式: Whisper 检测语言=%s 概率=%.2f，主引擎=%s",
-                detected_lang, lang_probability, _standard_primary)
-
-            if _standard_primary == "qwen":
-                from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
-                if use_qwen and filter_keywords and is_qwen_asr_available():
-                    gc.collect()
-                    _log.info("标准模式: 语言适合 Qwen，停止 Whisper，切换 Qwen")
-                    _log.info("标准模式: Qwen 使用锁定语言=%s", detected_lang)
-                    _qwen_holder["data"] = run_qwen_asr(
-                        audio_path, language=detected_lang)
-                else:
-                    _log.warning("标准模式: Qwen3-ASR 不可用或内存不足，继续 Whisper 主引擎")
-                    _standard_primary = "whisper"
+        detected_lang = info.language if info.language else detected_lang
 
         # ── Whisper segment iteration ──
-        if use_whisper or _standard_primary == "whisper":
-            for seg in whisper_output:
-                text = seg.text.strip()
-                n_total += 1
+        for seg in whisper_output:
+            text = seg.text.strip()
+            n_total += 1
 
-                s = Segment(
-                    id=len(results),
-                    start=round(seg.start, 2),
-                    end=round(seg.end, 2),
-                    text=text,
-                )
-                if getattr(seg, "words", None):
-                    s.words = []
-                    for w in seg.words:
-                        if isinstance(w, dict):
-                            s.words.append(w)
-                        else:
-                            s.words.append({
-                                "word": getattr(w, "word", ""),
-                                "start": getattr(w, "start", 0.0),
-                                "end": getattr(w, "end", 0.0),
-                                "probability": getattr(w, "probability", 0.0),
-                            })
-                results.append(s)
+            s = Segment(
+                id=len(results),
+                start=round(seg.start, 2),
+                end=round(seg.end, 2),
+                text=text,
+            )
+            if getattr(seg, "words", None):
+                s.words = []
+                for w in seg.words:
+                    if isinstance(w, dict):
+                        s.words.append(w)
+                    else:
+                        s.words.append({
+                            "word": getattr(w, "word", ""),
+                            "start": getattr(w, "start", 0.0),
+                            "end": getattr(w, "end", 0.0),
+                            "probability": getattr(w, "probability", 0.0),
+                        })
+            results.append(s)
 
-                if progress_callback and n_total % 10 == 0:
-                    try:
-                        progress_callback(n_total)
-                    except Exception:
-                        pass
-                _audio_duration = getattr(info, "duration", 0) or 0
-                if n_total % 50 == 0 and _audio_duration > 0 and seg.end > 0:
-                    pct = min(99, round(seg.end / _audio_duration * 100))
-                    _log.info("Whisper 进度: %d%% (音频 %ds/%ds, 已识别 %d 段)",
-                              pct, int(seg.end), int(_audio_duration), n_total)
+            if progress_callback and n_total % 10 == 0:
+                try:
+                    progress_callback(n_total)
+                except Exception:
+                    pass
+            _audio_duration = getattr(info, "duration", 0) or 0
+            if n_total % 50 == 0 and _audio_duration > 0 and seg.end > 0:
+                pct = min(99, round(seg.end / _audio_duration * 100))
+                _log.info("Whisper 进度: %d%% (音频 %ds/%ds, 已识别 %d 段)",
+                          pct, int(seg.end), int(_audio_duration), n_total)
 
-            gc.collect()
-            _log.info("Whisper 模型已释放")
+        release_whisper_model()
+        _log.info("Whisper 模型已释放")
     else:
         _log.info("标准模式: 跳过 Whisper 加载")
 
@@ -962,6 +992,16 @@ def transcribe(audio_path: str, model_size: str = "medium",
         qwen_thread.join()
         _log.info("Qwen3-ASR 独立线程已结束")
     qwen_chunks = _qwen_holder.get("data", [])
+
+    # ── Serial Qwen fallback (non-pipeline mode, precise only) ──
+    if transcription_tier == "precise" and filter_keywords and not qwen_thread:
+        _log.info("Qwen3-ASR 交叉验证开始 (tier=%s, 串行)", transcription_tier)
+        from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
+        if is_qwen_asr_available():
+            qwen_chunks = run_qwen_asr(audio_path, language=detected_lang,
+                                       cache_dir=cache_dir)
+        else:
+            _log.warning("Qwen3-ASR 不可用，跳过交叉验证")
 
     # ── P254/P276 智能路由：按模式和源语言选择主引擎 ──
     _whisper_segments = None
@@ -982,15 +1022,6 @@ def transcribe(audio_path: str, model_size: str = "medium",
                 detected_lang)
         _log.info("%s 模式: Whisper 主引擎", transcription_tier)
         qwen_chunks = list(qwen_chunks or [])
-
-    # ── Serial Qwen fallback (non-pipeline mode, precise only) ──
-    if transcription_tier == "precise" and filter_keywords and not qwen_thread:
-        _log.info("Qwen3-ASR 交叉验证开始 (tier=%s, 串行)", transcription_tier)
-        from backend.core.qwen_asr_runner import run_qwen_asr, is_qwen_asr_available
-        if is_qwen_asr_available():
-            qwen_chunks = run_qwen_asr(audio_path, language=detected_lang)
-        else:
-            _log.warning("Qwen3-ASR 不可用，跳过交叉验证")
 
     # ── Determine if external FA is needed ──
     # MLX path: Qwen segments carry word-level timestamps from internal FA → skip external FA
@@ -1197,12 +1228,14 @@ def transcribe(audio_path: str, model_size: str = "medium",
     # ── Five-layer hallucination filter (L2-L5, skip L1 if it already ran) ──
     # Standard mode: no Whisper → L2 cross-validation has no second signal, skip it
     _filter_qwen = qwen_chunks if use_whisper else None
+    _alt_segs = _whisper_segments if _which_primary == "qwen" else None
     if filter_keywords:
         results = filter_hallucinations(results, detected_lang,
                                         aligner_result=aligner_result,
                                         qwen_chunks=_filter_qwen,
                                         skip_l1=(_which_primary == "qwen"),
-                                        skip_l2=(transcription_tier == "standard"))
+                                        skip_l2=(transcription_tier == "standard"),
+                                        alt_segments=_alt_segs)
 
     if not results:
         _log.error("未检测到任何语音内容")

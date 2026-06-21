@@ -7,6 +7,7 @@ For audio longer than 20 minutes, chunks are formed at Whisper segment boundarie
 (batched into ~5-minute groups) and each chunk is transcribed independently.
 """
 import gc
+import json
 import logging
 import os
 import subprocess
@@ -87,8 +88,12 @@ def _get_audio_duration(audio_path: str) -> float:
         "-of", "default=noprint_wrappers=1:nokey=1",
         audio_path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    return float(result.stdout.strip())
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return float(result.stdout.strip())
+    except (ValueError, AttributeError):
+        _log.warning("ffprobe 无法获取音频时长: %s", audio_path)
+        return 0.0
 
 
 def _chunk_by_time(total_duration, max_duration=_CHUNK_MAX_DURATION_S):
@@ -249,8 +254,61 @@ def _transcribe_chunk(model, audio_path, t_start, t_end, language,
             pass
 
 
+def _qwen_chunk_ckpt_path(cache_dir: str | None) -> str | None:
+    if not cache_dir:
+        return None
+    return os.path.join(cache_dir, "qwen_chunks.json")
+
+
+def _load_qwen_chunk_ckpt(ckpt_path: str | None, time_chunks: list) -> tuple[list, int]:
+    """Load saved Qwen chunk results. Returns (saved_chunks, resume_index).
+
+    Validates that saved chunks match the current time_chunks plan — if the
+    chunking changed (different audio, different segment boundaries), the
+    checkpoint is discarded.
+    """
+    if not ckpt_path or not os.path.exists(ckpt_path):
+        return [], 0
+    try:
+        with open(ckpt_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        saved_plan = data.get("time_chunks", [])
+        saved_chunks = data.get("results", [])
+        done_idx = data.get("done_idx", 0)
+        if len(saved_plan) != len(time_chunks):
+            _log.info("Qwen 分段计划变更 (%d→%d chunks)，丢弃旧 checkpoint",
+                      len(saved_plan), len(time_chunks))
+            return [], 0
+        for i, (saved, current) in enumerate(zip(saved_plan, time_chunks)):
+            if abs(saved[0] - current[0]) > 0.1 or abs(saved[1] - current[1]) > 0.1:
+                _log.info("Qwen chunk %d 时间不匹配，丢弃旧 checkpoint", i)
+                return [], 0
+        _log.info("Qwen 断点续跑: 恢复 %d/%d chunks", done_idx, len(time_chunks))
+        return saved_chunks, done_idx
+    except Exception:
+        _log.warning("Qwen chunk checkpoint 损坏，从头开始", exc_info=True)
+        return [], 0
+
+
+def _save_qwen_chunk_ckpt(ckpt_path: str | None, time_chunks: list,
+                           results: list, done_idx: int) -> None:
+    if not ckpt_path:
+        return
+    data = {
+        "time_chunks": list(time_chunks),
+        "results": results,
+        "done_idx": done_idx,
+    }
+    try:
+        with open(ckpt_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        _log.warning("Qwen chunk checkpoint 保存失败", exc_info=True)
+
+
 def _run_qwen_asr_chunked(audio_path: str, total_duration: float,
-                           segments: list = None, language=None) -> list:
+                           segments: list = None, language=None,
+                           cache_dir: str = None) -> list:
     """Chunked cross-validation for long audio.
 
     Returns list of {text, segments, t_start, t_end}. MLX results include
@@ -258,6 +316,9 @@ def _run_qwen_asr_chunked(audio_path: str, total_duration: float,
 
     When segments is provided, chunks at Whisper segment boundaries.
     When segments is None, chunks at fixed 5-minute intervals.
+
+    cache_dir: if provided, saves per-chunk progress to qwen_chunks.json
+    so a crashed run can resume from the last completed chunk.
     """
     if segments:
         raw_chunks = _chunk_segments(segments)
@@ -269,31 +330,40 @@ def _run_qwen_asr_chunked(audio_path: str, total_duration: float,
         _log.info("Qwen3-ASR 独立分段: %d chunks (%.0fs 音频)",
                   len(time_chunks), total_duration)
 
+    ckpt_path = _qwen_chunk_ckpt_path(cache_dir)
+    qwen_chunks, resume_idx = _load_qwen_chunk_ckpt(ckpt_path, time_chunks)
+
+    if resume_idx >= len(time_chunks):
+        _log.info("Qwen3-ASR 全部 chunks 已有缓存，跳过转录")
+        return [c for c in qwen_chunks if c.get("text", "").strip()]
+
     t0 = time.time()
     try:
         model = _load_qwen_model()
     except Exception:
         _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证", exc_info=True)
-        return []
+        return [c for c in qwen_chunks if c.get("text", "").strip()]
     _log.info("Qwen3-ASR 模型加载耗时 %.1fs", time.time() - t0)
 
-    qwen_chunks = []
-    for idx, (t_start, t_end) in enumerate(time_chunks):
+    for idx in range(resume_idx, len(time_chunks)):
+        t_start, t_end = time_chunks[idx]
         result = _transcribe_chunk(model, audio_path, t_start, t_end,
                                    language, idx, len(time_chunks))
-        if result.get("text", "").strip():
-            qwen_chunks.append(result)
+        qwen_chunks.append(result)
+        _save_qwen_chunk_ckpt(ckpt_path, time_chunks, qwen_chunks, idx + 1)
 
     del model
     gc.collect()
 
-    _log.info("Qwen3-ASR 分段交叉验证完成: %d chunks 有文字", len(qwen_chunks))
-    return qwen_chunks
+    _log.info("Qwen3-ASR 分段交叉验证完成: %d chunks 有文字",
+              sum(1 for c in qwen_chunks if c.get("text", "").strip()))
+    return [c for c in qwen_chunks if c.get("text", "").strip()]
 
 
 # ── Public entry point ──
 
-def run_qwen_asr(audio_path: str, segments: list = None, language=None) -> list:
+def run_qwen_asr(audio_path: str, segments: list = None, language=None,
+                  cache_dir: str = None) -> list:
     """Return Qwen-ASR output as a list of {text, segments, t_start, t_end}.
 
     MLX backend: segments contain word-level timestamps [{text, start, end}].
@@ -302,6 +372,10 @@ def run_qwen_asr(audio_path: str, segments: list = None, language=None) -> list:
 
     When segments is None, Qwen runs independently — gets audio duration via
     ffprobe and chunks by fixed time intervals if needed.
+
+    cache_dir: path to the job's versioned cache directory. When provided,
+    long-audio chunked mode saves per-chunk progress so a crashed run can
+    resume from the last completed chunk.
     """
     if not is_qwen_asr_available():
         _log.warning("Qwen3-ASR 未安装，跳过交叉验证")
@@ -321,7 +395,8 @@ def run_qwen_asr(audio_path: str, segments: list = None, language=None) -> list:
     if total_duration > _LONG_AUDIO_THRESHOLD_S:
         _log.info("音频 %.0fs > 20min，启用 Qwen 分段对齐", total_duration)
         return _run_qwen_asr_chunked(audio_path, total_duration,
-                                     segments=segments, language=language)
+                                     segments=segments, language=language,
+                                     cache_dir=cache_dir)
 
     t0 = time.time()
     try:

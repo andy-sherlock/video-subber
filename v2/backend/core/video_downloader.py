@@ -29,7 +29,10 @@ def _detect_system_proxy() -> str | None:
     for var in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy"):
         val = os.environ.get(var, "").strip()
         if val:
-            _log.info("P249: 使用环境变量代理 %s=%s", var, val)
+            from urllib.parse import urlparse as _urlparse
+            _p = _urlparse(val)
+            _safe = f"{_p.scheme}://{_p.hostname}:{_p.port}" if _p.hostname else val
+            _log.info("P249: 使用环境变量代理 %s=%s", var, _safe)
             return val
 
     # ② macOS — read System Preferences proxy (FlClash, ClashX, Surge, V2Ray use this)

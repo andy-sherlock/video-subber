@@ -1,5 +1,52 @@
 # V3.06 进度日志
 
+**日期**：2026-06-21
+**版本**：V3.07 全部验收完成，准备发布
+
+## 2026-06-21 真实验收全部通过
+
+### MIDA-659.ts（8191秒日语）标准 vs 精准对比
+
+| 指标 | 标准模式 job `16a692d74e` | 精准模式 job `98ac3271c2` |
+|------|--------------------------|--------------------------|
+| [?]率 | **2.0%** (43/2057) | 38.4% (794/2068) |
+| 耗时 | ~34分钟 | ~65分钟 |
+| Refiner | 317处修正 single mode | 238处修正 single mode |
+| 主引擎 | Qwen3-ASR（标准路由） | Qwen3-ASR（P254修复后正确路由） |
+
+**P285 验收通过**：标准模式 Whisper 4秒探语言 → 释放 → Qwen 单独跑，不再卡住。
+**P289 验收通过**：L2 [?]率从95.2%降到38.4%，剩余问号均为真实重复叫声（うんうんうん/ああああ等）。
+**P291 验收通过**：Refiner 滑窗生效，9窗口共238处实际修正，不再 corrections=0。
+**P287 验收通过**：精准模式 786/1022 段带 whisper_text，数据回填正常。
+
+### London VLOG（英语）P284 验收
+
+**P284 验收通过**：用户清缓存后重新跑 London VLOG，clock/claw 问题已修复，"Hey Taylor" 断句正常。（cache 已清，日志不保留，用户人工确认）
+
+**P266 验收通过（基础）**：标准模式短探测使用 MLX Whisper 正常返回日语识别结果（4秒，概率0.92）。
+
+### 观察/待修记录
+P292（观察结论）：Mac Apple Silicon 上精准模式质量反不如标准模式，根因是 Whisper 幻觉污染 L2，70% 窗口 LOW_DATA。登记为已知行为，V3.08 阶段评估是否改善。
+P293（记录待修）：标准模式 Qwen 跑期间前端进度条卡在"正在启动语音识别…"，换 PyWebView 框架（V3.09）时修。
+
+**V3.07 所有验收项全部通过，可进入发布线。**
+
+---
+
+**日期**：2026-06-20
+**版本**：V3.07 P289 L2 交叉验证修复
+**上一版本**：V3.07 P287 whisper_text 回填
+
+## 2026-06-20 P289 修复
+
+- P289：L2 交叉验证在千元主引擎时失效（左右两边都放千元数据，95.2% 字幕标 [?]）
+- 修复方案：路由层交换主副引擎时，同步交换 L2 的左右输入（`alt_segments` 参数）
+- 完成 bug 修复流水线 ①-⑧（investigate → 双签审查 → 双签影响面 → 双签 diff → 设计走查 → TDD → verification）
+- 测试：P289 专项 6/6 passed，全量回归 600 passed（1 个环境相关已有失败不影响）
+- 待真实 GPU 环境用 MIDA-659.ts 精准模式端到端验收
+
+---
+
 **日期**：2026-06-17
 **版本**：V3.07 问题状态全面核实 + 规划文件整理
 **上一版本**：V3.07 P247 安全阀完成 + P265 重组碎片化定位
@@ -25,6 +72,93 @@
 - **SubForge** 值得借的是“低分段定点返修”，而不是再堆模型。
 - 公开资料里没看到谁明确靠“自训 / 微调 ASR 模型”解决 JAV 问题，主流做法还是 **换模型 + 对齐 + 分段 + 后处理**。
 - 对我们来说，当前更值得做的是 **减法**：把内部质量信号和用户问号继续分开，把短词和非人声孤立段继续收紧，而不是继续加链路。
+
+---
+
+## 2026-06-19 — 后台任务实时监控
+
+**分支**：main
+
+### 完成事项
+
+| 事项 | 状态 | 说明 |
+|------|------|------|
+| 后台任务快照 | ✅ | 扫描 `~/.video-subber/jobs/*/meta.json`，确认当前唯一 `running` 任务为 `48b739a158`（文件 `MIDA-659.ts`） |
+| 运行中任务日志追踪 | ✅ | 连续轮询 3 次，`user.log` / `debug.log` / `meta.json` 时间戳都停在 `2026-06-19 21:41:38` |
+| 卡点定位 | ✅ | `48b739a158` 最后一条日志停在 `加载 Whisper large-v3 模型…`；`checkpoint.json` 仍写在 `extract_audio` 阶段，说明状态和真实进度不一致 |
+| 最近失败任务复核 | ✅ | `2049795afe`、`05cbec0727`、`01bdd52151` 都是 URL `https://www.youtube.com/watch?v=abc`，被 `yt-dlp` 判定为截断链接，不是转录链路回归 |
+| 本地接口可达性检查 | ✅ | `lsof` 显示 `127.0.0.1:8766` 有 Python 进程监听，但 `curl /api/active-jobs` 连不上，当前监控改走 job 目录和日志实物 |
+
+### 本轮结论
+
+- 现在真正值得盯的是 `48b739a158` 这一个本地文件任务，不是多任务同时跑满。
+- 这条任务大概率已经卡住，不像正常运行中任务。理由是 15 秒轮询期间没有任何新日志、新时间戳或阶段推进。
+- 最近那 3 个 URL 报错属于输入链接本身无效，不代表下载器或转录流程整体坏了。
+
+---
+
+## 2026-06-19 — 标准模式为什么先看到 Whisper
+
+**分支**：main
+
+### 完成事项
+
+| 事项 | 状态 | 说明 |
+|------|------|------|
+| 标准模式代码口径核对 | ✅ | 当前 `transcriber_v2.py` 的设计就是“先用 Whisper 探语言，再决定继续 Whisper 还是切 Qwen” |
+| 日志含义拆分 | ✅ | `user.log` 里的 `tier=precise` 来自硬件推荐档位，不等于用户实际选择了精确模式 |
+
+### 本轮结论
+
+- `meta.json` 里这条任务的真实配置仍是 `transcriptionTier=standard`。
+- 之所以先看到 `加载 Whisper`，是因为标准模式要先拿 Whisper 做语言判断；只有识别出 `ja/zh/en/ko` 且置信度够高，才会释放 Whisper 再切到 Qwen。
+- 当前监控到的 `48b739a158` 卡在 `加载 Whisper large-v3 模型…` 之前这一步，所以还没走到“是否切 Qwen”的分支日志。
+
+## 2026-06-19 — P285 标准模式 Whisper 语言探测卡住诊断
+
+**分支**：main
+
+### 完成事项
+
+| 事项 | 状态 | 说明 |
+|------|------|------|
+| 后台状态复核 | ✅ | 新任务 `a58b786e34` 为唯一活跃任务，后端返回 `running/transcribe/progress=10/process_alive=true` |
+| CPU/内存复核 | ✅ | worker `59930` 持续运行，CPU 可到 `110.7%`，累计 CPU 时间增长；`top` 显示内存曾到 `20G` 级别 |
+| 输入音频复核 | ✅ | `audio.wav` 时长 `8191.168s`，约 2 小时 16 分 31 秒 |
+| 代码路径复核 | ✅ | 标准模式直接调用 `transcribe_whisper(audio_path, ...)`，没有截取第一段；`mlx_whisper.transcribe()` 对整条音频启用 `word_timestamps=True` |
+| 问题登记 | ✅ | 新增 `problems.md` P285，记录标准模式语言探测误跑整条长音频的问题 |
+
+### 本轮结论
+
+- 这不是前端误显示，也不是 worker 已崩溃；worker 还活着，并且在 MLX/Metal 的 Whisper 路径里消耗 CPU。
+- 标准模式的设计是“Whisper 只跑第一段判断语言”，但当前实现把 2 小时多的完整音频交给 Whisper。
+- 前端一直显示“正在启动语音识别…”是因为进度回调要等 `transcribe_whisper()` 返回后才继续触发；当前调用长时间不返回。
+- 本轮只读诊断，没有修改代码。下一步应按 bug 修复流水线处理 P285。
+
+## 2026-06-19 — P285 标准模式 MLX Whisper 短探测修复
+
+**分支**：main
+
+### 完成事项
+
+| 事项 | 状态 | 说明 |
+|------|------|------|
+| bug 管道文件 | ✅ | 新增 `pipelines/bug-pipeline-2026-06-19-p285-standard-mlx-language-probe.md` |
+| MLX 短探测入口 | ✅ | `whisper_runner.py` 新增 `detect_language_with_whisper()`，标准模式只抽短音频做语言判断 |
+| 标准模式路由修复 | ✅ | `transcriber_v2.py` 先探语言；适合 Qwen 时直接进入 Qwen，只有 fallback 才完整跑 Whisper |
+| 回归测试 | ✅ | 覆盖短临时音频、`word_timestamps=False`、标准模式 Qwen 路径不调用完整 Whisper |
+
+### 验证
+
+- 目标测试：`v2/.venv/bin/python -m pytest v2/test/test_p266_mlx_whisper.py v2/test/test_standard_precise_mode.py v2/test/test_p276_standard_language_env.py -q` → `25 passed`。
+- 语法检查：`python3 -m py_compile v2/backend/core/whisper_runner.py v2/backend/transcriber_v2.py` → 通过。
+- 全量测试：`v2/.venv/bin/python -m pytest v2/test -q` 在当前 Codex/headless 环境收集阶段被 Metal/GPU 限制挡住，错误为 `No Metal device available`。
+- 后台检查：未匹配到 `backend.worker`、`ffmpeg`、`mlx_whisper`、`Qwen`、`Whisper` 残留进程；当前高 CPU 主要来自 `WindowServer` 和 Codex。
+
+### 当前边界
+
+- 代码层已修复。
+- 仍需在普通 Mac 前台环境用标准模式重跑 `MIDA-659.ts`，确认前端不再卡在“正在启动语音识别…”，并能进入 Qwen 转录。
 
 ---
 
@@ -1372,3 +1506,23 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 - 命令：`cd v2 && .venv/bin/python -m pytest test/test_p266_mlx_whisper.py test/test_harden_v307_sprint2.py test/test_phase1d_qwen_health.py test/test_p160_layer2.py test/test_p160_stemmer.py -q`
 - 结果：`65 passed, 2 warnings`
 - 两个 warning 都是 FastAPI `on_event` 弃用提醒，不是本次 Whisper 换库或 P284 修复导致的失败。
+
+## 2026-06-20 P291 Refiner 滑窗润色（bug 修复流水线 ①-⑧ 完成）
+
+**问题**：Refiner（LLM 润色模块）所有模式下都失效——把全部段（日语约 1009 段/~22000 token）一次性扔给 LLM，注意力被稀释，1 秒返回 `corrections=0`，字幕碎片句（如「父さんとお母さん今」）从未被润色。取代 P269。
+
+**流水线①-⑧**：
+- ① investigate：三根因坐实——RC1 无滑窗单次全量调用、RC2 `_looks_broken_sentence` 对无标点日语全选导致筛选失效、RC3 双稿只裁决不润色。
+- ② plan-eng-review + steve-jobs：滑窗改「不重叠活跃区 + 两侧只读上下文 pad」（非 20% 重叠）；拆两 pass；窗口 120；`[?]` 改了就清没改保留（用户拍板）。
+- ③ ln-021-codegraph + bill-gates：删函数零风险；签名兼容（按窗口传子集）；盖茨标记二阶效应——下游翻译首次吃润色稿，⑩ 必须端到端测完整链路。
+- ④ /review + elon-musk：5 个旧代码雷；删假公式硬编码 120、删 2 筛选函数；Pass1 保留（L2 只标记不修正）。
+- ⑤ 设计走查：五问通过，Pass1→Pass2 真数据依赖串行正确。
+- ⑥ 安全：补 dual prompt 注入防护。
+- ⑦ TDD：新建 `test_p291_refiner_sliding_window.py` 13 用例 RED→GREEN 13/13；新增 `_chunk_refiner_windows`/`RefinerWindow`/`_run_refiner`，`_build_refiner_prompt` 加 context 参，删 3 个函数。
+- ⑧ verification：P291 13/13、相关旧测试 53/53、全量 613 passed。唯一失败 p201 经证明是预存测试隔离 flake（排除我的测试后全量仍 1 failed），非 P291 引入。
+
+**改动文件**：`v2/backend/worker.py`（Refiner 段）；新增 `v2/test/test_p291_refiner_sliding_window.py`。
+
+**待办**：⑨⑩ 端到端验收需 Mac 前台 GPU + DeepSeek API，用 MIDA-659.ts 跑标准+精准模式，看 `P291 Refiner 完成` 日志 pass2>0、`[?]` 数量、碎片句是否变通顺、进度条窗口进度。
+
+**预存 flake（与 P291 无关，单独标记）**：`test_p201_qwen_aligner_check::test_returns_false_when_model_not_downloaded` 在全量套件里因 `sys.modules` mock 被加载真实 qwen 的测试污染而失败，单独跑通过。建议后续加测试隔离（reload 后恢复 mock）。

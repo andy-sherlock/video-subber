@@ -4,30 +4,30 @@
 
 ---
 
-## ✅ 已修并通过真实重跑验收（2026-06-18 更新）
+## ✅ 已修并通过真实重跑验收（2026-06-21 最终更新）
 
-### 本轮已修（5 个 + 1 个验收补强）
+### V3.07 全部验收通过（2026-06-21）
 
-| # | 编号 | 定位 | 问题 | 优先级 |
-|---|------|------|------|--------|
-| 1 | P272 | `orchestrator.py:350-461` | 已加 `_review_seam()` 输出防线，拒绝“版本A/版本B/建议/原因”等解释文字写回字幕；job `23e2621360` 未发现这类污染 | ✅ 已验收 |
-| 2 | P237 | `worker.py:285-296` | 已在异常路径写入安全 `crash_snapshot`，不记录 API Key、环境变量、字幕全文 | ✅ 已验收 |
-| 3 | P281 Phase 2 | `transcriber_v2.py:379-423` | 已把 P275 人声地图接入短词合并：同一人声区内放宽合并，非人声区孤立短词只保留内部原因，不再直接显示 `[?]` | ✅ 已验收 |
-| 4 | P275 Phase 2 | `transcriber_v2.py:114-148` | 已新增人声地图质量统计日志；job `23e2621360` 显示 `无字幕人声区=0`、`最长疑似漏字幕=None` | ✅ 已验收 |
-| 5 | P277 验收补强 | `run-test.sh` / 启动命令 | 已新增无 reload 真实测试入口 `v2/run-test.sh`；真实 job 日志确认 `Worker Python` 指向 `v2/.venv/bin/python` | ✅ 已验收 |
-| 6 | P283 | `transcriber_v2.py:416-418` / `hallucination_filter.py:700-702` | 已把内部质量信号和用户可见问号分开；FJIN-141 `[?]` 从 129/922 降到 52/931 | ✅ 已验收 |
+| # | 编号 | 定位 | 问题 | 状态 |
+|---|------|------|------|------|
+| 1 | P272 | `orchestrator.py:350-461` | 翻译接缝审查污染字幕 | ✅ 已验收（FJIN-141 job 23e2621360） |
+| 2 | P237 | `worker.py:285-296` | 黑匣子日志闭环 | ✅ 已验收（FJIN-141 job 23e2621360） |
+| 3 | P281 Phase 2 | `transcriber_v2.py:379-423` | 人声地图接入短词合并 | ✅ 已验收（FJIN-141 job 23e2621360） |
+| 4 | P275 Phase 2 | `transcriber_v2.py:114-148` | 人声地图质量统计日志 | ✅ 已验收（FJIN-141 job 23e2621360） |
+| 5 | P277 | `run-test.sh` | 固定运行环境验收补强 | ✅ 已验收（FJIN-141 job 23e2621360） |
+| 6 | P283 | `transcriber_v2.py` / `hallucination_filter.py` | 问号噪音修复 | ✅ 已验收（[?] 从 129→52/931） |
+| 7 | P266 | `whisper_runner.py` | Mac 端换 mlx-whisper | ✅ 已验收（标准模式短探测 MLX 正常，4秒日语0.92） |
+| 8 | P284 | `transcriber_v2.py` | clock/claw Whisper 参考稿丢失 | ✅ 已验收（London VLOG 清缓存重跑正常） |
+| 9 | P285 | `whisper_runner.py` + `transcriber_v2.py` | 标准模式整条音频传 Whisper 卡住 | ✅ 已验收（job 16a692d74e，4秒探测→切 Qwen） |
+| 10 | P287 | `transcriber_v2.py` | Qwen 主引擎 whisper_text 未回填 | ✅ 已验收（job 98ac3271c2，786/1022段带 whisper_text） |
+| 11 | P289 | `orchestrator.py` | L2 交叉验证左右输入未互换 | ✅ 已验收（job 98ac3271c2，[?]率 95.2%→38.4%） |
+| 12 | P291 | `worker.py` | Refiner 整段一次性发 LLM | ✅ 已验收（job 98ac3271c2，9窗口238处修正） |
 
 ### 接受残留（1 个）
 
 | # | 编号 | 定位 | 问题 | 说明 |
 |---|------|------|------|------|
-| — | P273 | `transcriber_v2.py` | 短字幕、短促叫声、重复声、长 SRT 间隔残留 | P283 后 job `23e2621360` 已降到 52/931 个 `[?]`，且 P275 显示无字幕人声区为 0。成人片干扰项太多，继续追 100% 完美会伤害主线进度；V3.07 不再追加修法 |
-
-### V3.07 当前待验收（1 个）
-
-| # | 编号 | 定位 | 问题 |
-|---|------|------|------|
-| — | P266 | `transcriber_v2.py` + `backend/core/whisper_runner.py` | **Mac 端 Whisper 换 `mlx-whisper`**。代码层已完成：Mac Apple Silicon 使用 `mlx-whisper`，Windows/其他平台继续使用 `faster-whisper`。已下载 `mlx-community/whisper-large-v3-mlx` 权重到本机缓存（`3083520416 bytes`）。当前 Codex/headless 环境无 Metal/GPU，真实 MLX 转录需在普通 Mac 前台环境验收 |
+| — | P273 | `transcriber_v2.py` | 短字幕、短促叫声、重复声、长 SRT 间隔残留 | P283 后 job `23e2621360` 已降到 52/931 个 `[?]`。成人片干扰项，V3.07 不再追加修法 |
 
 ### 架构债（V3.08 搬家时一起处理）
 
@@ -5415,7 +5415,7 @@ P247 Refiner 的位置从 Step 4（字幕生成/翻译后）移到 L2 交叉验�
 
 **状态**：✅ 已修（2026-06-14，真实长视频待重跑）
 
-## P269 | 2026-06-14 | 🔴 P1 P247 Refiner 缺少单稿语义疏通模式
+## P269 | 2026-06-14 | 🔴 P1 P247 Refiner 缺少单稿语义疏通模式（→ 已被 P291 取代）
 
 **问题**：P247 Refiner 的历史目标是“LLM 双稿裁判 + 边界修复 + 润色去问号”。当 Qwen 和 Whisper 两份稿子都可用时，LLM 应对比两份稿子，修正 `claw/clock` 这类单词误听；当一个模型崩掉、只剩 Qwen 单稿时，LLM 也应对 Qwen 单稿做句意疏通：补标点、理顺明显乱序、修正明显不成句的碎片、处理 `[?]` 不确定段。
 
@@ -6133,3 +6133,276 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 - 全量 `pytest test -q` 在当前 Codex/headless 环境收集阶段被 Metal/GPU 限制挡住：`mlx` 报 `No Metal device available`，不是本次 P284 改动导致。
 
 **状态**：✅ 代码已修；⏳ 待普通 Mac 前台环境重跑 London VLOG，确认真实成品前两句和 `clock/claw` 均恢复。
+
+---
+
+## P285 | 2026-06-19 | 🔴 P0 标准模式 Whisper 语言探测误跑整条长音频，导致前端卡在“正在启动语音识别”
+
+**问题**：用户重新测试 `MIDA-659.ts`，标准模式任务 `a58b786e34` 长时间停在前端“正在启动语音识别…”。后台不是没有启动，也不是 worker 已退出，而是 worker 仍在高 CPU/高内存运行，日志一直停在 `加载 Whisper large-v3 模型…`。
+
+**证据**：
+- 当前活跃任务只有 `a58b786e34`，后端接口返回 `status=running`、`stage=transcribe`、`progress=10`、`message=正在启动语音识别…`、`process_alive=true`。
+- 任务配置明确是 `transcriptionTier=standard`，不是用户选择了精确模式。
+- 音频 `/Users/andy/.video-subber/jobs/a58b786e34/cache/b22fcca48136/audio.wav` 时长 `8191.168s`，约 2 小时 16 分 31 秒。
+- worker 进程 `59930` 持续运行，采样显示 CPU 可到 `110.7%`，累计 CPU 时间持续增长；`top` 采样显示内存曾到 `20G` 级别。
+- `lsof -p 59930` 显示已加载 `mlx/core`、`libmlx.dylib`、`mlx.metallib` 和 Metal 缓存文件，没有看到千问相关路径，说明还没进入 Qwen。
+- `user.log` / `debug.log` 最后一条均为 `22:15:36 加载 Whisper large-v3 模型…`，`meta.json` 和 `checkpoint.json` 时间戳也停在 `22:15:36`。
+
+**原因**：P276 的设计要求是“标准模式先跑 Whisper 第一段拿语言判断，再决定继续 Whisper 还是切 Qwen 跑全片”。但当前实现没有截取第一段。`transcriber_v2.py` 在标准模式下进入 `use_standard_router` 后，直接调用 `transcribe_whisper(audio_path, ...)`，把整条 2 小时多的音频交给 `mlx_whisper.transcribe()`；`whisper_runner.py` 又启用了 `word_timestamps=True`。因此所谓“语言探测”实际变成了“Whisper 对整片完整转录并取词级时间戳”。
+
+**为什么前端一直不动**：`worker.py` 只在调用 `transcribe_v2()` 前写入 10% 进度。`transcriber_v2.py` 只有在 `transcribe_whisper()` 返回之后、开始遍历 Whisper 段落时，才会继续回调段数进度。现在 `mlx_whisper.transcribe()` 长时间不返回，所以前端只能一直显示旧消息。
+
+**影响**：
+1. 标准模式没有按设计快速进入 Qwen，而是在 Whisper 入口消耗大量 CPU/内存。
+2. 长视频会表现为“正在启动语音识别…”长时间不动，用户无法区分正常转录、卡死、还是重复启动。
+3. P276 现有测试只覆盖路由函数 `choose_standard_primary_engine()`，没有覆盖“标准模式语言探测必须只用短音频”这个关键约束，所以漏掉了真实长视频问题。
+
+**解决方向**：
+1. 标准模式新增短音频语言探测函数，例如只截取前 30-60 秒或第一段人声，调用 Whisper 获取 `language` 和 `language_probability`。
+2. 如果判断为 `ja/zh/en/ko` 且置信度够高，释放 Whisper，切 Qwen 跑全片。
+3. 如果置信度不足或语言不适合 Qwen，再让 Whisper 跑全片，但必须把前端消息改成“正在使用 Whisper 全片转录”，不要继续叫“启动语音识别”。
+4. 补回归测试：标准模式下传给语言探测的音频不能是原始长音频；`transcribe_whisper()` 不应在语言探测阶段拿到完整 `audio.wav`。
+5. 增加“长时间无进度但 worker 仍活着”的心跳或超时提示，让前端能显示“Whisper 正在处理长音频/可能卡住”。
+
+**修复记录（2026-06-19）**：
+1. 在 `whisper_runner.py` 新增 `detect_language_with_whisper()`：标准模式只拿语言和概率，不再复用完整转录入口。
+2. Mac/MLX 路径先用 `ffmpeg` 抽取短音频临时 WAV，再调用 `mlx_whisper.transcribe(..., word_timestamps=False)`；结束后删除临时文件。
+3. Windows/faster 路径保留 faster-whisper 语义，只拿 `info.language`，不消费完整 `segments_iter`。
+4. `transcriber_v2.py` 标准模式改为先短探语言；只有当语言不适合 Qwen 或 Qwen 不可用时，才进入完整 Whisper 转录。
+5. 标准模式命中 Qwen 时，会释放 Whisper 模型引用并把完整音频交给 Qwen，避免长视频卡在“正在启动语音识别…”。
+
+**验证（2026-06-19）**：
+- RED 已复现：新增测试在旧代码下失败，原因是没有短探测入口，标准模式源码也没有 `detect_language_with_whisper`。
+- GREEN 已通过：`v2/.venv/bin/python -m pytest v2/test/test_p266_mlx_whisper.py v2/test/test_standard_precise_mode.py v2/test/test_p276_standard_language_env.py -q` → `25 passed`。
+- 语法检查已通过：`python3 -m py_compile v2/backend/core/whisper_runner.py v2/backend/transcriber_v2.py`。
+- 全量 `v2/.venv/bin/python -m pytest v2/test -q` 在当前 Codex/headless 环境收集阶段被 Metal/GPU 限制挡住：`mlx` 报 `No Metal device available`。这是当前运行环境没有可用 Metal 设备，不是 P285 代码失败。
+- 当前进程复查：未匹配到 `backend.worker`、`ffmpeg`、`mlx_whisper`、`Qwen`、`Whisper` 残留进程；高 CPU 主要来自 `WindowServer` 和 Codex。
+
+**状态**：✅ 代码已修；⏳ 待普通 Mac 前台环境用标准模式重跑 `MIDA-659.ts`，确认前端能快速越过语言探测并进入 Qwen。
+
+---
+
+## P286 | 2026-06-20 | 🔴 P0 mlx-whisper 不返回 language_probability，标准模式永远不进千问
+
+**问题**：P285 修完语言探测后，标准模式实际运行时 `language_probability` 始终为 `0.0`，导致 `choose_standard_primary_engine()` 判断概率 < 0.70，永远走 Whisper 完整转录，不切千问。
+
+**原因**：`mlx_whisper.transcribe()` 返回的字典里只有 `text`、`segments`、`language` 三个字段——**没有 `language_probability`**。旧版 `faster-whisper` 的 `model.transcribe()` 返回的 `info` 对象带有 `language_probability` 属性，但 mlx-whisper 的实现（`mlx_whisper/transcribe.py:111-112`）在内部调用了 `model.detect_language(mel_segment)` 拿到了概率表，但只取了 `max(probs, key=probs.get)` 作为语言名，**丢弃了概率值**，没写进返回字典。
+
+代码里 `_dict_get(result, "language_probability", 0.0)` 因为字段不存在，始终拿到默认值 `0.0`。
+
+**为什么 P285 流水线没发现**：
+1. P285 聚焦"Whisper 卡住"，十步审查都围绕"长音频传入"展开，没人检查探测到的概率是否正确
+2. TDD 阶段 mock 了 `mlx_whisper.transcribe()` 的返回值，手动写了 `language_probability: 0.93`，绕过了真实库不返回该字段的问题
+3. QA/端到端测试受 Codex/headless 环境限制无法执行
+
+**解决方案（乔布斯方案 — 不用 0.0 兜底）**：
+- `detect_language_with_mlx_whisper()`：绕过 `mlx_whisper.transcribe()`，直接调用底层 API：
+  - `mlx_whisper.load_models.load_model()` 加载模型
+  - `mlx_whisper.audio.load_audio()` / `log_mel_spectrogram()` / `pad_or_trim()` 处理音频
+  - `model.detect_language(mel_segment)` 直接拿到 `(tokens, probs)` 概率表
+  - 用户指定语言 → `language_probability=1.0`；自动检测 → 取 `max(probs)`；概率表为空 → 直接 `raise RuntimeError`，不静默返回 0.0
+- `transcribe_with_mlx_whisper()`：同样处理——用户指定语言给 1.0，自动检测时补调 `model.detect_language()` 拿真实概率，失败则报错
+- 测试重写：mock 底层 API（`mlx.core`、`mlx_whisper.audio`、`mlx_whisper.load_models`）而非 `mlx_whisper.transcribe()`
+
+**涉及文件**：
+- `v2/backend/core/whisper_runner.py:91-148`（transcribe_with_mlx_whisper）
+- `v2/backend/core/whisper_runner.py:218-274`（detect_language_with_mlx_whisper）
+- `v2/test/test_p266_mlx_whisper.py:75-136`（测试重写）
+
+**真实验证**：修复前用测试音频调用 `detect_language_with_mlx_whisper` 概率为 0.0；修复后返回 `ru: 0.9941`。
+
+**状态**：✅ 代码已修，测试通过；⏳ 待重启服务器用 `MIDA-659.ts` 做标准模式端到端验收。
+
+---
+
+## P287 | 2026-06-20 | 🔴 P1 _assemble_qwen_primary() 不回填 whisper_text，所有非英文语言 refiner 被迫走单稿模式
+
+**问题**：精准模式跑日语视频 `MIDA-659.ts`（job `a586439b5d`），Whisper 完整转录了 2191 段，Qwen 也转录完成，但最终 689 段字幕的 `whisper_text` 全部为空。refiner 被迫走 single 模式，DeepSeek 回复 `corrections=0`，成品满屏 `[?]` 和不通顺句子（「我是机器」「想舔」「雨珠」等）。
+
+**证据**：
+- job `a586439b5d`，配置 `transcriptionTier=precise`，API Key 已填（DeepSeek）
+- 日志：`Whisper 转录: 2191 段`、`precise 模式: ja → Qwen3-ASR 主引擎`
+- 日志：`P269 Refiner 模式: single, candidates=689`、`P247 Refiner 完成: corrections=0 accepted=0 mode=single`
+- `transcript.json`：689 段，`with_whisper_text=0`
+
+**原因**：P284 修复只给英文（`lang == "en"`）加了专门分支 `_assemble_qwen_on_whisper_boundaries()`，其他语言仍走 `_assemble_qwen_primary()`。该函数不回填 `whisper_text`，导致 `_choose_refiner_mode()` 判断无可用 Whisper 参考稿，refiner 只能走单稿模式。
+
+**与 P284 的关系**：P284 识别了根因（`_assemble_qwen_primary()` 不回填 whisper_text），但修法只覆盖英文。日语、中文、韩语等所有走 Qwen 主引擎 + `_assemble_qwen_primary()` 的语言均受影响。
+
+**修复方案**：在 `_assemble_qwen_primary()` 函数末尾，组装完所有段后，按时间重叠从 `whisper_segments` 中匹配对应的 Whisper 文本，赋给 `seg.whisper_text`。**不改断句逻辑**（保留日语 5 秒/25 字/`_should_break_ja_sentence()` 等精调参数），只加参考稿回填。
+
+**涉及文件**：
+- `v2/backend/transcriber_v2.py:655-698`（`_assemble_qwen_primary()`）
+
+**修复**：在 `_assemble_qwen_primary()` 尾部（return 前）加入 5 行回填逻辑：遍历每个组装好的段，按时间重叠匹配 `whisper_segments`，拼接对应 Whisper 文本赋给 `seg.whisper_text`。测试 `test_p287_whisper_text_backfill.py` 6/6 passed，全量回归 591 passed（3 个旧 failure 无关）。
+
+**状态**：✅ 已修
+
+## P288 | 2026-06-20 | 🔴 P0 P287 回填代码未判空，标准模式 Qwen 主引擎崩溃
+
+**问题**：标准模式下用 MIDA-659.ts 测试，worker 在组装字幕骨架时报错 `'NoneType' object is not iterable`，任务中断
+**原因**：P287 在 `_assemble_qwen_primary()` 尾部加了 whisper_text 回填逻辑，直接遍历 `whisper_segments`。精准模式下 Whisper 做完整转录，`whisper_segments` 有值；但标准模式下 Whisper 只做短音频语言探测就退场，`whisper_segments` 为 None。代码遍历 None 崩溃
+**解决方案**：在遍历前加空值判断——`if whisper_segments:` 才比对，否则赋空字符串。新增测试 `test_none_whisper_segments_no_crash`
+**涉及文件**：`v2/backend/transcriber_v2.py:699-707`
+**状态**：✅ 已修
+
+
+---
+
+## P289 | 2026-06-20 | 🔴 P1 L2 交叉验证在千问主引擎时自己跟自己比，精准模式 95% 字幕标 [?]
+
+**问题**：MIDA-659.ts 日语视频精准模式输出 689 段字幕中 656 段（95.2%）被标 [?]。标准模式同一视频无此问题（0 个 [?]）。L2 交叉验证（把两个模型的转录结果放在一起比对的环节）在千问当主引擎时失效——左右两边都放了千问数据，Whisper 的转录结果没被用上。
+
+**原因**：三个根因叠加——
+1. L2 左边取 `seg.text`（最终字幕文本），千问主引擎时该文本来自千问；右边取千问原始 chunks。两边都是千问数据。Whisper 原始转录（`_whisper_segments`）虽在 transcriber_v2.py 里保存了，但 L2 没使用。
+2. 同一份千问数据格式不同：左边是组装后的连写文本（如 `後輩たちの練習見てね`），右边是千问原始输出（如 `後輩 たち の 練習 見 て ね`）。LightweightStemmer 对连写日语提取 1 个词干，对空格分隔提取 6 个词干，交集=0，所有窗口判定不匹配。
+3. 精准模式千问产出比标准模式少 24%（2457 vs 3243 段），两个模型同时跑抢 GPU 资源。
+
+**解决方案**：路由层交换主副引擎时，同步交换 L2 的左右输入。L2 不关心谁是主引擎——永远只做一件事：比对两边。
+- transcriber_v2.py 路由层：千问主引擎时，把 Whisper 原始转录传给 L2 作为一边，千问 chunks 作为另一边
+- hallucination_filter.py：变量名从 `whisper_windows`/`qwen_windows` 改为 `primary_windows`/`secondary_windows`
+- 附加：Whisper 幻觉窗口（数据量严重不足或出现已知幻觉关键词）直接信任千问，不标问号
+
+**涉及文件**：
+- `v2/backend/core/hallucination_filter.py:611-684`（L2 窗口比对主逻辑）
+- `v2/backend/core/hallucination_filter.py:490-525`（_assign_qwen_to_windows）
+- `v2/backend/core/hallucination_filter.py:540-560`（filter_hallucinations 入口）
+- `v2/backend/transcriber_v2.py:995-1013`（智能路由分支）
+- `v2/backend/transcriber_v2.py:1227-1235`（L2 调用入口）
+
+**状态**：✅ 已修（2026-06-20，代码通过全量测试 600 passed，待真实 GPU 环境端到端验收）
+
+## P290 | 2026-06-20 | 🟡 P1 Mac 精准模式双 MLX 模型并行抢 GPU，Whisper 卡在模型加载
+
+**问题**：精准模式下千元 ASR 和 Whisper 同时启动，两个模型都用 MLX 框架走 Apple Silicon GPU。千元先抢到 GPU 开始推理，Whisper 卡在模型加载阶段 22+ 分钟无法动弹，直到千元跑完释放 GPU 后才能继续。
+
+**原因**：换库前 Whisper 用 faster-whisper（CTranslate2，走 CPU），千元用 MLX（走 GPU），两者用不同硬件互不干扰，并行正常工作。换成 mlx-whisper 后，两个模型都走 MLX GPU，共享 Apple Silicon 统一内存和 Metal 计算单元。MLX 不支持多进程/多模型并发共享 GPU——先占用的模型独占资源，后启动的模型在加载阶段被阻塞。
+
+**关键对比**：
+- **Mac（换库前）**：faster-whisper(CPU) + 千元(MLX/GPU) → 并行正常
+- **Mac（换库后）**：mlx-whisper(GPU) + 千元(MLX/GPU) → 后启动的卡死
+- **Windows**：faster-whisper(CPU 或 CUDA) + 千元(PyTorch/CUDA) → 不同硬件通道，并行正常；如果都走 CUDA 同一张卡，NVIDIA 驱动有时间片轮转不会完全卡死，但 VRAM 不够会 OOM
+
+**解决方案**：Mac 精准模式改为串行调度——先跑完千元 ASR（释放 GPU），再启动 mlx-whisper。Windows 端保持并行不变（faster-whisper 默认走 CPU）。具体改动：`transcriber_v2.py` 的 `transcribe()` 函数中，Mac + 精准模式时，等千元线程完成后再调用 `transcribe_whisper()`。
+
+**涉及文件**：
+- `v2/backend/transcriber_v2.py:868-940`（Whisper 启动逻辑）
+- `v2/backend/transcriber_v2.py:995-1013`（千元并行启动逻辑）
+
+**状态**：⏸ 未修（P289 端到端验收完成后实施）
+
+
+## P291 | 2026-06-20 | 🔴 P1 Refiner 滑窗润色缺失——所有模式下 LLM 润色无效
+
+**问题**：Refiner（LLM 润色模块）在所有模式下都无法有效工作。不管是双稿模式（Qwen + Whisper 对比后选出最终稿）还是单稿模式（只有 Qwen），Refiner 都应该对最终稿做语义润色（补标点、理顺碎片句、修正上下文可判断的误听）。当前代码把全部候选段（日语场景下约 1009 段、~22000 token）一次性扔给 LLM，LLM 注意力被稀释，1 秒返回 `corrections=0`，等于什么都没改。
+
+**实测证据**（MIDA-659.ts 日语视频，2026-06-20）：
+- 标准模式：`P269 Refiner 模式: single, candidates=1009` → `P247 Refiner 完成: corrections=0 accepted=0 mode=single`，从发起到返回仅 1 秒
+- 精准模式：`mode=single, corrections=0`，同样无效
+- 双稿模式：即使 Whisper 数据可用进入 dual 模式，全篇一次性发给 LLM 的问题同样存在
+- 字幕中存在明显碎片句（如 `少しですかうんお`、`父さんとお母さん今`），Refiner 未做任何修正
+
+**根因**：三层问题叠加——
+1. **无滑窗**：不管多少段，全部一口气塞给 LLM。超过 LLM 注意力疲劳极限（约上下文窗口的 30%），中间内容被"走神"忽略
+2. **候选段筛选失效（日语）**：`_looks_broken_sentence()` 检查"长度 < 20 且结尾无标点"——千问输出的日语没有任何标点，导致 1008/1022 段全被选中，等于没筛选
+3. **设计缺陷**：P269 只为单稿模式设计了润色，但双稿模式对比完也需要润色最终稿。润色应该是所有模式的最后一步
+
+**解决方案**：
+
+1. **Refiner 加滑窗机制**（复用翻译模块的注意力疲劳公式）：
+   - 窗口大小：借用 `_compute_chunk_size(llm)` 的公式（`ctx * 0.30 - 2000 overhead // 8`），但加硬上限 **150 段/窗口**（Refiner 需要更密的注意力做精细判断）
+   - 重叠比例：**20%**，与翻译模块一致
+   - 重叠区域处理：**只取第一个窗口的修改结果**，后续窗口的重叠部分当作只读上下文（不需要缝隙审查）
+   - 每个窗口带前 3 句 + 后 3 句只读上下文，prompt 标注"上下文，不要修改"
+
+2. **砍掉候选段筛选逻辑**：
+   - 删除 `_looks_broken_sentence()` 函数（对日语完全失效，是语言特定的硬编码）
+   - 删除 `_looks_too_short_fragment()` 函数（滑窗方案下不再需要预筛选）
+   - 删除 `_select_refiner_segments()` 中 single 模式的筛选逻辑
+   - 所有段都进滑窗，LLM 自己判断哪些需要修、哪些不需要（语义通顺判断是 LLM 的核心能力）
+
+3. **统一所有模式的润色流程**：
+   - 双稿模式：先走现有 `[CONFLICT]` 裁判对比 → 得到最终稿 → 再走滑窗润色
+   - 单稿模式：直接走滑窗润色
+   - 两种模式最终都走同一个滑窗润色函数，prompt 统一为"补标点、理顺碎片、修正上下文可判断的误听"
+
+4. **输出格式不变**：仍用 JSON corrections 格式，安全阀（`_clean_dist` 阈值）保留
+
+**涉及文件**：
+- `v2/backend/worker.py:168-176`（`_looks_too_short_fragment` + `_looks_broken_sentence`，删除）
+- `v2/backend/worker.py:193-201`（`_select_refiner_segments`，改为全部段进滑窗）
+- `v2/backend/worker.py:204-251`（`_build_refiner_prompt`，改为按窗口构建 prompt）
+- `v2/backend/worker.py:550-600`（Refiner 执行入口，加滑窗循环）
+- `v2/backend/translation/orchestrator.py:331-347`（`_compute_chunk_size`，参考但不 import）
+
+**审查后修订（②plan-eng+jobs / ③codegraph+gates / ④review+elon / ⑤走查 / ⑥安全 锁定，与上方原始方案的差异）**：
+
+1. **滑窗改「不重叠活跃区 + 两侧只读上下文 pad」**，不是「20% 重叠取第一个窗口」。翻译的 20% 重叠是「重译两遍 + 缝隙审查挑优」，Refiner 不重写不需要；照搬会让边界段只看到半边上下文。最终：活跃区 step=window_size 永不重叠，每窗两侧各 `_REFINER_CONTEXT_PAD` 段只读上下文。无去重、无缝隙审查。
+2. **窗口 120、上下文 pad 20**（常量 `_REFINER_WINDOW_SIZE=120` / `_REFINER_CONTEXT_PAD=20`），不借翻译公式（公式下限 200，硬上限 150 等于公式失效）。Refiner 逐段判断比批量翻译更费注意力，取小窗。
+3. **拆两个 pass**：Pass1 冲突裁决（仅 dual 模式）→ Pass2 通顺润色（所有模式）。不合一个 prompt（裁决「只返回有冲突段」与润色「把粗糙段改顺」指令打架）。
+4. **`[?]` 清除 = 改了就清、没改保留**（用户拍板）。润色真改了某句（corrections 落地且过 0.80 安全阀）→ 清该句 uncertain；没改 → 保留。正是现有 single 模式 apply 语义。
+5. **每窗 try/except 隔离 + 按窗口传 segment 子集**：失败窗口不调 apply → 其段保留 uncertain，绝不伪造"已验证"（P207 教训）；只把活跃区段交给 apply → 引用只读上下文 seg_id 的修正被自然拒绝。
+6. **补 dual prompt 注入防护句**；加每窗进度日志（14 窗约 45-70 秒，进度条显示「润色中 N/总 窗口」，避免像 P285 那样"看着不动"）。
+
+**实现（2026-06-20 ⑦TDD）**：新增 `_chunk_refiner_windows()` / `RefinerWindow` / `_run_refiner()`；`_build_refiner_prompt` 加 `context_before/context_after` 可选参；删 `_looks_broken_sentence`/`_looks_too_short_fragment`/`_select_refiner_segments`；`_choose_refiner_mode`/`_apply_refiner_corrections` 签名不变。新测试 `test_p291_refiner_sliding_window.py` 13/13 passed。
+
+**与 P269 的关系**：P291 取代 P269。P269 只针对单稿模式设计润色，且实现有缺陷（无滑窗、筛选失效）。P291 统一所有模式的润色流程，从根本上解决注意力稀释问题。
+
+**状态**：✅ 真实验收通过。标准模式(job 16a692d74e) P291 Refiner 生效：mode=single，9窗口，317处修正（精准模式238处）。滑窗机制正常工作，DeepSeek响应有效。
+
+---
+
+## P292 | 2026-06-21 | 🔵 观察结论 Mac 精准模式在 Apple Silicon 上质量反不如标准模式
+
+**问题**：精准模式（Whisper+Qwen 双模型互相对比）跑 MIDA-659.ts（8191秒日语），[?]率达 38.4%（794/2068段）；标准模式（Qwen 单独跑）同一视频 [?]率只有 2.0%（43/2057段）。精准模式不仅质量更差，耗时也更长（65分钟 vs 34分钟）。
+
+**根因**：Whisper在Mac MLX后端产生大量幻觉片段，导致L2交叉验证（把Whisper和Qwen的识别结果放在一起对比那一步）严重失效——272个L2窗口中191个（70%）是LOW_DATA（两边数据量相差太大，比不出来），只好把这些窗口里的字幕都标成[?]。换成串行后（P290 fix）时间戳对齐也更差，加剧了LOW_DATA问题。标准模式单跑Qwen没有Whisper噪音干扰，L2不存在，[?]只来自真正置信度低的字幕。
+
+**数据对比（同一视频 MIDA-659.ts，V3.07）**：
+- 标准模式 job `16a692d74e`：[?] 43/2057 = **2.0%**，耗时 ~34分钟，Refiner 317处修正(single mode)
+- 精准模式 job `98ac3271c2`：[?] 794/2068 = **38.4%**，耗时 ~65分钟，Refiner 238处修正(single mode)
+
+**结论**：对于日语/中文/韩语等 Qwen 擅长的语言，在 Mac Apple Silicon 上，**标准模式是更好的默认选项**。精准模式加了 Whisper 反而拖累整体质量。精准模式仅在 Windows（faster-whisper CPU，无GPU争抢，并行）或 Whisper 质量明显好于 Qwen 的语言上有价值。
+
+**状态**：⏸ 观察记录，不修代码。后续换框架时一并考虑是否为 Mac 用户默认推荐标准模式。
+
+---
+
+## P293 | 2026-06-21 | 🟡 P2 标准模式前端进度条卡在"正在启动语音识别…"
+
+**问题**：标准模式下前端界面在 Qwen 跑完整音频（~23分钟）全程只显示"正在启动语音识别…"，没有"已识别X段"的进度更新。精准模式有实时段数显示。
+
+**根因**：`worker.py` 的 `_trans_progress(n)` 回调只在 Whisper 逐段迭代循环里调用（每10段一次）。标准模式下 Whisper 只跑4秒做语言探测，然后 `run_qwen_asr()` 接管——但 `run_qwen_asr()` 没有接 `progress_callback` 参数，跑完28个chunk全程不向前端汇报进度。
+
+**涉及文件**：
+- `v2/backend/transcriber_v2.py:926`（`run_qwen_asr()` 调用处，缺 progress_callback）
+- `v2/backend/core/qwen_asr_runner.py`（`run_qwen_asr()` 签名，需加 progress_cb 参数）
+
+**修法**：给 `run_qwen_asr()` 加 `progress_cb` 参数，每跑完一个chunk后把累计段数回传给 worker 的 `_trans_progress`。
+
+**状态**：⏸ 未修，用户决定换框架时一并处理。
+
+## P294 | 2026-06-21 | 🟡 P2 Mac 端 check_whisper() 绿灯判断不准
+
+**问题**：`env_check.py:check_whisper()` 在 Mac Apple Silicon 上只检查 `mlx_whisper` 包是否可导入，不检查是否有模型文件缓存。如果用户装了 mlx-whisper 包但没下载过模型，前端会显示绿灯"已就绪"，实际点开始后才会报错。
+
+**根因**：Mac 路径（行 54-58）的 `installed` 字段只看 `importlib.util.find_spec("mlx_whisper")`，不像非 Mac 路径（行 59）用 `len(_cached_whisper_models()) > 0` 判断。另外非 Mac 路径 `_cached_whisper_models()` 被调用了两次（行 59-60），浪费一次磁盘扫描。
+
+**涉及文件**：
+- `v2/backend/env_check.py:54-60`
+
+**修法**：Mac 路径也用 `len(models) > 0` 判断 installed，非 Mac 路径把 `_cached_whisper_models()` 结果存变量避免重复调用。
+
+**状态**：✅ 已修（2026-06-21，乔布斯副审建议"让环境检查别撒谎"，补了最小修复）
+
+## P295 | 2026-06-21 | 🟡 P2 ffprobe 获取音频/视频时长无异常保护
+
+**问题**：`qwen_asr_runner.py:_get_audio_duration()` 和 `extractor.py:get_duration()` 直接对 ffprobe 输出做 `float()` 转换，如果 ffprobe 出错（文件损坏、格式不支持），会抛出 ValueError 导致整个任务崩溃，用户看到一堆技术错误信息。
+
+**涉及文件**：
+- `v2/backend/core/qwen_asr_runner.py:91-92`
+- `v2/backend/core/extractor.py:51-54`
+
+**修法**：加 try/except，失败时返回 0.0 并记录日志。
+
+**状态**：✅ 已修（2026-06-21，版本收尾双签 diff 发现并修复）

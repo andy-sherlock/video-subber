@@ -561,12 +561,17 @@ def _assign_by_similarity(qwen_chunks, whisper_windows, window_size, language):
 
 
 def _layer2_cross_validate(segments: list, language: str = "auto",
-                           custom_thresholds: dict = None, qwen_chunks=None):
+                           custom_thresholds: dict = None, qwen_chunks=None,
+                           alt_segments=None):
     """P160/P256: window stem-overlap cross-validation (B+A architecture).
 
     P256: windows align to Qwen sentence boundaries (smart boundaries)
     instead of fixed 30s cuts. Falls back to fixed 30s when no Qwen
     timestamps are available.
+
+    P289: alt_segments — when the routing layer swaps the primary engine
+    (e.g. Qwen primary), pass the secondary engine's raw segments here
+    so L2 compares two different sources instead of the same one.
 
     Returns (annotated_segments, window_stats).
     """
@@ -591,7 +596,7 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
     boundaries = _build_smart_boundaries(qwen_chunks, total_duration_s)
     num_windows = len(boundaries) - 1
 
-    whisper_windows = ["" for _ in range(num_windows)]
+    primary_windows = ["" for _ in range(num_windows)]
 
     def _find_best_window(start, end):
         idx = max(0, bisect_right(boundaries, start) - 1)
@@ -608,15 +613,16 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
                 best = w
         return best
 
-    for seg in segments:
-        if seg.filtered:
+    source_segments = alt_segments if alt_segments else segments
+    for seg in source_segments:
+        if getattr(seg, "filtered", False):
             continue
         win = _find_best_window(seg.start, seg.end)
         if win < num_windows:
-            whisper_windows[win] += " " + seg.text
+            primary_windows[win] += " " + seg.text
 
-    qwen_windows = _assign_qwen_to_windows(
-        qwen_chunks, whisper_windows, WINDOW_SIZE, language,
+    secondary_windows = _assign_qwen_to_windows(
+        qwen_chunks, primary_windows, WINDOW_SIZE, language,
         boundaries=boundaries)
 
     # ── Stem + score each window ──
@@ -624,8 +630,8 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
     _BGM_THRESHOLD = 0.20
     window_stats = {}
     for idx in range(num_windows):
-        w_text = whisper_windows[idx].strip()
-        q_text = qwen_windows[idx].strip()
+        w_text = primary_windows[idx].strip()
+        q_text = secondary_windows[idx].strip()
 
         if not w_text and not q_text:
             window_stats[idx] = {"status": "EMPTY", "score": 1.0,
@@ -722,7 +728,8 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
 
 def filter_hallucinations(segments: list, source_lang: str = "auto",
                           aligner_result=None, qwen_chunks=None,
-                          skip_l1: bool = False, skip_l2: bool = False) -> list:
+                          skip_l1: bool = False, skip_l2: bool = False,
+                          alt_segments=None) -> list:
     """Five-layer hallucination filter. Order: L1→L2→L4→L5→L3.
 
     Args:
@@ -768,7 +775,8 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
         _log.info("L2 跳过: 单主引擎模式无第二份参考稿")
     elif qwen_reliable:
         surviving, _ignore_stats = _layer2_cross_validate(
-            surviving, source_lang, qwen_chunks=qwen_chunks)
+            surviving, source_lang, qwen_chunks=qwen_chunks,
+            alt_segments=alt_segments)
 
     for seg in surviving:
         if not seg.filtered:
