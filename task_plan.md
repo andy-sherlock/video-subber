@@ -1,10 +1,10 @@
-# V3.06 当前状态 + 后续版本计划
+# V3.07 已发布 + 后续版本计划
 
-**版本**：V3.07
-**日期**：2026-06-10
-**Git**：Whisper 换库分支已合入 main（merge commit `c9824bb`，收尾记录 commit 待提交）
-**测试**：重点回归已通过；全量测试受本机 headless/模型环境限制，不能报全量绿灯
-**状态**：V3.07 主问题已收口，FJIN-141 真实重跑验收可接受；8766 当前由 `screen` 会话托管，使用 `v2/.venv`。2026-06-18 已在 `Whisper换库` 分支完成 P266 代码层换库：Mac Apple Silicon 走 `mlx-whisper`，Windows/其他平台继续走 `faster-whisper`；已下载 `mlx-community/whisper-large-v3-mlx` 权重到本机缓存。当前 Codex/headless 环境无 Metal/GPU，真实 MLX 转录需在普通 Mac 前台环境验收。P273 残留接受，不再继续为 JAV 场景干扰项追加修法
+**版本**：V3.07 ✅ 已发布
+**日期**：2026-06-21
+**Git**：tag `v3.07`（commit `5302d9d`），只读快照 `v2/v3.07/`
+**测试**：614 passed, 1 skipped, 0 failed
+**状态**：V3.07 已发布。收尾线 7 步 + 发布线 5 步全部通过。收尾审查修复 P294/P295/代理 URL 安全脱敏。8 项 P1/P2 遗留归入 V3.08。P273 残留接受，不阻塞发布
 
 **补充记录（2026-06-18）**：已新增 `competitor-comparison.md`，完成外部项目对比与 JAV 场景借鉴整理。当前结论：先做人声地图、短词并段、低分段返修，不新增本地 ASR，不立刻走模型微调。
 
@@ -231,12 +231,12 @@
 
 | 状态 | 事项 | 说明 |
 |------|------|------|
-| ⬜ | v2/ → v3/ 重命名 | 活跃代码目录从 `v2/` 改为 `v3/` |
-| ⬜ | 快照移出 | v2.01~v2.12、v3.01~v3.06 快照移到与 `v3/` 同级 |
-| ⬜ | P271+P282 清理旧目录和环境 | 删除 `v3.02-v3.05/test/` 旧快照测试目录（pytest 撞名）、`v2/v2/` 嵌套目录、多余 `.venv`、临时数据库、`.hex-skills` 等历史文件。搬家时统一处理 |
-| ⬜ | 路径引用更新 | CLAUDE.md、pyproject.toml、所有 import 路径、测试脚本 |
-| ⬜ | 测试确认零退化 | 搬家后跑全量测试，确认 419 全过 |
-| ⬜ | Git commit | 单独一个 commit，消息 "P132: 目录整理 v2/→v3/" |
+| ✅ | v2/ → v3/ 重命名 | 2026-06-21 完成 |
+| ✅ | 快照移出 | v2.10~v3.07 全部移到 `snapshots/` 目录 |
+| ✅ | P271+P282 清理旧目录和环境 | 已清理：根目录 .venv(1.7G)、v3.05/.venv(1.2G)、.git.*、.hex-skills×2、egg-info×2、v2/v2 嵌套、快照 test 目录。垃圾暂存 `_trash/`(2.9G) |
+| ✅ | 路径引用更新 | CLAUDE.md、.gitignore、run-test.sh 已更新。代码内部无硬编码 v2/ 路径 |
+| ✅ | 测试确认零退化 | 614 passed, 1 skipped, 0 failed（与 V3.07 发布时一致） |
+| ⬜ | Git commit | 单独一个 commit，消息 "V3.08: 目录整理 v2/→v3/" |
 
 **为什么拆出来**：搬家有风险。不和 V3.07 的 bug 修混在一起。V3.07 全部修完 commit 之后再搬家。搬家坏了——回滚 V3.08 即可，V3.07 不受影响。
 
@@ -246,12 +246,12 @@
 
 | # | 文件 | 函数 | 复杂度 | 状态 |
 |---|------|------|--------|------|
-| 1 | [transcriber_v2.py](v2/backend/transcriber_v2.py) | `transcribe` | 41 🔴 | ⬜ |
-| 2 | [sensevoice_runner.py](v2/backend/core/sensevoice_runner.py) | `run_sensevoice` | 22 | ⬜ |
-| 3 | [hallucination_filter.py](v2/backend/core/hallucination_filter.py) | `_layer2_cross_validate` | 19 | ⬜ |
-| 4 | [qwen_asr_runner.py](v2/backend/core/qwen_asr_runner.py) | `run_qwen_asr` | 19 | ⬜ |
-| 5 | [orchestrator.py](v2/backend/translation/orchestrator.py) | `translate_with_orchestrator` | 17 | ⬜ |
-| 6 | [subtitle_style.py](v2/backend/subtitle_style.py) | `build_ass_styled` | 16 | ⬜ |
+| 1 | [transcriber_v2.py](v3/backend/transcriber_v2.py) | `transcribe` | 41 🔴 | ⬜ |
+| 2 | [sensevoice_runner.py](v3/backend/core/sensevoice_runner.py) | `run_sensevoice` | 22 | ⬜ |
+| 3 | [hallucination_filter.py](v3/backend/core/hallucination_filter.py) | `_layer2_cross_validate` | 19 | ⬜ |
+| 4 | [qwen_asr_runner.py](v3/backend/core/qwen_asr_runner.py) | `run_qwen_asr` | 19 | ⬜ |
+| 5 | [orchestrator.py](v3/backend/translation/orchestrator.py) | `translate_with_orchestrator` | 17 | ⬜ |
+| 6 | [subtitle_style.py](v3/backend/subtitle_style.py) | `build_ass_styled` | 16 | ⬜ |
 
 **V3.07 双签 diff 遗留项（2026-06-21 版本收尾审查发现，归入 V3.08 一起做）**：
 

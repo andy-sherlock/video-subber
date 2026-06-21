@@ -1,7 +1,59 @@
-# V3.06 进度日志
+# V3.08 进度日志
 
 **日期**：2026-06-21
-**版本**：V3.07 全部验收完成，准备发布
+**版本**：V3.08（搬家完成，复杂度拆分待做）
+
+## 2026-06-21 V3.08 搬家 + 清理
+
+### 完成事项
+
+| 事项 | 状态 | 说明 |
+|------|------|------|
+| 停后端服务 | ✅ | PID 60923 端口 8766，停掉后搬家 |
+| v2/ → v3/ 重命名 | ✅ | 活跃代码目录从 `v2/` 改为 `v3/` |
+| 快照移出 | ✅ | v2.10~v3.07 共 10 个快照移到 `snapshots/` |
+| v2/v2 嵌套目录 | ✅ | v3.06 快照先救出，v2/v2 删除 |
+| 根目录 .venv 清理 | ✅ | 1.7G V1 遗留虚拟环境 → _trash |
+| v3.05/.venv 清理 | ✅ | 1.2G 快照虚拟环境 → _trash |
+| .git.* 垃圾清理 | ✅ | .git.broken/.git.old/.git.trash/.git.trash2 → _trash |
+| .hex-skills 清理 | ✅ | 根目录(20M) + v3/(19M) → _trash |
+| egg-info 清理 | ✅ | video_subber.egg-info + video_subber_web.egg-info → _trash |
+| 快照 test 目录清理 | ✅ | v3.02~v3.05 的 test/ 目录 → _trash（P271 pytest 撞名修复） |
+| .superpowers/.pytest_cache 清理 | ✅ | → _trash |
+| CLAUDE.md 更新 | ✅ | v2/ → v3/，快照说明更新 |
+| .gitignore 更新 | ✅ | 删除已不存在的 .git.* 条目，新增 _trash/ snapshots/ |
+| run-test.sh 注释更新 | ✅ | v2/.venv → v3/.venv |
+| 全量测试 | ✅ | 614 passed, 1 skipped, 0 failed（零退化） |
+| 后端服务重启 | ✅ | PID 78466 在 v3/ 下监听 127.0.0.1:8766 |
+
+### 清理统计
+
+- 垃圾暂存 `_trash/`：13 项，共 2.9G
+- 活跃虚拟环境：仅保留 `v3/.venv`（1.5G）
+- 快照统一目录：`snapshots/`（10 个版本）
+
+---
+
+## 2026-06-21 V3.07 发布
+
+### 版本收尾线（7 步全部通过）
+- ① 双签 diff ✅ — 发现并修复 P294（Mac check_whisper 误报绿灯）、P295（ffprobe ×2 缺异常保护）、代理 URL 日志泄漏密码
+- ② 设计一致性走查 ✅ — 4 处代码比设计图多（VAD/SV语言推断/人声地图/短字幕合并），均合理，归入 V3.08 更新设计图
+- ③ 安全审查 ✅ — 代理 URL 已脱敏，XSS 延至框架切换，Refiner 双模式均有注入保护
+- ④ 架构分析 ✅ — 无循环依赖，transcribe() 复杂度 41 归入 V3.08 拆分
+- ⑤ 全量测试 ✅ — 614 passed, 1 skipped, 0 failed
+- ⑥ QA ⏭ 跳过（CLI 项目）
+- ⑦ 端到端 ✅ — 12 项真实视频验收已通过
+
+### 发布线
+- ① verification ✅ — 614 passed, 0 failed
+- ② 版本号 ✅ — pyproject.toml version="3.07"（已是正确版本）
+- ③ git commit + tag ✅ — `5302d9d` + tag `v3.07`
+- ④ 只读快照 ✅ — `v2/v3.07/`（22MB，chmod a-w）
+- ⑤ 进度文件更新 ✅
+
+### P1/P2 遗留项（8 项归入 V3.08）
+详见 task_plan.md V3.08 章节第 256-267 行
 
 ## 2026-06-21 真实验收全部通过
 
