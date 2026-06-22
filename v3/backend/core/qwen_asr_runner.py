@@ -23,15 +23,18 @@ _AUDIO_PAD_S = 5.0                # pronunciation buffer on each side
 
 _USE_MLX = False
 _USE_PYTORCH = False
+# Imports can raise beyond ImportError (mlx raises RuntimeError with no Metal
+# device); catch broadly so a missing/unusable backend can't crash module import
+# and break test collection — just fall through to the other backend.
 try:
     from mlx_qwen3_asr import load_model as _mlx_load_model, transcribe as _mlx_transcribe  # noqa: F401
     _USE_MLX = True
-except ImportError:
+except Exception:
     pass
 try:
     from qwen_asr import Qwen3ASRModel  # noqa: F401
     _USE_PYTORCH = True
-except ImportError:
+except Exception:
     pass
 
 

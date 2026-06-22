@@ -6452,3 +6452,22 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 **教训**：单机 /review 看不见跨环境失败路径——我在有 Metal 的 Mac 上跑，check_qwen_asr 一路绿，这条失败路径在我机器上根本不可见，/review 判 clean 漏了它。第二双眼睛、换个环境才抓出来，印证了"先让工程师审、再放大到 worker.main"的排序。
 
 **状态**：✅ 已修（2026-06-22，外部工程师审查发现 + 修复）
+
+## P299 | 2026-06-22 | V3.08 跨环境可测 | qwen_asr_runner 顶层 MLX 导入只接 ImportError，无 Metal 环境打断测试收集
+
+**问题**：无 Metal 环境（Linux CI / Intel Mac / Windows）跑全量测试，pytest 收集到 `test_p182_tail_flush.py` 时被 `RuntimeError: No Metal device available` 打断，整套测试跑不完。外部工程师复验 P298 修复时发现（P298 修好了 `env_check` 这条链，这是同类的第二处）。
+
+**原因**：`qwen_asr_runner.py:26` 的**模块级** `try` 块 `from mlx_qwen3_asr import load_model ...` 只 `except ImportError`。无 Metal 设备时这个 import 抛 **RuntimeError**（非 ImportError）→ 没被接住 → 模块在 import 时就崩。凡是直接/间接 import 该 runner 的测试，在收集阶段就挂。与 P298 同一类（MLX 导入只接 ImportError），区别是这处在模块顶层而非函数内，影响面是「整个模块无法 import」。
+
+**涉及文件**：
+- `v3/backend/core/qwen_asr_runner.py:24-37`（模块级 _USE_MLX/_USE_PYTORCH 探测块）
+
+**修法**：两个 `except ImportError` → `except Exception`。MLX 导入失败（含无 Metal 的 RuntimeError）→ `_USE_MLX=False` → 落 PyTorch 兜底；两个都失败 → `is_qwen_asr_available()` 返回 False。Metal 机器上 MLX 导入成功、走原路，零行为变更。
+
+**核实范围**：扫全 backend 的 MLX 导入——模块级 MLX 顶层导入**仅此一处**；`whisper_runner.py` 的 8 处 mlx 导入全在函数体内（懒加载，import 模块时不触发，收集安全）；`env_check.py:125` 已由 P298 修。所以修这一处 = 补完整 MLX-import-time 漏洞。
+
+**测试**：TDD 先红后绿。`test_p299_qwen_runner_import.py`（mock mlx 抛 RuntimeError → reload 模块不崩、_USE_MLX=False，finally 还原状态）。**全量 624 passed**。本机（有 Metal）正常路径不变。
+
+**未尽**：本机有 Metal，无法本机复验"无 Metal 收集能过 qwen_asr_runner"；待工程师在无 Metal 环境复跑确认是否还有非 MLX 的后续拦截点。
+
+**状态**：✅ 已修（2026-06-22，外部工程师审查发现 + 修复；无 Metal 环境复验待工程师）

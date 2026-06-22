@@ -15,6 +15,12 @@
 - TDD：`TestCheckAllResilience` 2 测试先红后绿。**全量 623 passed**。真活：本机 qwen_asr 仍 `{ready:True,backend:mlx}`，正常路径不变。
 - **教训**：单机 /review 看不见跨环境失败路径——我在有 Metal 的 Mac 上判 clean，漏了这条。第二双眼睛/换环境才抓出，印证"先工程师审、再放大 worker.main"的排序。
 
+### P299：qwen_asr_runner 顶层 MLX 导入只接 ImportError（工程师复验 P298 时连带发现）
+- 工程师复验：`1896f13` 修好 P298 ✅；启动日志完整打出（他无 Metal 环境 qwen_asr 走 PyTorch 显示可用）；新增测试 8 passed。但全量测试仍跑不完——卡点已不是 check_all，而是 `qwen_asr_runner.py:26` 的**模块级** MLX 导入只接 ImportError，无 Metal 抛 RuntimeError → 模块 import 崩 → 收集到 test_p182 时断。
+- 修法：模块级两个 `except ImportError` → `except Exception`，落 PyTorch 兜底。**扫全 backend 确认模块级 MLX 顶层导入仅此一处**（whisper_runner 的 8 处全在函数体内懒加载、安全；env_check 已 P298 修），所以补完整。
+- TDD：`test_p299_qwen_runner_import.py`（mock mlx 抛 RuntimeError → reload 不崩、_USE_MLX=False）。**全量 624 passed**，本机正常路径不变。
+- 待工程师在无 Metal 环境复跑确认是否还有非 MLX 后续拦截点。
+
 ---
 
 ## 2026-06-22 V3.08：启动健康检查（后端）+ B路 P207 复核
