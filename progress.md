@@ -3,6 +3,27 @@
 **日期**：2026-06-21
 **版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
 
+## 2026-06-22 V3.08：启动健康检查（后端）+ B路 P207 复核
+
+### B路：核实「除法兜底静默造假时间戳」是否删净（乔布斯建议先焊船底）
+- 读 `backend/core/qwen_aligner.py` 全文 + `problems.md` P207 记录。
+- **结论：焊死了**。`align()` 走官方 `Qwen3ForcedAligner.align()`，失败 `raise`（不再静默），除法兜底 `duration/len(words)` 代码已整段删除，每词打 `_quality:"official"` 标签。
+- 行为验证：`test_p207_fa_official_api.py` + `test_p201_qwen_aligner_check.py` **11 passed**（真音频）。
+- P207 真根因（静默假数据）在**代码层**消除，非仅文档。残留 P212（真人声精度验证）属测试质量项，与假数据漏洞无关，另行跟踪。
+
+### 启动健康检查（决策：只补后端，可见面板留 V3.09 PyWebView）
+- 乔布斯视角分析（用户要求）：B 真活自检（开机喂音频跑模型）= 砍。交叉验证抓不到 P207（它比文字、烂的是时间戳），且每次开机跑模型太慢。启动只做 A 轻量静态检查。
+- **发现 A 后端早已存在**：`env_check.py:check_all()` 查 6 类依赖/模型，挂 `/api/env`。缺口：前端没调（红绿灯没亮）、缺 yt-dlp 检查、无开机摘要。
+- **本次补强（TDD：先红 5 failed → 实现 → 绿）**：
+  - `env_check.py`：加 `check_ytdlp()`（包 `is_ytdlp_available`）塞进 `check_all()`；加纯函数 `health_summary_line()`（一行 ✅/❌ 摘要）+ `missing_checks()`（列未就绪项）。
+  - `main.py`：`@app.on_event("startup")` 开头调 `check_all()` 打健康摘要日志，未就绪项额外 warning。
+  - 新测试 `test/test_health_check_startup.py`（6 测试）。
+- 真活输出（本机）：`✅ ffmpeg ✅ whisper ✅ resemblyzer ✅ sensevoice ✅ qwen_asr ✅ qwen_aligner ✅ ytdlp`，未就绪：无。
+- 验证：**全量 621 passed, 0 failed**（615+6）。
+- **未做（刻意）**：临时前端的可见红绿灯面板——前端 V3.09 换 PyWebView，留到那时做，不在要拆的墙上贴瓷砖。
+
+---
+
 ## 2026-06-22 V3.08：拆分 ④ translate_with_orchestrator F61→B7 + ⑤ 核实不拆
 
 **管道文件**：`pipelines/refactor-pipeline-2026-06-22-remaining5.md`（④⑤ 节 + 末尾「待拆名单」）

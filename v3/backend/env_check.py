@@ -137,6 +137,18 @@ def check_qwen_aligner() -> dict:
         return {"ready": False}
 
 
+def check_ytdlp() -> dict:
+    """Check if yt-dlp is installed (for online video download).
+
+    P174: a missing yt-dlp used to surface as a misleading OOM error.
+    """
+    try:
+        from backend.core.video_downloader import is_ytdlp_available
+        return {"ready": is_ytdlp_available()}
+    except ImportError:
+        return {"ready": False}
+
+
 def check_all() -> dict:
     return {
         "ffmpeg": check_ffmpeg(),
@@ -145,4 +157,23 @@ def check_all() -> dict:
         "sensevoice": check_sensevoice(),
         "qwen_asr": check_qwen_asr(),
         "qwen_aligner": check_qwen_aligner(),
+        "ytdlp": check_ytdlp(),
     }
+
+
+def _entry_ok(d: dict) -> bool:
+    """A check entry is ready if it reports ready=True or installed=True."""
+    return bool(d.get("ready", d.get("installed", False)))
+
+
+def health_summary_line(status: dict) -> str:
+    """One-line ✅/❌ summary of check_all() output, for startup logging."""
+    return "  ".join(
+        f"{'✅' if _entry_ok(d) else '❌'} {name}"
+        for name, d in status.items()
+    )
+
+
+def missing_checks(status: dict) -> list:
+    """Names of checks that are not ready, for startup warnings."""
+    return [name for name, d in status.items() if not _entry_ok(d)]

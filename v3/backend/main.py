@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .env_check import check_all, preload_resemblyzer
+from .env_check import check_all, preload_resemblyzer, health_summary_line, missing_checks
 from .ws_manager import ws_manager
 from .worker_manager import worker_manager
 
@@ -197,6 +197,16 @@ def _fetch_remote_models():
 
 @app.on_event("startup")
 async def startup():
+    # ── 启动健康检查：依赖/模型 ✅/❌ 一行摘要（P174：暴露缺失的 yt-dlp 等）──
+    try:
+        _health = check_all()
+        _log.warning("启动健康检查: %s", health_summary_line(_health))
+        _missing = missing_checks(_health)
+        if _missing:
+            _log.warning("启动健康检查: 以下未就绪 → %s", ", ".join(_missing))
+    except Exception as _e:
+        _log.warning("启动健康检查执行失败: %s", _e)
+
     import threading
     threading.Thread(target=_fetch_remote_models, daemon=True).start()
 
