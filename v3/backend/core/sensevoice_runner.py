@@ -140,6 +140,80 @@ def _run_sensevoice_chunked(audio_path: str, device: str,
 # Public API
 # ═══════════════════════════════════════════════════════════════════
 
+def _load_sensevoice_model(device: str):
+    """加载 SenseVoice 模型；import 失败或加载失败返回 None。"""
+    try:
+        from funasr import AutoModel
+    except ImportError:
+        _log.warning("SenseVoice 未安装 (funasr import failed)")
+        return None
+
+    _log.info("加载 SenseVoice 模型 (device=%s) ...", device)
+    t0 = time.time()
+    try:
+        model = AutoModel(
+            model="iic/SenseVoiceSmall",
+            trust_remote_code=True,
+            device=device,
+            disable_pbar=True,     # P238: 关闭 tqdm 进度条，避免 stderr BrokenPipe
+        )
+    except Exception:
+        _log.warning("SenseVoice 模型加载失败", exc_info=True)
+        return None
+
+    load_time = time.time() - t0
+    _log.info("SenseVoice 模型加载完成 (%.1fs)", load_time)
+    return model
+
+
+def _sensevoice_generate(model, audio_path: str):
+    """SenseVoice 推理；失败返回 None，成功返回原始 res。"""
+    t1 = time.time()
+    try:
+        res = model.generate(
+            input=audio_path,
+            cache={},
+            language="auto",
+            use_itn=True,
+            batch_size_s=60,
+            sentence_timestamp=True,
+        )
+    except Exception:
+        _log.warning("SenseVoice generate() 失败", exc_info=True)
+        return None
+
+    proc_time = time.time() - t1
+    n_items = len(res) if res else 0
+    _log.info("SenseVoice 处理完成 (%.1fs), %d 个片段", proc_time, n_items)
+    return res
+
+
+def _parse_sensevoice_results(res) -> list[dict]:
+    """把 SenseVoice 原始 res 解析为 event dict 列表，并打印标签分布。"""
+    events = []
+    for item in res:
+        raw_text = item.get("text", "")
+        parsed = extract_tags(raw_text)
+        timestamp = item.get("timestamp") or []
+        start_s = timestamp[0][0] / 1000.0 if timestamp else 0.0
+        end_s = timestamp[-1][1] / 1000.0 if timestamp else 0.0
+
+        events.append({
+            "text": parsed["clean_text"],
+            "tags": parsed,
+            "start_s": start_s,
+            "end_s": end_s,
+            "event": parsed["event"],
+        })
+
+    tag_counts = {}
+    for ev in events:
+        tag_counts[ev["event"]] = tag_counts.get(ev["event"], 0) + 1
+    _log.info("SenseVoice 标签分布: %s", tag_counts)
+
+    return events
+
+
 def run_sensevoice(audio_path: str, device: str = "cpu",
                    segments: list = None) -> list[dict] | None:
     """Run SenseVoice on audio and return raw sound-event segments.
@@ -164,78 +238,24 @@ def run_sensevoice(audio_path: str, device: str = "cpu",
                       total_duration)
             return _run_sensevoice_chunked(audio_path, device, segments)
 
-    # ── Direct path (original behaviour) ──
-    try:
-        from funasr import AutoModel
-    except ImportError:
-        _log.warning("SenseVoice 未安装 (funasr import failed)")
+    # ── Direct path ──
+    model = _load_sensevoice_model(device)
+    if model is None:
         return None
 
-    _log.info("加载 SenseVoice 模型 (device=%s) ...", device)
-    t0 = time.time()
-    try:
-        model = AutoModel(
-            model="iic/SenseVoiceSmall",
-            trust_remote_code=True,
-            device=device,
-            disable_pbar=True,     # P238: 关闭 tqdm 进度条，避免 stderr BrokenPipe
-        )
-    except Exception:
-        _log.warning("SenseVoice 模型加载失败", exc_info=True)
-        return None
-
-    load_time = time.time() - t0
-    _log.info("SenseVoice 模型加载完成 (%.1fs)", load_time)
-
-    t1 = time.time()
-    try:
-        res = model.generate(
-            input=audio_path,
-            cache={},
-            language="auto",
-            use_itn=True,
-            batch_size_s=60,
-            sentence_timestamp=True,
-        )
-    except Exception:
-        _log.warning("SenseVoice generate() 失败", exc_info=True)
-        del model
-        gc.collect()
-        return None
-
-    proc_time = time.time() - t1
-    n_items = len(res) if res else 0
-    _log.info("SenseVoice 处理完成 (%.1fs), %d 个片段", proc_time, n_items)
+    res = _sensevoice_generate(model, audio_path)
 
     del model
     gc.collect()
+    # 注：generate 失败（res is None）保持原行为——不打印"已释放"日志，直接返回 None。
+    if res is None:
+        return None
     _log.info("SenseVoice 模型已释放")
 
     if not res:
         return []
 
-    events = []
-    for item in res:
-        raw_text = item.get("text", "")
-        parsed = extract_tags(raw_text)
-        timestamp = item.get("timestamp") or []
-        start_s = timestamp[0][0] / 1000.0 if timestamp else 0.0
-        end_s = timestamp[-1][1] / 1000.0 if timestamp else 0.0
-
-        events.append({
-            "text": parsed["clean_text"],
-            "tags": parsed,
-            "start_s": start_s,
-            "end_s": end_s,
-            "event": parsed["event"],
-        })
-
-    tag_counts = {}
-    for ev in events:
-        tag_counts[ev["event"]] = tag_counts.get(ev["event"], 0) + 1
-    _log.info("SenseVoice 标签分布: %s", tag_counts)
-
-    return events
+    return _parse_sensevoice_results(res)
 
 
 def trim_segments_by_sensevoice(segments: list, sv_events: list[dict]) -> list:

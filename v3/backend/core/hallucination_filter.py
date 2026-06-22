@@ -560,6 +560,72 @@ def _assign_by_similarity(qwen_chunks, whisper_windows, window_size, language):
     return qwen_windows
 
 
+def _l2_find_best_window(start, end, boundaries, num_windows):
+    """P256：给定段 [start,end]，返回重叠最大的窗口下标。"""
+    idx = max(0, bisect_right(boundaries, start) - 1)
+    best = min(idx, num_windows - 1)
+    max_overlap = 0
+    lo = max(0, bisect_right(boundaries, start) - 1)
+    hi = min(num_windows - 1, bisect_right(boundaries, end) - 1)
+    for w in range(lo, hi + 1):
+        ws = boundaries[w]
+        we = boundaries[w + 1]
+        overlap = min(end, we) - max(start, ws)
+        if overlap > max_overlap:
+            max_overlap = overlap
+            best = w
+    return best
+
+
+def _score_l2_window(w_text, q_text, language, win_has_bgm,
+                     current_threshold, min_stems):
+    """对单窗口的主/次稿做词干重叠打分，返回 window_stats 条目。"""
+    _BGM_THRESHOLD = 0.20
+    if not w_text and not q_text:
+        return {"status": "EMPTY", "score": 1.0,
+                "w_count": 0, "q_count": 0, "shared": 0}
+
+    if not q_text:
+        return {"status": "NO_QWEN", "score": 1.0,
+                "w_count": 0, "q_count": 0, "shared": 0}
+
+    w_stems = LightweightStemmer.clean_and_stem(w_text, language)
+    q_stems = LightweightStemmer.clean_and_stem(q_text, language)
+
+    shared = w_stems & q_stems
+    score = len(shared) / max(len(w_stems), len(q_stems)) if (w_stems or q_stems) else 0.0
+
+    effective_threshold = _BGM_THRESHOLD if win_has_bgm else current_threshold
+
+    ws_entry = {"score": score, "w_count": len(w_stems),
+                "q_count": len(q_stems), "shared": len(shared),
+                "bgm": win_has_bgm}
+
+    if len(w_stems) < min_stems:
+        ws_entry["status"] = "LOW_DATA"
+    elif score >= effective_threshold:
+        ws_entry["status"] = "GREEN"
+    else:
+        ws_entry["status"] = "YELLOW"
+
+    return ws_entry
+
+
+def _annotate_l2_segments(segments, window_stats, boundaries, num_windows):
+    """把每个存活段标注 l2_status；YELLOW/LOW_DATA 置 uncertain。"""
+    for seg in segments:
+        if seg.filtered:
+            continue
+        win = _l2_find_best_window(seg.start, seg.end, boundaries, num_windows)
+        ws = window_stats.get(win)
+        if ws:
+            seg.l2_status = ws["status"]
+            if ws["status"] in ("YELLOW", "LOW_DATA"):
+                seg.uncertain = True
+        else:
+            seg.l2_status = "NO_DATA"
+
+
 def _layer2_cross_validate(segments: list, language: str = "auto",
                            custom_thresholds: dict = None, qwen_chunks=None,
                            alt_segments=None):
@@ -597,27 +663,11 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
     num_windows = len(boundaries) - 1
 
     primary_windows = ["" for _ in range(num_windows)]
-
-    def _find_best_window(start, end):
-        idx = max(0, bisect_right(boundaries, start) - 1)
-        best = min(idx, num_windows - 1)
-        max_overlap = 0
-        lo = max(0, bisect_right(boundaries, start) - 1)
-        hi = min(num_windows - 1, bisect_right(boundaries, end) - 1)
-        for w in range(lo, hi + 1):
-            ws = boundaries[w]
-            we = boundaries[w + 1]
-            overlap = min(end, we) - max(start, ws)
-            if overlap > max_overlap:
-                max_overlap = overlap
-                best = w
-        return best
-
     source_segments = alt_segments if alt_segments else segments
     for seg in source_segments:
         if getattr(seg, "filtered", False):
             continue
-        win = _find_best_window(seg.start, seg.end)
+        win = _l2_find_best_window(seg.start, seg.end, boundaries, num_windows)
         if win < num_windows:
             primary_windows[win] += " " + seg.text
 
@@ -627,47 +677,18 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
 
     # ── Stem + score each window ──
     MIN_STEMS = 5
-    _BGM_THRESHOLD = 0.20
     window_stats = {}
     for idx in range(num_windows):
         w_text = primary_windows[idx].strip()
         q_text = secondary_windows[idx].strip()
-
-        if not w_text and not q_text:
-            window_stats[idx] = {"status": "EMPTY", "score": 1.0,
-                                 "w_count": 0, "q_count": 0, "shared": 0}
-            continue
-
-        if not q_text:
-            window_stats[idx] = {"status": "NO_QWEN", "score": 1.0,
-                                 "w_count": 0, "q_count": 0, "shared": 0}
-            continue
-
-        w_stems = LightweightStemmer.clean_and_stem(w_text, language)
-        q_stems = LightweightStemmer.clean_and_stem(q_text, language)
-
-        shared = w_stems & q_stems
-        score = len(shared) / max(len(w_stems), len(q_stems)) if (w_stems or q_stems) else 0.0
-
         win_has_bgm = any(
             getattr(seg, "bgm_override", False)
             for seg in segments
-            if not seg.filtered and _find_best_window(seg.start, seg.end) == idx
+            if not seg.filtered and _l2_find_best_window(
+                seg.start, seg.end, boundaries, num_windows) == idx
         )
-        effective_threshold = _BGM_THRESHOLD if win_has_bgm else current_threshold
-
-        ws_entry = {"score": score, "w_count": len(w_stems),
-                    "q_count": len(q_stems), "shared": len(shared),
-                    "bgm": win_has_bgm}
-
-        if len(w_stems) < MIN_STEMS:
-            ws_entry["status"] = "LOW_DATA"
-        elif score >= effective_threshold:
-            ws_entry["status"] = "GREEN"
-        else:
-            ws_entry["status"] = "YELLOW"
-
-        window_stats[idx] = ws_entry
+        window_stats[idx] = _score_l2_window(
+            w_text, q_text, language, win_has_bgm, current_threshold, MIN_STEMS)
 
     # ── P149 calibration diagnostics ──
     for idx in sorted(window_stats):
@@ -679,17 +700,7 @@ def _layer2_cross_validate(segments: list, language: str = "auto",
                    ws["shared"], ws["score"], ws["status"])
 
     # ── Annotate surviving segments with l2_status ──
-    for seg in segments:
-        if seg.filtered:
-            continue
-        win = _find_best_window(seg.start, seg.end)
-        ws = window_stats.get(win)
-        if ws:
-            seg.l2_status = ws["status"]
-            if ws["status"] in ("YELLOW", "LOW_DATA"):
-                seg.uncertain = True
-        else:
-            seg.l2_status = "NO_DATA"
+    _annotate_l2_segments(segments, window_stats, boundaries, num_windows)
 
     _log.info("L2 窗口比对完成: %d 窗口 (P256 智能边界), 阈值=%.2f, 最低词干=%d, %s",
               num_windows, current_threshold, MIN_STEMS,

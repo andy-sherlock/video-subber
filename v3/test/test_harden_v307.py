@@ -28,12 +28,20 @@ def _make_seg(id=0, start=0.0, end=1.0, text="hello"):
 
 class TestP170EmptyListGuard(unittest.TestCase):
 
-    def test_function_has_empty_list_check(self):
-        """run_qwen_asr must guard against empty segments."""
-        import inspect
-        from backend.core.qwen_asr_runner import run_qwen_asr
-        src = inspect.getsource(run_qwen_asr)
-        self.assertIn("if not segments", src)
+    def test_empty_segments_returns_empty(self):
+        """run_qwen_asr must return [] for empty segments (P170 guard).
+
+        行为测试（取代旧的源码文本检查）：空 segments 守卫如今在
+        _resolve_qwen_duration 里，此处直接验证行为而非源码长相，
+        重构挪动守卫位置不会再误伤本测试。mock is_qwen_asr_available
+        以越过「Qwen 未安装」的可用性早返回，确保走到空 segments 分支。
+        """
+        from unittest.mock import patch
+        from backend.core import qwen_asr_runner
+        with patch.object(qwen_asr_runner, "is_qwen_asr_available",
+                          return_value=True):
+            result = qwen_asr_runner.run_qwen_asr("dummy.wav", segments=[])
+        self.assertEqual(result, [])
 
 
 # ═══════════════════════════════════════════════════════════

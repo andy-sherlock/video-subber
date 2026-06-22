@@ -362,50 +362,22 @@ def _run_qwen_asr_chunked(audio_path: str, total_duration: float,
 
 # ── Public entry point ──
 
-def run_qwen_asr(audio_path: str, segments: list = None, language=None,
-                  cache_dir: str = None) -> list:
-    """Return Qwen-ASR output as a list of {text, segments, t_start, t_end}.
-
-    MLX backend: segments contain word-level timestamps [{text, start, end}].
-    PyTorch backend: segments is [].
-    Returns [] when Qwen is unavailable or produced nothing.
-
-    When segments is None, Qwen runs independently — gets audio duration via
-    ffprobe and chunks by fixed time intervals if needed.
-
-    cache_dir: path to the job's versioned cache directory. When provided,
-    long-audio chunked mode saves per-chunk progress so a crashed run can
-    resume from the last completed chunk.
-    """
-    if not is_qwen_asr_available():
-        _log.warning("Qwen3-ASR 未安装，跳过交叉验证")
-        return []
-
+def _resolve_qwen_duration(audio_path: str, segments: list):
+    """拿到总时长：segments 模式取末段 end；独立模式 ffprobe。
+    空 segments 或 ffprobe 失败返回 None（主函数据此返回 []）。"""
     if segments is not None:
         if not segments:
-            return []
-        total_duration = segments[-1].end
-    else:
-        try:
-            total_duration = _get_audio_duration(audio_path)
-        except Exception:
-            _log.warning("无法获取音频时长，跳过 Qwen 交叉验证")
-            return []
-
-    if total_duration > _LONG_AUDIO_THRESHOLD_S:
-        _log.info("音频 %.0fs > 20min，启用 Qwen 分段对齐", total_duration)
-        return _run_qwen_asr_chunked(audio_path, total_duration,
-                                     segments=segments, language=language,
-                                     cache_dir=cache_dir)
-
-    t0 = time.time()
+            return None
+        return segments[-1].end
     try:
-        model = _load_qwen_model()
+        return _get_audio_duration(audio_path)
     except Exception:
-        _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证", exc_info=True)
-        return []
-    _log.info("Qwen3-ASR 模型加载耗时 %.1fs", time.time() - t0)
+        _log.warning("无法获取音频时长，跳过 Qwen 交叉验证")
+        return None
 
+
+def _qwen_transcribe(model, audio_path: str, language):
+    """MLX/PyTorch 两后端转录；失败返回 None，成功返回 (full_text, ts_segments)。"""
     t1 = time.time()
     try:
         if _USE_MLX:
@@ -432,14 +404,55 @@ def run_qwen_asr(audio_path: str, segments: list = None, language=None,
             ts_segments = []
     except Exception:
         _log.warning("Qwen3-ASR 转录失败，跳过交叉验证")
-        del model
-        gc.collect()
-        return []
+        return None
     _log.info("Qwen3-ASR 转录耗时 %.1fs, language=%s, %d segments",
               time.time() - t1, detected_lang or "unknown", len(ts_segments))
+    return full_text, ts_segments
 
+
+def run_qwen_asr(audio_path: str, segments: list = None, language=None,
+                  cache_dir: str = None) -> list:
+    """Return Qwen-ASR output as a list of {text, segments, t_start, t_end}.
+
+    MLX backend: segments contain word-level timestamps [{text, start, end}].
+    PyTorch backend: segments is [].
+    Returns [] when Qwen is unavailable or produced nothing.
+
+    When segments is None, Qwen runs independently — gets audio duration via
+    ffprobe and chunks by fixed time intervals if needed.
+
+    cache_dir: path to the job's versioned cache directory. When provided,
+    long-audio chunked mode saves per-chunk progress so a crashed run can
+    resume from the last completed chunk.
+    """
+    if not is_qwen_asr_available():
+        _log.warning("Qwen3-ASR 未安装，跳过交叉验证")
+        return []
+
+    total_duration = _resolve_qwen_duration(audio_path, segments)
+    if total_duration is None:
+        return []
+
+    if total_duration > _LONG_AUDIO_THRESHOLD_S:
+        _log.info("音频 %.0fs > 20min，启用 Qwen 分段对齐", total_duration)
+        return _run_qwen_asr_chunked(audio_path, total_duration,
+                                     segments=segments, language=language,
+                                     cache_dir=cache_dir)
+
+    t0 = time.time()
+    try:
+        model = _load_qwen_model()
+    except Exception:
+        _log.warning("Qwen3-ASR 模型加载失败，跳过交叉验证", exc_info=True)
+        return []
+    _log.info("Qwen3-ASR 模型加载耗时 %.1fs", time.time() - t0)
+
+    out = _qwen_transcribe(model, audio_path, language)
     del model
     gc.collect()
+    if out is None:
+        return []
+    full_text, ts_segments = out
 
     if not full_text or not full_text.strip():
         return []
