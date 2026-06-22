@@ -6432,3 +6432,23 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 **修法**：把 `.gitignore:14` 的 `test/` 改成 `/test/`（前导斜杠锚定到仓库根，只忽略根目录的旧 `test/`，不再误伤 `v3/test/`）。`git check-ignore -v v3/test/test_p266_mlx_whisper.py` 确认 v3/test 不再被忽略；`git add v3/test/` 把 65 个测试文件首次纳入版本控制。根 `test/`（旧测试视频）仍被忽略。
 
 **状态**：✅ 已修（2026-06-22，V3.08 HARDEN 阶段。`test/`→`/test/`；65 个测试文件首次纳入版本控制；cso 安全审查确认无密钥泄露；615 测试零退化）
+
+## P298 | 2026-06-22 | V3.08 启动健康检查 | check_qwen_asr 只接 ImportError，无 Metal 环境抛 RuntimeError 拖垮整份健康摘要
+
+**问题**：启动健康检查（main.py startup 调 `check_all()`）在无 GPU/Metal 的环境里整份摘要打不出来。本想报告「yt-dlp 是否就绪」，却因 Qwen 检查先炸而一个字都没打。外部工程师审查 commit `7a2089c` 时发现。
+
+**原因**：`env_check.py:check_qwen_asr()` 第一步 `from mlx_qwen3_asr import transcribe` 只 `except ImportError`。但 mlx 在无 Metal 设备时 import 抛的是 **RuntimeError**（不是 ImportError）→ 没被接住 → 冒泡出 `check_all()`。原本只有手动开 `/api/env` 才会碰到；本轮把 `check_all()` 接进开机 startup 后，每次启动都会触发。startup 的 `try/except` 兜住了不崩，但在打印摘要前就异常退出，**整份健康摘要丢失**。这是一**类**问题：`check_sensevoice`/`check_resemblyzer` 同样只接 ImportError，import 也可能抛别的。
+
+**涉及文件**：
+- `v3/backend/env_check.py:117`（check_qwen_asr）
+- `v3/backend/env_check.py:151`（check_all 聚合器）
+
+**修法**（比工程师字面建议更治本，两层）：
+1. `check_qwen_asr`：mlx import 改 `except Exception: pass`（落到 pytorch 兜底，而非直接 return——保留无 Metal 但有 pytorch 后端时仍报 ready 的能力）；pytorch import 改 `except Exception as e: return {"ready": False, "error": type(e).__name__}`。
+2. `check_all`：改成循环逐个调用，每个检查裹 `try/except Exception`，任一检查抛错 → 该键记 `{"ready": False, "error": 类型名}`，其余检查照常、摘要必出。健康检查聚合器的韧性是命根子。
+
+**测试**：TDD 先红后绿。`test_health_check_startup.py::TestCheckAllResilience` 2 测试（mock mlx 抛 RuntimeError → check_qwen_asr 返回 not-ready 不抛；mock 某检查抛错 → check_all 仍返回完整字典）。**全量 623 passed, 0 失败**。真活验证：本机（有 Metal）qwen_asr 仍 `{ready:True, backend:mlx}`，正常路径不变。
+
+**教训**：单机 /review 看不见跨环境失败路径——我在有 Metal 的 Mac 上跑，check_qwen_asr 一路绿，这条失败路径在我机器上根本不可见，/review 判 clean 漏了它。第二双眼睛、换个环境才抓出来，印证了"先让工程师审、再放大到 worker.main"的排序。
+
+**状态**：✅ 已修（2026-06-22，外部工程师审查发现 + 修复）

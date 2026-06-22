@@ -115,17 +115,22 @@ def check_sensevoice() -> dict:
 
 
 def check_qwen_asr() -> dict:
-    """Check if Qwen3-ASR is installed (MLX on Apple Silicon, or PyTorch)."""
+    """Check if Qwen3-ASR is installed (MLX on Apple Silicon, or PyTorch).
+
+    Imports can raise beyond ImportError (e.g. mlx raises RuntimeError when no
+    Metal device is present), so treat any failure as "this backend unusable"
+    and fall through rather than letting it escape and sink the health check.
+    """
     try:
         from mlx_qwen3_asr import transcribe  # noqa: F401
         return {"ready": True, "backend": "mlx"}
-    except ImportError:
-        pass
+    except Exception:
+        pass  # mlx unusable (not installed, or no Metal) → try pytorch
     try:
         from qwen_asr import Qwen3ASRModel  # noqa: F401
         return {"ready": True, "backend": "pytorch"}
-    except ImportError:
-        return {"ready": False}
+    except Exception as e:
+        return {"ready": False, "error": type(e).__name__}
 
 
 def check_qwen_aligner() -> dict:
@@ -150,15 +155,23 @@ def check_ytdlp() -> dict:
 
 
 def check_all() -> dict:
-    return {
-        "ffmpeg": check_ffmpeg(),
-        "whisper": check_whisper(),
-        "resemblyzer": check_resemblyzer(),
-        "sensevoice": check_sensevoice(),
-        "qwen_asr": check_qwen_asr(),
-        "qwen_aligner": check_qwen_aligner(),
-        "ytdlp": check_ytdlp(),
+    # Isolate each check: one checker raising must never sink the whole summary.
+    checks = {
+        "ffmpeg": check_ffmpeg,
+        "whisper": check_whisper,
+        "resemblyzer": check_resemblyzer,
+        "sensevoice": check_sensevoice,
+        "qwen_asr": check_qwen_asr,
+        "qwen_aligner": check_qwen_aligner,
+        "ytdlp": check_ytdlp,
     }
+    result = {}
+    for name, fn in checks.items():
+        try:
+            result[name] = fn()
+        except Exception as e:
+            result[name] = {"ready": False, "error": type(e).__name__}
+    return result
 
 
 def _entry_ok(d: dict) -> bool:

@@ -3,6 +3,20 @@
 **日期**：2026-06-21
 **版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
 
+## 2026-06-22 V3.08：外部工程师审查 → 修 P298（check_qwen_asr 异常吞噬）
+
+外部工程师审本会话两个提交（已推 GitHub）：
+- **`de6eb18`（④ 重构）：通过。** 核对了执行顺序不变、translated 三态都在、failed_indices 仍是同一列表（P230 重试删项 → 免费补全只补剩余，没断）。判定符合「纯重构、行为不变」。
+- **`7a2089c`（健康检查）：发现 1 个 bug → 已修（P298）。** 见下。
+
+### P298：check_qwen_asr 只接 ImportError，无 Metal 环境拖垮整份健康摘要
+- 根因：`check_qwen_asr()` 第一步 `from mlx_qwen3_asr import transcribe` 只 `except ImportError`，但 mlx 在无 Metal 设备 import 抛 **RuntimeError** → 冒泡出 `check_all()` → startup 摘要在打印前异常退出，整份丢失。接进开机 startup 后每次启动都触发。
+- 修法（两层，比工程师字面建议更治本）：① `check_qwen_asr` 改 `except Exception`（mlx 失败落 pytorch 兜底、pytorch 失败返回 `{ready:False,error}`）；② `check_all` 改循环逐个调用、每个裹 try/except，任一检查炸只标该键 not-ready，摘要必出（防住 sensevoice/resemblyzer 同类隐患）。
+- TDD：`TestCheckAllResilience` 2 测试先红后绿。**全量 623 passed**。真活：本机 qwen_asr 仍 `{ready:True,backend:mlx}`，正常路径不变。
+- **教训**：单机 /review 看不见跨环境失败路径——我在有 Metal 的 Mac 上判 clean，漏了这条。第二双眼睛/换环境才抓出，印证"先工程师审、再放大 worker.main"的排序。
+
+---
+
 ## 2026-06-22 V3.08：启动健康检查（后端）+ B路 P207 复核
 
 ### B路：核实「除法兜底静默造假时间戳」是否删净（乔布斯建议先焊船底）
@@ -21,6 +35,13 @@
 - 真活输出（本机）：`✅ ffmpeg ✅ whisper ✅ resemblyzer ✅ sensevoice ✅ qwen_asr ✅ qwen_aligner ✅ ytdlp`，未就绪：无。
 - 验证：**全量 621 passed, 0 failed**（615+6）。
 - **未做（刻意）**：临时前端的可见红绿灯面板——前端 V3.09 换 PyWebView，留到那时做，不在要拆的墙上贴瓷砖。
+
+### HARDEN：轻量 /review（clean）
+- 对 commit `7a2089c` 的 diff 跑了 /review 核心：关键扫雷 + 交叉影响 + 对抗视角（<50 行真实逻辑，按 /review 自身门槛跳过专家军团/codex）。
+- **交叉影响（重点）**：给 `check_all()` 加 `ytdlp` 键是纯 additive。逐一核对消费方——`/api/env`（多字段向后兼容，不假设固定键集）、前端（根本没调）、startup 钩子/health_summary_line/missing_checks（`_entry_ok` 泛化处理任意键）、`test_p201`（assertIn 不破坏）——**无一被污染**。
+- **异常安全**：startup 健康检查整段裹 `try/except Exception`，抛错只 warning、startup 继续，不会拖垮启动。无循环导入（video_downloader 懒加载）。
+- 1 条 INFORMATIONAL（不修）：check_all() 在 async startup 同步执行短暂阻塞事件循环，pre-flight 固有代价、服务对外前、符合预期。
+- **结论：CLEAN，0 修复项，不动一行。**
 
 ---
 
