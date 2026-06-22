@@ -1622,4 +1622,15 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 
 **改动文件**：`.gitignore`（test/→/test/）；`v3/backend/transcriber_v2.py`（拆 22 helper + _Routing dataclass，删空壳 _assemble_qwen_on_whisper_boundaries）；`v3/test/`（65 文件首次纳入版本控制）。
 
-**待提交**：HARDEN 全绿，改动在工作区未 commit。P296（闭包竞态）仍刻意保留待后续 bug 流水线。
+**已提交**：commit `1c4c4fa`（71 文件）。P296（闭包竞态）仍刻意保留待后续 bug 流水线。
+
+## 2026-06-22 V3.08 余下函数拆分 ①②③（已提交 3258d40）
+
+承接 transcribe 拆分（1c4c4fa）。策略（用户拍板 + 乔布斯副审一致）：**每拆一个跑全量 615 测试 + 详细记录**。
+
+- ① `run_sensevoice` C13→B6（sensevoice_runner.py，抽 _load/_generate/_parse 3 helper）。615 passed。
+- ② `_layer2_cross_validate` D30→C18（hallucination_filter.py，闭包 _find_best_window 提模块级 + _score_l2_window + _annotate_l2_segments）。615 passed。
+- ③ `run_qwen_asr` C18→B8（qwen_asr_runner.py，抽 _resolve_qwen_duration + _qwen_transcribe）。**首跑测试抓到 1 失败**——P170 源码文本检查测试（assertIn "if not segments"）因守卫挪进 helper 而炸；按用户选择改成行为测试。615 passed。
+- 详细记录见 `pipelines/refactor-pipeline-2026-06-22-remaining5.md`。
+- **遗留新会话**：④ `translate_with_orchestrator` F(61)、211 行 + ⑤ `build_ass_styled` + 启动健康检查。
+- **教训**：源码文本检查测试（inspect.getsource+assertIn）与重构天生冲突，应改行为测试；工具调用里 `| grep` 正则和超大 Edit 易触发解析退化，命令保持极简、改动拆小步。
