@@ -18,7 +18,8 @@
 ### P299：qwen_asr_runner 顶层 MLX 导入只接 ImportError（工程师复验 P298 时连带发现）
 - 工程师复验：`1896f13` 修好 P298 ✅；启动日志完整打出（他无 Metal 环境 qwen_asr 走 PyTorch 显示可用）；新增测试 8 passed。但全量测试仍跑不完——卡点已不是 check_all，而是 `qwen_asr_runner.py:26` 的**模块级** MLX 导入只接 ImportError，无 Metal 抛 RuntimeError → 模块 import 崩 → 收集到 test_p182 时断。
 - 修法：模块级两个 `except ImportError` → `except Exception`，落 PyTorch 兜底。**扫全 backend 确认模块级 MLX 顶层导入仅此一处**（whisper_runner 的 8 处全在函数体内懒加载、安全；env_check 已 P298 修），所以补完整。
-- TDD：`test_p299_qwen_runner_import.py`（mock mlx 抛 RuntimeError → reload 不崩、_USE_MLX=False）。**全量 624 passed**，本机正常路径不变。
+- TDD：`test_p299_qwen_runner_import.py`。**全量 624 passed**，本机正常路径不变。
+- **追加修复（2026-06-23，工程师复验 + 乔布斯把关）**：0d940f3 后 MLX import 失败 → `_mlx_load_model`/`_mlx_transcribe` 名字未绑定 → test_arch7 的 `patch(..._mlx_load_model)` 报 AttributeError（无 Metal 2 failed）。修：try 前加模块级占位 `= None`（不占位 Qwen3ASRModel——探针、函数内本地 import、无人 patch）。**测试踩坑**：第一版用 pop+reload 复现，污染父包属性带崩 test_phase1c；改用「隔离命名空间 exec 源码」零污染。红→绿均验，全量 624 passed。
 - 待工程师在无 Metal 环境复跑确认是否还有非 MLX 后续拦截点。
 
 ---

@@ -23,6 +23,11 @@ _AUDIO_PAD_S = 5.0                # pronunciation buffer on each side
 
 _USE_MLX = False
 _USE_PYTORCH = False
+# Placeholders so these names always exist as module attributes even when the
+# MLX import fails (no Metal). Functions reference them and tests patch them;
+# a real import below overwrites them on Apple Silicon.
+_mlx_load_model = None
+_mlx_transcribe = None
 # Imports can raise beyond ImportError (mlx raises RuntimeError with no Metal
 # device); catch broadly so a missing/unusable backend can't crash module import
 # and break test collection — just fall through to the other backend.

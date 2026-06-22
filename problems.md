@@ -6470,4 +6470,8 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 
 **未尽**：本机有 Metal，无法本机复验"无 Metal 收集能过 qwen_asr_runner"；待工程师在无 Metal 环境复跑确认是否还有非 MLX 的后续拦截点。
 
-**状态**：✅ 已修（2026-06-22，外部工程师审查发现 + 修复；无 Metal 环境复验待工程师）
+**追加修复（2026-06-23，工程师复验发现 + 乔布斯把关）**：0d940f3 修对主问题，但 `except Exception` 后 MLX import 失败时 `_mlx_load_model`/`_mlx_transcribe` 这两个名字从未绑定，而 test_arch7_pipeline.py 会 `patch(..._mlx_load_model)`——patch 要求属性先存在，无 Metal 环境这 2 测试 AttributeError。修法（乔布斯确认方向对、只补该补的）：在 try 之前加模块级占位 `_mlx_load_model = None` / `_mlx_transcribe = None`（不占位 Qwen3ASRModel——它只是 _USE_PYTORCH 探针、真用处在函数内本地 import、无人 patch）。Metal 上真函数覆盖、零行为变更。
+- **测试踩坑教训**：复现"无 Metal 名字缺失"第一版用 `sys.modules.pop + importlib.reload`，污染了父包属性（`import a.b.c as x` 绑的是父包属性，fresh import 把它改了、patch.dict 不还原），带崩 test_phase1c 的 reload（`ImportError: module not in sys.modules`）。改用「在隔离命名空间 exec 模块源码 + 假 mlx 抛 RuntimeError」复现，零 sys.modules 污染。test_p299_qwen_runner_import.py，红→绿均验。
+- 全量 624 passed。
+
+**状态**：✅ 已修（2026-06-22 主修 0d940f3 + 2026-06-23 占位追加；无 Metal 环境复验待工程师确认全量可收集）
