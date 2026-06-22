@@ -705,6 +705,228 @@ def _translate_whole_with_markers(
     return translated, token_usage_total, final_sub_splits
 
 
+def _translate_llm_per_batch(
+    texts: list[str],
+    llm_backends: list,
+    progress_callback=None,
+) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
+    """Per-batch LLM translation (no full context)."""
+    batches = _split_into_batches(texts)
+    all_results = []
+    token_usage_total = None
+
+    for bi, batch in enumerate(batches):
+        if progress_callback:
+            pct = int((bi + 1) / len(batches) * 95)
+            progress_callback(pct, f"LLM 逐段翻译… (批 {bi+1}/{len(batches)})")
+
+        batch_results, _, _, batch_tokens = _run_quality_mode_batch(batch, llm_backends)
+
+        all_results.extend(batch_results)
+        token_usage_total = _merge_tokens(token_usage_total, batch_tokens)
+
+        if bi < len(batches) - 1:
+            time.sleep(1.5)
+
+    final_failed = [i for i, r in enumerate(all_results) if r == "[翻译失败]"]
+    llm_names = [b.name for b in llm_backends]
+    _log.info("LLM 逐段翻译完成: %d/%d 条 (%s)", len(texts) - len(final_failed), len(texts), ", ".join(llm_names))
+    return all_results, final_failed, token_usage_total, {}
+
+
+def _translate_free_only(
+    texts: list[str],
+    mode: str,
+    ordered_backends: list,
+    progress_callback=None,
+) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
+    """Free backends only (no LLM keys)."""
+    all_backends = ordered_backends
+    batches = _split_into_batches(texts)
+    all_results = []
+    all_failed = []
+    token_usage_total = None
+    used_backends = set()
+
+    for bi, batch in enumerate(batches):
+        if progress_callback:
+            pct = int((bi + 1) / len(batches) * 95)
+            progress_callback(pct, f"翻译中… (批 {bi + 1}/{len(batches)})")
+
+        if mode == "speed":
+            batch_results, backend, _ = _run_speed_mode_batch(batch, all_backends)
+            if backend:
+                used_backends.add(backend.name)
+        else:
+            batch_results, backend, failed_indices, _ = _run_quality_mode_batch(
+                batch, all_backends, context=""
+            )
+            if backend:
+                used_backends.add(backend.name)
+            for fi in failed_indices:
+                all_failed.append(fi + len(all_results))
+
+        all_results.extend(batch_results)
+        time.sleep(1)
+
+    final_failed = [
+        i for i, r in enumerate(all_results)
+        if r == "[翻译失败]" or r is None or r == ""
+    ]
+    actual_names = list(used_backends) if used_backends else [b.name for b in all_backends]
+    _log.info("免费引擎翻译完成: %d/%d 条 (实际使用: %s)", len(texts) - len(final_failed), len(texts), ", ".join(actual_names))
+
+    return all_results, final_failed, token_usage_total, {}
+
+
+def _run_llm_fallback_chain(
+    texts: list[str],
+    llm_backends: list,
+    progress_callback=None,
+):
+    """LLM fallback chain: try each backend until one produces a result.
+
+    Returns (translated, failed_indices, token_usage, sub_splits, last_llm,
+    llm_produced). On total failure, translated is the all-"[翻译失败]" list.
+    """
+    translated = None
+    token_usage = None
+    sub_splits = {}
+    last_llm = None
+    _llm_order = [getattr(b, 'name', '?') for b in llm_backends]
+    _log.warning("LLM 降级链启动: %d 个后端 (%s)", len(llm_backends), ", ".join(_llm_order))
+    _chain_t0 = time.monotonic()
+    for llm in llm_backends:
+        _attempt_t0 = time.monotonic()
+        _llm_name = getattr(llm, 'name', 'LLM')
+        _llm_idx = llm_backends.index(llm) + 1
+        try:
+            last_llm = llm
+            # T5+T3 merged: terminology + context summary in one call
+            if progress_callback:
+                progress_callback(0, f"正在用 {getattr(llm, 'name', 'LLM')} 分析内容…")
+            terminology, context_summary = _extract_terminology_and_summary(texts, llm)
+            # Fallback: if either part missing, call old function individually
+            if not terminology:
+                if progress_callback:
+                    progress_callback(1, f"正在用 {getattr(llm, 'name', 'LLM')} 提取术语…")
+                terminology = extract_terminology(texts, llm)
+            if not context_summary:
+                if progress_callback:
+                    progress_callback(2, "正在分析内容…")
+                context_summary = _generate_context_summary(texts, llm, terminology)
+
+            # P165: P1 smoke test — summary must contain CJK
+            if context_summary and not _is_valid_translation(context_summary):
+                _log.warning("P165 内容闸: %s 摘要无中文 (CJK<%.0f%%), 判定不可靠, 跳过 → %r",
+                             _llm_name, _TRANSLATION_CJK_MIN_RATIO * 100,
+                             context_summary[:80])
+                continue
+
+            # T3: sliding window translation
+            translated, token_usage, sub_splits = _translate_whole_with_markers(
+                texts, llm,
+                terminology=terminology,
+                context_summary=context_summary,
+                progress_callback=progress_callback,
+            )
+            failed_indices = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
+            if len(failed_indices) < len(texts):
+                # This backend produced at least some valid translations — use it
+                _dur = int((time.monotonic() - _attempt_t0) * 1000)
+                _log.warning("LLM %s 翻译成功 (%d/%d 条, 耗时 %dms), 降级链结束",
+                             _llm_name, len(texts) - len(failed_indices), len(texts), _dur)
+                break
+            _log.warning("LLM %s 全部翻译失败，尝试下一个 (耗时 %dms)",
+                         _llm_name, int((time.monotonic() - _attempt_t0) * 1000))
+        except Exception as _e:
+            _log.warning("LLM %s 异常 (%s: %s, 耗时 %dms), 尝试下一个",
+                         _llm_name, type(_e).__name__, _e,
+                         int((time.monotonic() - _attempt_t0) * 1000))
+            continue
+
+    llm_produced = translated is not None
+    _chain_dur = int((time.monotonic() - _chain_t0) * 1000)
+    if not llm_produced:
+        translated = ["[翻译失败]"] * len(texts)
+        failed_indices = list(range(len(texts)))
+        sub_splits = {}
+        _log.warning("LLM 降级链结束: 全部失败, 总耗时 %dms, 切换免费引擎", _chain_dur)
+    else:
+        failed_indices = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
+        _log.warning("LLM 降级链结束: %s 成功, 总耗时 %dms",
+                     getattr(last_llm, 'name', 'LLM'), _chain_dur)
+    return translated, failed_indices, token_usage, sub_splits, last_llm, llm_produced
+
+
+def _retry_failed_with_llm(texts, translated, failed_indices, last_llm):
+    """P230: retry individual failed segments with a minimal prompt.
+
+    Only when ≤10 segments failed. Mutates translated and failed_indices in place.
+    """
+    # P230: retry individual failed segments with minimal prompt
+    # (no format to get wrong). Only when ≤10 segments failed.
+    if failed_indices and last_llm and len(failed_indices) <= 10:
+        _log.info("P230 单独重试 %d 条遗漏字幕 (LLM: %s)",
+                  len(failed_indices), getattr(last_llm, 'name', 'LLM'))
+        for fi in list(failed_indices):
+            try:
+                simple_prompt = (
+                    f"将以下内容翻译成{_TARGET_LANGUAGE}。只输出译文，不要解释。\n\n{texts[fi]}"
+                )
+                retry = last_llm.translate_raw(simple_prompt, max_tokens=512)
+                retry_text = (retry.translated[0] if retry.translated else "").strip()
+                if retry_text and _is_valid_translation(retry_text):
+                    translated[fi] = retry_text
+                    failed_indices.remove(fi)
+            except Exception:
+                pass  # fall through to free backend retry below
+
+
+def _fill_gaps_with_free(texts, translated, failed_indices, ordered_backends, progress_callback):
+    """Fill remaining failed segments with free backends. Mutates translated in place."""
+    # Fill gaps with free backends
+    if failed_indices and ordered_backends:
+        if progress_callback:
+            progress_callback(96, f"补全 {len(failed_indices)} 条遗漏字幕…")
+        texts_to_retry = [texts[i] for i in failed_indices]
+        retry_batches = _split_into_batches(texts_to_retry)
+        retry_results = []
+        for batch in retry_batches:
+            batch_res, _, _ = _run_speed_mode_batch(batch, ordered_backends)
+            retry_results.extend(batch_res)
+        for idx, retry_text in zip(failed_indices, retry_results):
+            translated[idx] = retry_text
+
+
+def _translate_llm_context_aware(
+    texts: list[str],
+    llm_backends: list,
+    ordered_backends: list,
+    progress_callback=None,
+) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
+    """Full-context LLM translation: fallback chain → LLM retry → free-backend gap fill."""
+    translated, failed_indices, token_usage, sub_splits, last_llm, llm_produced = \
+        _run_llm_fallback_chain(texts, llm_backends, progress_callback)
+    _retry_failed_with_llm(texts, translated, failed_indices, last_llm)
+    _fill_gaps_with_free(texts, translated, failed_indices, ordered_backends, progress_callback)
+
+    final_failed = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
+    free_names = [b.name for b in ordered_backends[:3]] if ordered_backends else []
+    if llm_produced:
+        llm_name = getattr(last_llm, 'name', 'LLM')
+        if final_failed:
+            _log.info("LLM 上下文感知翻译: %s 完成 %d/%d 条, 剩余 %d 条由免费引擎(%s)补全",
+                      llm_name, len(texts) - len(final_failed), len(texts),
+                      len(final_failed), ", ".join(free_names))
+        else:
+            _log.info("LLM 上下文感知翻译完成: %d 条 (%s)", len(texts), llm_name)
+    else:
+        _log.info("所有 LLM 均失败, 免费引擎(%s)完成翻译: %d/%d 条",
+                  ", ".join(free_names), len(texts) - len(final_failed), len(texts))
+    return translated, final_failed, token_usage, sub_splits
+
+
 # ── Main entry point (T1: tier removed) ──
 
 def translate_with_orchestrator(
@@ -744,177 +966,11 @@ def translate_with_orchestrator(
     # ── LLM path: user provided API keys ──
     if llm_backends:
         if context_aware:
-            translated = None
-            token_usage = None
-            sub_splits = {}
-            last_llm = None
-            _llm_order = [getattr(b, 'name', '?') for b in llm_backends]
-            _log.warning("LLM 降级链启动: %d 个后端 (%s)", len(llm_backends), ", ".join(_llm_order))
-            _chain_t0 = time.monotonic()
-            for llm in llm_backends:
-                _attempt_t0 = time.monotonic()
-                _llm_name = getattr(llm, 'name', 'LLM')
-                _llm_idx = llm_backends.index(llm) + 1
-                try:
-                    last_llm = llm
-                    # T5+T3 merged: terminology + context summary in one call
-                    if progress_callback:
-                        progress_callback(0, f"正在用 {getattr(llm, 'name', 'LLM')} 分析内容…")
-                    terminology, context_summary = _extract_terminology_and_summary(texts, llm)
-                    # Fallback: if either part missing, call old function individually
-                    if not terminology:
-                        if progress_callback:
-                            progress_callback(1, f"正在用 {getattr(llm, 'name', 'LLM')} 提取术语…")
-                        terminology = extract_terminology(texts, llm)
-                    if not context_summary:
-                        if progress_callback:
-                            progress_callback(2, "正在分析内容…")
-                        context_summary = _generate_context_summary(texts, llm, terminology)
-
-                    # P165: P1 smoke test — summary must contain CJK
-                    if context_summary and not _is_valid_translation(context_summary):
-                        _log.warning("P165 内容闸: %s 摘要无中文 (CJK<%.0f%%), 判定不可靠, 跳过 → %r",
-                                     _llm_name, _TRANSLATION_CJK_MIN_RATIO * 100,
-                                     context_summary[:80])
-                        continue
-
-                    # T3: sliding window translation
-                    translated, token_usage, sub_splits = _translate_whole_with_markers(
-                        texts, llm,
-                        terminology=terminology,
-                        context_summary=context_summary,
-                        progress_callback=progress_callback,
-                    )
-                    failed_indices = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
-                    if len(failed_indices) < len(texts):
-                        # This backend produced at least some valid translations — use it
-                        _dur = int((time.monotonic() - _attempt_t0) * 1000)
-                        _log.warning("LLM %s 翻译成功 (%d/%d 条, 耗时 %dms), 降级链结束",
-                                     _llm_name, len(texts) - len(failed_indices), len(texts), _dur)
-                        break
-                    _log.warning("LLM %s 全部翻译失败，尝试下一个 (耗时 %dms)",
-                                 _llm_name, int((time.monotonic() - _attempt_t0) * 1000))
-                except Exception as _e:
-                    _log.warning("LLM %s 异常 (%s: %s, 耗时 %dms), 尝试下一个",
-                                 _llm_name, type(_e).__name__, _e,
-                                 int((time.monotonic() - _attempt_t0) * 1000))
-                    continue
-
-            llm_produced = translated is not None
-            _chain_dur = int((time.monotonic() - _chain_t0) * 1000)
-            if not llm_produced:
-                translated = ["[翻译失败]"] * len(texts)
-                failed_indices = list(range(len(texts)))
-                sub_splits = {}
-                _log.warning("LLM 降级链结束: 全部失败, 总耗时 %dms, 切换免费引擎", _chain_dur)
-            else:
-                failed_indices = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
-                _log.warning("LLM 降级链结束: %s 成功, 总耗时 %dms",
-                             getattr(last_llm, 'name', 'LLM'), _chain_dur)
-
-            # P230: retry individual failed segments with minimal prompt
-            # (no format to get wrong). Only when ≤10 segments failed.
-            if failed_indices and last_llm and len(failed_indices) <= 10:
-                _log.info("P230 单独重试 %d 条遗漏字幕 (LLM: %s)",
-                          len(failed_indices), getattr(last_llm, 'name', 'LLM'))
-                for fi in list(failed_indices):
-                    try:
-                        simple_prompt = (
-                            f"将以下内容翻译成{_TARGET_LANGUAGE}。只输出译文，不要解释。\n\n{texts[fi]}"
-                        )
-                        retry = last_llm.translate_raw(simple_prompt, max_tokens=512)
-                        retry_text = (retry.translated[0] if retry.translated else "").strip()
-                        if retry_text and _is_valid_translation(retry_text):
-                            translated[fi] = retry_text
-                            failed_indices.remove(fi)
-                    except Exception:
-                        pass  # fall through to free backend retry below
-
-            # Fill gaps with free backends
-            if failed_indices and ordered_backends:
-                if progress_callback:
-                    progress_callback(96, f"补全 {len(failed_indices)} 条遗漏字幕…")
-                texts_to_retry = [texts[i] for i in failed_indices]
-                retry_batches = _split_into_batches(texts_to_retry)
-                retry_results = []
-                for batch in retry_batches:
-                    batch_res, _, _ = _run_speed_mode_batch(batch, ordered_backends)
-                    retry_results.extend(batch_res)
-                for idx, retry_text in zip(failed_indices, retry_results):
-                    translated[idx] = retry_text
-
-            final_failed = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
-            free_names = [b.name for b in ordered_backends[:3]] if ordered_backends else []
-            if llm_produced:
-                llm_name = getattr(last_llm, 'name', 'LLM')
-                if final_failed:
-                    _log.info("LLM 上下文感知翻译: %s 完成 %d/%d 条, 剩余 %d 条由免费引擎(%s)补全",
-                              llm_name, len(texts) - len(final_failed), len(texts),
-                              len(final_failed), ", ".join(free_names))
-                else:
-                    _log.info("LLM 上下文感知翻译完成: %d 条 (%s)", len(texts), llm_name)
-            else:
-                _log.info("所有 LLM 均失败, 免费引擎(%s)完成翻译: %d/%d 条",
-                          ", ".join(free_names), len(texts) - len(final_failed), len(texts))
-            return translated, final_failed, token_usage, sub_splits
-        else:
-            # Per-batch LLM translation (no full context)
-            batches = _split_into_batches(texts)
-            all_results = []
-            token_usage_total = None
-
-            for bi, batch in enumerate(batches):
-                if progress_callback:
-                    pct = int((bi + 1) / len(batches) * 95)
-                    progress_callback(pct, f"LLM 逐段翻译… (批 {bi+1}/{len(batches)})")
-
-                batch_results, _, _, batch_tokens = _run_quality_mode_batch(batch, llm_backends)
-
-                all_results.extend(batch_results)
-                token_usage_total = _merge_tokens(token_usage_total, batch_tokens)
-
-                if bi < len(batches) - 1:
-                    time.sleep(1.5)
-
-            final_failed = [i for i, r in enumerate(all_results) if r == "[翻译失败]"]
-            llm_names = [b.name for b in llm_backends]
-            _log.info("LLM 逐段翻译完成: %d/%d 条 (%s)", len(texts) - len(final_failed), len(texts), ", ".join(llm_names))
-            return all_results, final_failed, token_usage_total, {}
-
-    # ── Free backends only ──
-    all_backends = ordered_backends
-    batches = _split_into_batches(texts)
-    all_results = []
-    all_failed = []
-    token_usage_total = None
-    used_backends = set()
-
-    for bi, batch in enumerate(batches):
-        if progress_callback:
-            pct = int((bi + 1) / len(batches) * 95)
-            progress_callback(pct, f"翻译中… (批 {bi + 1}/{len(batches)})")
-
-        if mode == "speed":
-            batch_results, backend, _ = _run_speed_mode_batch(batch, all_backends)
-            if backend:
-                used_backends.add(backend.name)
-        else:
-            batch_results, backend, failed_indices, _ = _run_quality_mode_batch(
-                batch, all_backends, context=""
+            return _translate_llm_context_aware(
+                texts, llm_backends, ordered_backends, progress_callback
             )
-            if backend:
-                used_backends.add(backend.name)
-            for fi in failed_indices:
-                all_failed.append(fi + len(all_results))
 
-        all_results.extend(batch_results)
-        time.sleep(1)
+        else:
+            return _translate_llm_per_batch(texts, llm_backends, progress_callback)
 
-    final_failed = [
-        i for i, r in enumerate(all_results)
-        if r == "[翻译失败]" or r is None or r == ""
-    ]
-    actual_names = list(used_backends) if used_backends else [b.name for b in all_backends]
-    _log.info("免费引擎翻译完成: %d/%d 条 (实际使用: %s)", len(texts) - len(final_failed), len(texts), ", ".join(actual_names))
-
-    return all_results, final_failed, token_usage_total, {}
+    return _translate_free_only(texts, mode, ordered_backends, progress_callback)

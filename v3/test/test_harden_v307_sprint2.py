@@ -161,16 +161,35 @@ class TestP244GetJobPathTraversal(unittest.TestCase):
 class TestP241RetryLanguage(unittest.TestCase):
     """P241: P230 retry must not hardcode '英文翻译成中文'."""
 
+    def _capture_retry_prompt(self):
+        """Drive the P230 single-segment retry and capture the prompt sent to the LLM."""
+        from backend.translation.orchestrator import _retry_failed_with_llm
+        captured = []
+
+        class _FakeLLM:
+            name = "fake"
+
+            def translate_raw(self, prompt, max_tokens=512):
+                captured.append(prompt)
+
+                class _R:
+                    translated = ["占位"]
+
+                return _R()
+
+        _retry_failed_with_llm(["hello"], ["[翻译失败]"], [0], _FakeLLM())
+        self.assertTrue(captured, "P230 retry should call translate_raw on the failed segment")
+        return captured[0]
+
     def test_no_hardcoded_english_to_chinese(self):
-        from backend.translation.orchestrator import translate_with_orchestrator
-        src = inspect.getsource(translate_with_orchestrator)
-        self.assertNotIn("将以下英文翻译成中文", src,
+        prompt = self._capture_retry_prompt()
+        self.assertNotIn("将以下英文翻译成中文", prompt,
                          "P230 retry prompt must use _TARGET_LANGUAGE, not hardcoded '英文→中文'")
 
     def test_uses_target_language_variable(self):
-        from backend.translation.orchestrator import translate_with_orchestrator
-        src = inspect.getsource(translate_with_orchestrator)
-        self.assertIn("_TARGET_LANGUAGE", src,
+        from backend.translation.orchestrator import _TARGET_LANGUAGE
+        prompt = self._capture_retry_prompt()
+        self.assertIn(_TARGET_LANGUAGE, prompt,
                       "P230 retry prompt must reference _TARGET_LANGUAGE")
 
 

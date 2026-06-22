@@ -100,8 +100,88 @@
 
 ---
 
-## ④ translate_with_orchestrator — 2026-06-22（进行中）
+## ④ translate_with_orchestrator — 2026-06-22 ✅
 **文件**：orchestrator.py，**F(61)**，710-920（211 行），本轮最大。
 **方案**：抽 3 个顶层 helper——_translate_llm_context_aware / _translate_llm_per_batch / _translate_free_only，各返回 4 元组。主函数只剩准备 backends + 三分支调用。
 **保真要点**：三分支返回值都是 4 元组 (translated, failed_indices, token_usage, sub_splits) 逐字保留；context_aware 用 ordered_backends，free_only 用 ordered_backends+mode，per_batch 都不用。
-**结果**：⏸ 留待新会话单独处理（F61 太大、211 行，当前会话长 + 工具调用退化频发，硬拆易错。方案已记录见上，下次在干净上下文里一次性拆 3 顶层 helper + context_aware 内部细拆）。
+
+### 执行（分两波，每波跑全量测试）
+- **WAVE 1**：抽 _translate_llm_per_batch（else 分支）+ _translate_free_only（免费引擎分支）。先替换主函数分支为调用（趁原文唯一），再插 helper 定义。主函数 F(61)→F(43)。**615 passed**。
+- **WAVE 2**：context_aware 分支内部细拆，再抽 4 个 helper：
+  - `_run_llm_fallback_chain` C(17)：降级链 for 循环（init+loop+post-loop status），返回 6 元组 (translated, failed_indices, token_usage, sub_splits, last_llm, llm_produced)
+  - `_retry_failed_with_llm` B(9)：P230 单段重试，guard 内置，原地改 translated/failed_indices
+  - `_fill_gaps_with_free` B(7)：免费引擎补全，guard 内置，原地改 translated
+  - `_translate_llm_context_aware` B(7)：编排（chain → retry → fill → final_failed + 收尾日志）
+
+### 行为保真要点（最易错）
+1. **translated 三态**：循环后 translated 可能是 None（全 P165/异常）、全失败列表（最后一个 backend 全失败未 break）、或部分成功列表。llm_produced = (translated is not None)，所以"最后一个全失败"也算 llm_produced=True。`_run_llm_fallback_chain` 原样返回，逐字保留。
+2. **failed_indices 同一对象贯穿**：chain 返回的 failed_indices 列表对象，先传给 retry（原地 .remove 删项），再传给 fill（读同一对象）。三个 helper 共享同一 list 引用，mutation 贯穿——和原内联代码等价。
+3. **retry/fill 的 guard 内置**：原 `if failed_indices and last_llm and len<=10` / `if failed_indices and ordered_backends` 守卫整体搬进 helper，调用方无条件调，等价。
+
+### ⚠️ 测试抓到 1 个失败（又是源码文本测试，同 ③ P170）
+- 失败：`test_harden_v307_sprint2.py::TestP241RetryLanguage::test_uses_target_language_variable`
+- 根因：`inspect.getsource(translate_with_orchestrator)` 断言含 `_TARGET_LANGUAGE`。P230 重试 prompt 搬进 `_retry_failed_with_llm` 后，主函数源码文本不再有这词 → 测试失败。**功能没坏**（重试 prompt 照样用 _TARGET_LANGUAGE）。
+- 处理（按 ③ 已确立的"源码文本测试一律改行为测试"）：`TestP241RetryLanguage` 两个方法改成行为测试——mock 假 LLM 调 `_retry_failed_with_llm`，捕获实际 prompt，断言含 `_TARGET_LANGUAGE`、不含硬编码"将以下英文翻译成中文"。survive 未来重构。
+
+### 结果（下一步只看这里）
+- 复杂度：`translate_with_orchestrator` **F(61)→B(7)**；新 helper 全部 ≤17（_run_llm_fallback_chain C17 是降级链循环固有复杂度，同 ② L2 留 C18 的道理，已把 retry/fill 抽走）。
+- 主函数现在只剩：默认 priority → 组 ordered_backends → 组 llm_backends → if llm_backends:(context_aware? 调 context_aware : 调 per_batch) else 调 free_only。
+- 验证：TestP241 行为测试 2 passed 0.03s；**全量 615 passed, 0 failed（99.38s）**。零退化。
+- 改动文件：`orchestrator.py:708-930`（新增 6 个 helper，主函数精简为三分支调度）+ `test/test_harden_v307_sprint2.py:161-192`（源码文本测试 → 行为测试）。
+- ✅ **完成**
+
+---
+
+## ⑤ build_ass_styled — 2026-06-22 ✅（核实后判定：不拆）
+**文件**：`v3/backend/subtitle_style.py:13`
+**预估**：约 16（office-hours 旧数据，搬家前）
+**实测**：radon **B(6)**，函数体仅 62 行（13-74），从头到尾一条直路（解析 style → _collect_entries/_annotate_speaker_changes → 写 ASS 文件三段）。
+**判定**：**不拆**。radon 健康区间 A=1-5、B=6-10，B(6) 已属低复杂度。给已简单的函数硬抽 helper 只增加间接层、不降复杂度，违背「纯重构只为降复杂度」初衷（Karpathy Simplicity First / Surgical Changes）。
+**附带核实**：subtitler.py 里 build_ass_styled 的三个辅助函数（_collect_entries/_annotate_speaker_changes/_to_ass_time）均 A/B，无需动；该文件唯一 C 级是 `_split_zh_into_sentences` C(14)，本轮不在范围。
+- ✅ **本轮「余下 5 函数拆分」收官**：①②③（已提交 3258d40）+ ④（本会话，待提交）真拆；⑤ 核实判定不拆。
+
+---
+
+## 📋 待拆名单（下一轮，单独开会话）— 2026-06-22 扫描
+本会话末扫全 `v3/backend/` 发现的真·复杂度热点（D 级及以上，均**不在**原「5 函数」清单内，是新发现）。
+**为何留新会话**：worker.main F(109) 体量超大（比 transcribe 的 41 还大 2.5 倍），需占满一整块上下文，硬塞进长会话易切错。按 transcribe 先例单独开干净会话拆。
+
+| 函数 | 文件 | 复杂度 | 备注 |
+|------|------|--------|------|
+| `main` | worker.py:408 | **F(109)** 🔥 | 头号目标，单独一会话 |
+| `LightweightStemmer` / `.clean_and_stem` | hallucination_filter.py:15/28 | F(46)/F(45) | 类+方法，词干器 |
+| `_translate_whole_with_markers` | orchestrator.py:556 | F(44) | 滑窗翻译 |
+| `_detect_speaker_changes` | transcriber_v2.py:222 | D(28) | |
+| `_assemble_qwen_primary` | transcriber_v2.py:657 | D(25) | |
+| `create_job` | main.py:613 | D(25) | |
+| `filter_hallucinations` | hallucination_filter.py:740 | D(24) | |
+| `llm_split_segments` | sentence_splitter.py:94 | D(23) | |
+| `_whisper_is_usable` | transcriber_v2.py:487 | D(22) | |
+| `_extract_qwen_sentences` | hallucination_filter.py:384 | D(21) | |
+
+### 下一会话开场话术（复制粘贴用，省 token）
+```
+继续 video-subtitle V3.08 函数复杂度拆分，新会话。
+项目根 /Users/andy/Andy-agent/video-subtitle/，活跃代码在 v3/。
+
+本轮拆 worker.py 的 main 函数（radon F109，全项目最绕，比已拆的 transcribe 41 还大）。
+纯重构：只搬代码不改逻辑，逐字保留行为含日志。
+
+开工先做两件事，别漫无目的探索：
+1. 读 pipelines/refactor-pipeline-2026-06-22-remaining5.md 末尾「待拆名单」节恢复上下文
+2. cd v3 && .venv/bin/python -m radon cc backend/worker.py -s 看 main 当前复杂度，再完整读 main 函数体
+
+拆分方法（和已拆 4 个一致）：
+- 找出 main 干的几件大事 → 每件抽成一个顶层 helper → 主函数只剩编排调度
+- 小步拆，每抽完一步跑一次全量测试当安全网：
+  后台跑 cd v3 && .venv/bin/python -m pytest test/ -q > /tmp/t.log 2>&1，绿了(615 passed)再下一步
+- 替换分支时「先替换主函数为调用(趁原文唯一)、再插 helper 定义」，避免重复文本破坏 Edit 匹配
+- Edit 拆小步，别发 100+ 行的超大 Edit(会触发工具调用解析退化)
+- bash 命令保持极简，别用管道正则
+- 警惕源码文本测试(inspect.getsource + assertIn)：抽函数后会误伤，按先例改成行为测试
+- 全程记录到新管道文件 pipelines/refactor-pipeline-worker-main-<日期>.md
+
+基线：当前 615 测试全绿。④ translate_with_orchestrator 已拆(F61→B7)，
+若工作区未提交先确认 git 状态。拆完 main 再按复杂度依次处理待拆名单其余 D/F 函数。
+```
+> 话术也存在此处，下个会话读本文件即可，不必回看本对话。

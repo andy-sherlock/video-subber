@@ -3,6 +3,34 @@
 **日期**：2026-06-21
 **版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
 
+## 2026-06-22 V3.08：拆分 ④ translate_with_orchestrator F61→B7 + ⑤ 核实不拆
+
+**管道文件**：`pipelines/refactor-pipeline-2026-06-22-remaining5.md`（④⑤ 节 + 末尾「待拆名单」）
+
+### ④ translate_with_orchestrator（本会话核心）
+| 指标 | 结果 |
+|------|------|
+| 复杂度 | **F(61) → B(7)**（radon） |
+| 抽出 helper | 6 个，全部 ≤17 |
+| 测试 | **615 passed, 0 failed**（零退化） |
+
+- 拆法分两波，每波跑全量测试：WAVE 1 抽 `_translate_llm_per_batch` + `_translate_free_only`（F61→F43）；WAVE 2 context_aware 内部细拆，再抽 `_run_llm_fallback_chain`(C17)/`_retry_failed_with_llm`(B9)/`_fill_gaps_with_free`(B7)/`_translate_llm_context_aware`(B7)。主函数精简为「准备 backends + 三分支调度」。
+- 行为保真：translated 三态、failed_indices 同一 list 对象贯穿 retry→fill 的原地 mutation、guard 内置——逐字保留含日志。
+- **又撞 1 个源码文本测试**（`TestP241RetryLanguage`，同 ③ P170 同类）：`inspect.getsource` 断言主函数含 `_TARGET_LANGUAGE`，重试逻辑搬进 helper 后误伤。按先例改成行为测试（mock 假 LLM 捕获实际 prompt 断言）。
+
+### ⑤ build_ass_styled —— 核实后判定「不拆」
+- 预估约 16（搬家前旧数据），**实测 radon B(6)**，62 行直路。已属低复杂度，硬抽 helper 是过度工程 → 判定不拆。
+- **本轮「余下 5 函数拆分」收官**：①②③真拆(已提交) + ④真拆(待提交) + ⑤核实不拆。
+
+### 新发现：待拆名单（留新会话单独干）
+- 扫全 `v3/backend/` 发现真热点：`worker.py:main` **F(109)**、`hallucination_filter` 词干器 F46/F45、`orchestrator._translate_whole_with_markers` F44，及一批 D 级。均不在原 5 函数清单内。
+- worker.main 体量超 transcribe 2.5 倍，按先例单独开干净会话拆。完整名单 + 下会话话术存管道文件末尾。
+
+### 待提交
+- ④ 的 orchestrator.py + test_harden_v307_sprint2.py 改动**尚未提交**，工作区有改动。
+
+---
+
 ## 2026-06-21 V3.08 开发线：拆分 transcribe() 复杂度 41→10
 
 **流水线**：开发线 DECIDE → BUILD（HARDEN 待跑）。管道文件 `pipelines/dev-pipeline-2026-06-21-v308-transcribe-split.md`
