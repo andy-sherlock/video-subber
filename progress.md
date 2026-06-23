@@ -3,6 +3,18 @@
 **日期**：2026-06-21
 **版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
 
+## 2026-06-23 V3.08：worker.main 函数复杂度拆分（F109 → C15）
+
+纯重构，只搬代码不改逻辑（含日志/进度/emit/异常路径逐字保留）。worker.py 的 `main()` 是全项目最绕的函数（radon F109，比已拆 transcribe 的 41 还大 2.5 倍），单独开会话拆。
+
+- **方法**：找出 main 干的 12 件大事 → 每件抽成顶层 helper → main 只剩编排调度。每抽一步「先替换 main 为调用、再插 helper 定义」，每批后台跑全量测试当安全网，绿了再下一步。
+- **抽出 12 个 helper**：`_validate_config`(嵌套→模块级)、`_invalidate_stale_caches`、`_download_source_if_url`、`_step_extract_audio`、`_step_transcribe`、`_run_transcript_refiner`、`_llm_fallback_if_needed`、`_reflection_review`、`_step_translate`、`_step_subtitle`、`_step_burn_or_mux`、`_copy_outputs_to_save_path`。
+- **结果**：`main` **F(109) → C(15)**（7 倍下降），全文件不再有任何 F/D 级函数。最复杂的 helper 是 `_step_translate` C(19)（翻译步骤内聚分支，远低于 F，不再碎拆）。
+- **settings 字段提取刻意跳过**：那块直筒赋值、只 2 分支，抽出要改 main 里十几个变量名，churn 高收益低。
+- **测试**：基线核实为 **624 passed**（交接旧数 615 已更正）。全程 5 个测试批次每次 624 passed，**零回归**。
+- 详见 `pipelines/refactor-pipeline-worker-main-2026-06-23.md`。**未提交**，待用户确认或进发布线。
+- 待拆名单剩余 9 个 D/F 函数（orchestrator `_translate_whole_with_markers` F44、hallucination_filter `LightweightStemmer`/`clean_and_stem` F46/F45 等），建议各开干净会话照先例处理。
+
 ## 2026-06-22 V3.08：外部工程师审查 → 修 P298（check_qwen_asr 异常吞噬）
 
 外部工程师审本会话两个提交（已推 GitHub）：
