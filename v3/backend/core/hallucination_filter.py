@@ -12,6 +12,100 @@ from collections import Counter
 _log = logging.getLogger("hallucination_filter")
 
 
+def _stem_chinese_text(text):
+    return set(re.findall(r'[一-龥]', text))
+
+
+_EN_SUFFIXES_4 = ('tion', 'ment', 'ness', 'able', 'ible')
+_EN_SUFFIXES_3 = ('ful', 'ous', 'ive', 'ize', 'ise', 'ity', 'ing')
+_EN_SUFFIXES_2 = ('ed', 'er', 'ly', 'al')
+
+
+def _normalize_english_three_suffix_stem(word):
+    if word.endswith('i') and len(word) > 2:
+        return word
+    if len(word) >= 3 and word[-1] == word[-2]:
+        return word[:-1]
+    return word
+
+
+def _strip_english_suffix(word):
+    if word.endswith(_EN_SUFFIXES_4):
+        return word[:-4]
+    if word.endswith(_EN_SUFFIXES_3):
+        return _normalize_english_three_suffix_stem(word[:-3])
+    if word.endswith(_EN_SUFFIXES_2):
+        return word[:-2]
+    if word.endswith('es'):
+        return word[:-2]
+    if word.endswith('s') and not word.endswith('ss'):
+        return word[:-1]
+    return word
+
+
+def _stem_english_word(word):
+    if len(word) >= 4:
+        word = _strip_english_suffix(word)
+    return word
+
+
+def _stem_english_text(text):
+    words = re.findall(r"[a-z0-9']+", text)
+    return {_stem_english_word(w) for w in words}
+
+
+_RU_SUFFIXES = (
+    'его', 'ого',                # adj genitive - P160: missing in v1
+    'ами', 'ями', 'ов', 'ев', 'ей', 'ег',
+    'ах', 'ях', 'ом', 'ем', 'ой', 'ей',
+    'ую', 'юю', 'ая', 'яя', 'ое', 'ее',
+    'ые', 'ие', 'ым', 'им', 'их', 'ых',
+    'ешь', 'ет', 'ем', 'ете', 'ут', 'ют',
+    'ишь', 'ит', 'им', 'ите', 'ат', 'ят',
+    'ся', 'сь',                   # reflexive - P160: missing in v1
+    'л', 'ла', 'ло', 'ли',
+    'ть', 'ти', 'а', 'я', 'о', 'е', 'ы', 'и', 'ь',
+)
+
+_RU_SHORT_SUFFIXES = ('а', 'я', 'о', 'е', 'ы', 'и', 'ь')
+
+
+def _strip_russian_suffix(word):
+    stemmed = False
+    for suff in _RU_SUFFIXES:
+        if word.endswith(suff):
+            word = word[:-len(suff)]
+            stemmed = True
+            break
+    if not stemmed:
+        for suff in _RU_SHORT_SUFFIXES:
+            if word.endswith(suff) and len(word) - len(suff) >= 3:
+                word = word[:-len(suff)]
+                break
+    if word.endswith('ь') and len(word) > 3:
+        word = word[:-1]
+    return word
+
+
+def _stem_russian_text(text):
+    words = re.findall(r'[а-яё0-9]+', text)
+    stems = []
+    for w in words:
+        if len(w) > 3:
+            w = _strip_russian_suffix(w)
+        stems.append(w)
+    return set(stems)
+
+
+def _stem_japanese_korean_text(text, lang):
+    words = re.findall(r'[぀-ゟ゠-ヿ一-龯가-힣]+', text)
+    if lang == "ja":
+        ja_particles = {'は', 'が', 'を', 'に', 'の', 'で', 'へ', 'と', 'から',
+                        'まで', 'です', 'ます', 'た'}
+        return {w for w in words if w not in ja_particles}
+    return set(words)
+
+
 class LightweightStemmer:
     """Zero-dependency multi-language stemmer (P160).
 
@@ -32,74 +126,19 @@ class LightweightStemmer:
 
         # Chinese: extract individual hanzi characters
         if lang == "zh":
-            return set(re.findall(r'[一-龥]', text))
+            return _stem_chinese_text(text)
 
         # English: lightweight suffix stripping
         if lang == "en":
-            words = re.findall(r"[a-z0-9']+", text)
-            stems = []
-            for w in words:
-                if len(w) >= 4:
-                    if w.endswith('tion') or w.endswith('ment') or w.endswith('ness') or w.endswith('able') or w.endswith('ible'):
-                        w = w[:-4]
-                    elif w.endswith('ful') or w.endswith('ous') or w.endswith('ive') or w.endswith('ize') or w.endswith('ise') or w.endswith('ity') or w.endswith('ing'):
-                        w = w[:-3]
-                        if w.endswith('i') and len(w) > 2:
-                            pass
-                        elif len(w) >= 3 and w[-1] == w[-2]:
-                            w = w[:-1]
-                    elif w.endswith('ed') or w.endswith('er') or w.endswith('ly') or w.endswith('al'):
-                        w = w[:-2]
-                    elif w.endswith('es'):
-                        w = w[:-2]
-                    elif w.endswith('s') and not w.endswith('ss'):
-                        w = w[:-1]
-                stems.append(w)
-            return set(stems)
+            return _stem_english_text(text)
 
         # Russian: manual suffix stripping (Snowball-inspired, P160)
         if lang == "ru":
-            words = re.findall(r'[а-яё0-9]+', text)
-            stems = []
-            ru_suffixes = (
-                'его', 'ого',                # adj genitive - P160: missing in v1
-                'ами', 'ями', 'ов', 'ев', 'ей', 'ег',
-                'ах', 'ях', 'ом', 'ем', 'ой', 'ей',
-                'ую', 'юю', 'ая', 'яя', 'ое', 'ее',
-                'ые', 'ие', 'ым', 'им', 'их', 'ых',
-                'ешь', 'ет', 'ем', 'ете', 'ут', 'ют',
-                'ишь', 'ит', 'им', 'ите', 'ат', 'ят',
-                'ся', 'сь',                   # reflexive - P160: missing in v1
-                'л', 'ла', 'ло', 'ли',
-                'ть', 'ти', 'а', 'я', 'о', 'е', 'ы', 'и', 'ь',
-            )
-            for w in words:
-                if len(w) > 3:
-                    stemmed = False
-                    for suff in ru_suffixes:
-                        if w.endswith(suff):
-                            w = w[:-len(suff)]
-                            stemmed = True
-                            break
-                    if not stemmed:
-                        for suff in ('а', 'я', 'о', 'е', 'ы', 'и', 'ь'):
-                            if w.endswith(suff) and len(w) - len(suff) >= 3:
-                                w = w[:-len(suff)]
-                                break
-                    # re-strip trailing soft sign after longer suffix removal
-                    if w.endswith('ь') and len(w) > 3:
-                        w = w[:-1]
-                stems.append(w)
-            return set(stems)
+            return _stem_russian_text(text)
 
         # Japanese/Korean: filter grammatical particles
         if lang in ("ja", "ko"):
-            words = re.findall(r'[぀-ゟ゠-ヿ一-龯가-힣]+', text)
-            if lang == "ja":
-                ja_particles = {'は', 'が', 'を', 'に', 'の', 'で', 'へ', 'と', 'から',
-                                'まで', 'です', 'ます', 'た'}
-                return {w for w in words if w not in ja_particles}
-            return set(words)
+            return _stem_japanese_korean_text(text, lang)
 
         # Default: split on whitespace
         return set(text.split())
@@ -381,6 +420,63 @@ def _qwen_is_reliable(qwen_chunks: list) -> bool:
     return True
 
 
+def _qwen_word_from_segment(seg):
+    text = (seg.get("text") or "").strip()
+    start = seg.get("start")
+    end = seg.get("end")
+    if text and start is not None and end is not None:
+        return {"text": text, "start": start, "end": end}
+    return None
+
+
+def _extract_qwen_word_chunks(qwen_chunks):
+    all_words = []
+    for chunk in qwen_chunks:
+        if not isinstance(chunk, dict):
+            continue
+        chunk_words = []
+        for seg in chunk.get("segments") or []:
+            word = _qwen_word_from_segment(seg)
+            if word:
+                chunk_words.append(word)
+        if chunk_words:
+            all_words.append(chunk_words)
+    return all_words
+
+
+def _append_split_qwen_sentence(sentences, buf_texts, buf_start, end):
+    text = " ".join(buf_texts).strip()
+    clean = [p.strip() for p in _L2_SENTENCE_SPLIT.split(text)
+             if p.strip()]
+    if clean:
+        sentences.append({"text": clean[0], "start": buf_start, "end": end})
+
+
+def _append_trailing_qwen_sentence(sentences, buf_texts, buf_start, end):
+    text = " ".join(buf_texts).strip()
+    if text:
+        sentences.append({"text": text, "start": buf_start, "end": end})
+
+
+def _qwen_words_to_sentences(chunk_words):
+    sentences = []
+    buf_texts = []
+    buf_start = None
+    for word in chunk_words:
+        if buf_start is None:
+            buf_start = word["start"]
+        buf_texts.append(word["text"])
+        if _L2_SENTENCE_SPLIT.search(word["text"]):
+            _append_split_qwen_sentence(sentences, buf_texts, buf_start,
+                                        word["end"])
+            buf_texts = []
+            buf_start = None
+    if buf_texts:
+        _append_trailing_qwen_sentence(sentences, buf_texts, buf_start,
+                                       chunk_words[-1]["end"])
+    return sentences
+
+
 def _extract_qwen_sentences(qwen_chunks):
     """P256: merge word-level Qwen timestamps into sentence-level.
 
@@ -390,43 +486,12 @@ def _extract_qwen_sentences(qwen_chunks):
     """
     if not qwen_chunks:
         return []
-    all_words = []
-    for chunk in qwen_chunks:
-        if not isinstance(chunk, dict):
-            continue
-        chunk_words = []
-        for seg in chunk.get("segments") or []:
-            text = (seg.get("text") or "").strip()
-            start = seg.get("start")
-            end = seg.get("end")
-            if text and start is not None and end is not None:
-                chunk_words.append({"text": text, "start": start, "end": end})
-        if chunk_words:
-            all_words.append(chunk_words)
+    all_words = _extract_qwen_word_chunks(qwen_chunks)
     if not all_words:
         return []
     sentences = []
     for chunk_words in all_words:
-        buf_texts = []
-        buf_start = None
-        for w in chunk_words:
-            if buf_start is None:
-                buf_start = w["start"]
-            buf_texts.append(w["text"])
-            if _L2_SENTENCE_SPLIT.search(w["text"]):
-                text = " ".join(buf_texts).strip()
-                clean = [p.strip() for p in _L2_SENTENCE_SPLIT.split(text)
-                         if p.strip()]
-                if clean:
-                    sentences.append({"text": clean[0], "start": buf_start,
-                                      "end": w["end"]})
-                buf_texts = []
-                buf_start = None
-        if buf_texts:
-            text = " ".join(buf_texts).strip()
-            if text:
-                sentences.append({"text": text, "start": buf_start,
-                                  "end": chunk_words[-1]["end"]})
+        sentences.extend(_qwen_words_to_sentences(chunk_words))
     return sentences
 
 
@@ -737,6 +802,63 @@ def _layer3_speech_rate(seg, source_lang: str = "auto") -> None:
                   seg.start, rate, threshold, source_lang)
 
 
+def _initialize_filter_state(segments):
+    for seg in segments:
+        if not hasattr(seg, "filtered"):
+            seg.filtered = False
+        if not hasattr(seg, "filter_reason"):
+            seg.filter_reason = None
+        if not hasattr(seg, "uncertain"):
+            seg.uncertain = False
+
+
+def _effective_l1_alignment(aligner_result, qwen_chunks):
+    effective_alignment = aligner_result
+    if not effective_alignment and _has_timestamp_segments(qwen_chunks):
+        effective_alignment = _qwen_segments_as_alignment(qwen_chunks)
+        _log.info("L1 使用 Qwen 内部 FA 时间戳: %d 词",
+                  len(effective_alignment))
+    return effective_alignment
+
+
+def _apply_layer1(segments, source_lang, aligner_result, qwen_chunks, skip_l1):
+    if skip_l1:
+        return
+    effective_alignment = _effective_l1_alignment(aligner_result, qwen_chunks)
+    for seg in segments:
+        if not seg.filtered:
+            _layer1_dual_signal(seg, effective_alignment, source_lang)
+
+
+def _apply_layer2(segments, source_lang, qwen_chunks, skip_l2, alt_segments):
+    qwen_reliable = _qwen_is_reliable(qwen_chunks)
+    if skip_l2:
+        _log.info("L2 跳过: 单主引擎模式无第二份参考稿")
+    elif qwen_reliable:
+        segments, _ignore_stats = _layer2_cross_validate(
+            segments, source_lang, qwen_chunks=qwen_chunks,
+            alt_segments=alt_segments)
+    return segments
+
+
+def _apply_layer4(segments):
+    for seg in segments:
+        if not seg.filtered:
+            _layer4_regex(seg)
+
+
+def _apply_layer3(segments, source_lang):
+    for seg in segments:
+        if not seg.filtered:
+            _layer3_speech_rate(seg, source_lang)
+
+
+def _renumber_segments(segments):
+    for i, seg in enumerate(segments):
+        seg.id = i
+    return segments
+
+
 def filter_hallucinations(segments: list, source_lang: str = "auto",
                           aligner_result=None, qwen_chunks=None,
                           skip_l1: bool = False, skip_l2: bool = False,
@@ -760,48 +882,22 @@ def filter_hallucinations(segments: list, source_lang: str = "auto",
     if not segments:
         return []
 
-    for seg in segments:
-        if not hasattr(seg, "filtered"):
-            seg.filtered = False
-        if not hasattr(seg, "filter_reason"):
-            seg.filter_reason = None
-        if not hasattr(seg, "uncertain"):
-            seg.uncertain = False
+    _initialize_filter_state(segments)
 
     # When Qwen chunks carry word-level timestamps (MLX path), derive
     # alignment data from them — no external FA needed for L1.
-    if not skip_l1:
-        effective_alignment = aligner_result
-        if not effective_alignment and _has_timestamp_segments(qwen_chunks):
-            effective_alignment = _qwen_segments_as_alignment(qwen_chunks)
-            _log.info("L1 使用 Qwen 内部 FA 时间戳: %d 词", len(effective_alignment))
-
-        for seg in segments:
-            if not seg.filtered:
-                _layer1_dual_signal(seg, effective_alignment, source_lang)
+    _apply_layer1(segments, source_lang, aligner_result, qwen_chunks, skip_l1)
 
     surviving = [s for s in segments if not s.filtered]
-    qwen_reliable = _qwen_is_reliable(qwen_chunks)
-    if skip_l2:
-        _log.info("L2 跳过: 单主引擎模式无第二份参考稿")
-    elif qwen_reliable:
-        surviving, _ignore_stats = _layer2_cross_validate(
-            surviving, source_lang, qwen_chunks=qwen_chunks,
-            alt_segments=alt_segments)
+    surviving = _apply_layer2(
+        surviving, source_lang, qwen_chunks, skip_l2, alt_segments)
 
-    for seg in surviving:
-        if not seg.filtered:
-            _layer4_regex(seg)
+    _apply_layer4(surviving)
 
     surviving = [s for s in surviving if not s.filtered]
     surviving = _layer5_dedup(surviving)
 
-    for seg in surviving:
-        if not seg.filtered:
-            _layer3_speech_rate(seg, source_lang)
+    _apply_layer3(surviving, source_lang)
 
     result = [s for s in surviving if not s.filtered]
-    for i, s in enumerate(result):
-        s.id = i
-
-    return result
+    return _renumber_segments(result)

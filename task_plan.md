@@ -273,6 +273,8 @@
 | 5 | [orchestrator.py](v3/backend/translation/orchestrator.py) | `translate_with_orchestrator` | 17 | ⬜ |
 | 6 | [subtitle_style.py](v3/backend/subtitle_style.py) | `build_ass_styled` | 16 | ⬜ |
 
+**补充记录（2026-06-25）**：剩余复杂度拆分对话 A 已完成。`v3/backend/core/hallucination_filter.py` 四个目标均降级：`LightweightStemmer` F(46)→B(8)，`clean_and_stem` F(45)→B(7)，`_extract_qwen_sentences` D(21)→A(4)，`filter_hallucinations` D(24)→B(8)。纯重构零行为变更；每步全量测试，最终 **624 passed, 8 warnings**。记录见 `pipelines/refactor-pipeline-hallucination-filter-2026-06-25.md`，剩余 B/C/D 三组见 `pipelines/refactor-remaining-plan.md`。
+
 **V3.07 双签 diff 遗留项（2026-06-21 版本收尾审查发现，归入 V3.08 一起做）**：
 
 | # | 类型 | 内容 | 来源 |

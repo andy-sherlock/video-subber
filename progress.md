@@ -3,6 +3,23 @@
 **日期**：2026-06-21
 **版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
 
+## 2026-06-25 V3.08：hallucination_filter 对话 A 函数复杂度拆分
+
+承接 `pipelines/refactor-remaining-plan.md`，本轮只拆 `v3/backend/core/hallucination_filter.py` 四个目标函数，纯重构，只搬代码不改逻辑。
+
+- **路径修正**：规划旧写 `backend/hallucination_filter.py`，真实活跃路径是 `v3/backend/core/hallucination_filter.py`。
+- **拆分结果**：
+  - `LightweightStemmer` **F(46) → B(8)**
+  - `clean_and_stem` **F(45) → B(7)**
+  - `_extract_qwen_sentences` **D(21) → A(4)**
+  - `filter_hallucinations` **D(24) → B(8)**
+- **抽出 helper**：词干器按语言拆出 `_stem_*`/`_strip_*` helper；Qwen 句子提取拆出词块收集和句子合成 helper；五层过滤主函数拆出 `_apply_layer1/_apply_layer2/_apply_layer4/_apply_layer3` 等阶段 helper。
+- **全文件结果**：`hallucination_filter.py` 不再有 D/F 级函数，最高为 `_layer4_regex C(19)`、`_layer2_cross_validate C(18)`。
+- **验证**：每抽一步均跑全量测试；最终 `cd v3 && .venv/bin/python -m pytest test/ -q` → **624 passed, 8 warnings**。
+- **环境说明**：沙盒内全量测试会卡在 Hugging Face/Metal 访问；本轮全量测试均用非沙盒权限跑同一条命令。
+- **记录**：详见 `pipelines/refactor-pipeline-hallucination-filter-2026-06-25.md`。
+- **下一步**：推荐继续对话 C，拆 `v3/backend/translation/orchestrator.py::_translate_whole_with_markers`。
+
 ## 2026-06-23 V3.08：worker.main 函数复杂度拆分（F109 → C15）
 
 纯重构，只搬代码不改逻辑（含日志/进度/emit/异常路径逐字保留）。worker.py 的 `main()` 是全项目最绕的函数（radon F109，比已拆 transcribe 的 41 还大 2.5 倍），单独开会话拆。
