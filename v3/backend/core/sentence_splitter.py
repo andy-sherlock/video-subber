@@ -109,49 +109,65 @@ def llm_split_segments(segments: list, llm_backend=None, pre_splits: dict | None
 
     Falls back to rule-based splitting when no LLM is available.
     """
-    from backend.transcriber_v2 import Segment
-
     # Phase 1C: apply pre-computed splits from LLM translation step
     if pre_splits:
-        _log.info("使用预计算断句 (LLM 翻译已拆 %d 条)", len(pre_splits))
-        result = []
-        for i, seg in enumerate(segments):
-            if i in pre_splits and len(pre_splits[i]) >= 2:
-                parts = pre_splits[i]
-                subs = _build_split_segments(seg, parts)
-                result.extend(subs)
-            else:
-                result.append(seg)
-        # Apply rule-based splitting to remaining long segments
-        # that were NOT pre-split (fallback gap-fill)
-        final_result = []
-        for seg in result:
-            zh = getattr(seg, 'zh', '').strip()
-            if (zh and zh != '[翻译失败]' and len(zh) > _MAX_ZH_CHARS
-                    and not any(seg.id == orig * 100 + j
-                                for orig, parts in pre_splits.items()
-                                for j in range(len(parts)))):
-                final_result.extend(_rule_based_split(seg))
-            else:
-                final_result.append(seg)
-        return final_result
+        return _apply_precomputed_splits(segments, pre_splits)
 
-    long_segs = []
-    for i, seg in enumerate(segments):
-        zh = getattr(seg, 'zh', '').strip()
-        if zh and zh != '[翻译失败]' and len(zh) > _MAX_ZH_CHARS:
-            long_segs.append(i)
+    long_segs = _find_long_segment_indexes(segments)
 
     if not long_segs:
         return segments
 
-    if llm_backend and hasattr(llm_backend, 'translate_raw'):
-        replacements = _llm_batch_split(
-            [segments[i] for i in long_segs], llm_backend
-        )
-    else:
-        replacements = [_rule_based_split(segments[i]) for i in long_segs]
+    replacements = _split_long_segments(segments, long_segs, llm_backend)
+    return _replace_segments_with_splits(segments, long_segs, replacements)
 
+
+def _is_long_zh_segment(seg) -> bool:
+    zh = getattr(seg, 'zh', '').strip()
+    return bool(zh and zh != '[翻译失败]' and len(zh) > _MAX_ZH_CHARS)
+
+
+def _is_from_precomputed_split(seg, pre_splits: dict) -> bool:
+    return any(
+        seg.id == orig * 100 + j
+        for orig, parts in pre_splits.items()
+        for j in range(len(parts))
+    )
+
+
+def _apply_precomputed_splits(segments: list, pre_splits: dict) -> list:
+    _log.info("使用预计算断句 (LLM 翻译已拆 %d 条)", len(pre_splits))
+    result = []
+    for i, seg in enumerate(segments):
+        if i in pre_splits and len(pre_splits[i]) >= 2:
+            parts = pre_splits[i]
+            subs = _build_split_segments(seg, parts)
+            result.extend(subs)
+        else:
+            result.append(seg)
+
+    # Apply rule-based splitting to remaining long segments
+    # that were NOT pre-split (fallback gap-fill)
+    final_result = []
+    for seg in result:
+        if _is_long_zh_segment(seg) and not _is_from_precomputed_split(seg, pre_splits):
+            final_result.extend(_rule_based_split(seg))
+        else:
+            final_result.append(seg)
+    return final_result
+
+
+def _find_long_segment_indexes(segments: list) -> list[int]:
+    return [i for i, seg in enumerate(segments) if _is_long_zh_segment(seg)]
+
+
+def _split_long_segments(segments: list, long_segs: list[int], llm_backend=None) -> list[list]:
+    if llm_backend and hasattr(llm_backend, 'translate_raw'):
+        return _llm_batch_split([segments[i] for i in long_segs], llm_backend)
+    return [_rule_based_split(segments[i]) for i in long_segs]
+
+
+def _replace_segments_with_splits(segments: list, long_segs: list[int], replacements: list[list]) -> list:
     result = []
     replace_map = dict(zip(long_segs, replacements))
     for i, seg in enumerate(segments):
@@ -159,7 +175,6 @@ def llm_split_segments(segments: list, llm_backend=None, pre_splits: dict | None
             result.extend(replace_map[i])
         else:
             result.append(seg)
-
     return result
 
 

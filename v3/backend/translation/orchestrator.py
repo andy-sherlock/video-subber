@@ -553,6 +553,154 @@ def _translate_one_chunk(
     return ci, chunk_result, result.tokens_used
 
 
+def _initialize_whole_translation(texts: list[str]) -> tuple[list[str], list[tuple[int, str]]]:
+    translated = ["[翻译失败]"] * len(texts)
+    non_empty = []
+    for i, t in enumerate(texts):
+        if not t.strip():
+            translated[i] = ""
+        else:
+            non_empty.append((i, t.strip()))
+    return translated, non_empty
+
+
+def _build_overlapping_chunks(
+    non_empty: list[tuple[int, str]],
+    llm: TranslationBackend,
+) -> list[list[tuple[int, str]]]:
+    chunk_size = _compute_chunk_size(llm)
+    overlap_size = int(chunk_size * _OVERLAP_RATIO)
+    step = chunk_size - overlap_size
+    chunks = []
+    for s in range(0, len(non_empty), step):
+        chunk = non_empty[s:s + chunk_size]
+        if chunk:
+            chunks.append(chunk)
+        if s + chunk_size >= len(non_empty):
+            break
+    return chunks
+
+
+def _build_whole_translation_prompt_prefix(
+    terminology: dict[str, str] | None,
+    context_summary: str,
+) -> str:
+    term_section = ""
+    if terminology:
+        term_lines = "\n".join(f"- {k} → {v}" for k, v in list(terminology.items())[:30])
+        term_section = f"【术语表（翻译时必须使用）】\n{term_lines}\n\n"
+
+    summary_section = ""
+    if context_summary:
+        summary_section = f"【内容摘要】\n{context_summary}\n\n"
+        _log.info("翻译策略已启用（内容摘要 %d 字）", len(context_summary))
+
+    return _SUBTITLE_PROMPT + term_section + summary_section
+
+
+def _translate_chunks_with_prompt(
+    chunks: list[list[tuple[int, str]]],
+    texts: list[str],
+    translated: list[str],
+    prompt_prefix: str,
+    llm: TranslationBackend,
+    progress_callback=None,
+) -> tuple[list[dict[int, str]], dict | None]:
+    total_chunks = len(chunks)
+    chunk_results = [{} for _ in range(total_chunks)]
+    translated_lock = threading.Lock()
+    token_usage_total = None
+
+    completed = 0
+    with ThreadPoolExecutor(max_workers=min(total_chunks, 5)) as executor:
+        futures = {
+            executor.submit(_translate_one_chunk, chunks[ci], prompt_prefix, llm, ci, total_chunks): ci
+            for ci in range(total_chunks)
+        }
+        for future in as_completed(futures):
+            ci, chunk_result, chunk_tokens = future.result()
+            chunk_results[ci] = chunk_result
+            with translated_lock:
+                for idx, zh in chunk_result.items():
+                    if 0 <= idx < len(texts) and zh:
+                        translated[idx] = zh
+            token_usage_total = _merge_tokens(token_usage_total, chunk_tokens)
+            completed += 1
+            if progress_callback and total_chunks > 1:
+                pct = int(completed / total_chunks * 80)
+                progress_callback(pct, f"LLM 翻译第 {completed}/{total_chunks} 段…")
+
+    return chunk_results, token_usage_total
+
+
+def _review_translation_seams(
+    chunks: list[list[tuple[int, str]]],
+    chunk_results: list[dict[int, str]],
+    translated: list[str],
+    terminology: dict[str, str],
+    llm: TranslationBackend,
+    token_usage_total: dict | None,
+    progress_callback=None,
+) -> dict | None:
+    if progress_callback:
+        progress_callback(82, "接缝审查中…")
+
+    for ci in range(1, len(chunks)):
+        prev_chunk = chunks[ci - 1]
+        curr_chunk = chunks[ci]
+
+        prev_indices = {idx for idx, _ in prev_chunk}
+        curr_indices = {idx for idx, _ in curr_chunk}
+        overlap_indices = sorted(prev_indices & curr_indices)
+
+        if len(overlap_indices) < 3:
+            continue
+
+        overlap_start = overlap_indices[0]
+        overlap_end = overlap_indices[-1] + 1
+
+        version_a = chunk_results[ci - 1]
+        version_b = chunk_results[ci]
+
+        reviewed = _review_seam(
+            translated, overlap_start, overlap_end,
+            version_a, version_b, terminology, llm,
+        )
+        if reviewed:
+            for idx, zh in reviewed.items():
+                translated[idx] = zh
+            token_usage_total = _merge_tokens(
+                token_usage_total, {"seam_reviews": 1}
+            )
+
+    if progress_callback:
+        progress_callback(90, "接缝审查完成")
+
+    return token_usage_total
+
+
+def _finalize_whole_translation(
+    texts: list[str],
+    translated: list[str],
+    sub_splits: dict[int, list[str]],
+) -> tuple[dict[int, list[str]], int]:
+    final_sub_splits: dict[int, list[str]] = {}
+    for idx, parts in sorted(sub_splits.items()):
+        if len(parts) >= 2:
+            translated[idx] = " ".join(parts)
+            final_sub_splits[idx] = parts
+        elif len(parts) == 1:
+            # Single sub-part — treat as regular translation (override if needed)
+            if translated[idx] == "[翻译失败]":
+                translated[idx] = parts[0]
+    if final_sub_splits:
+        _log.info("LLM 已预拆分段: %d 条 (%d 个子句)",
+                  len(final_sub_splits), sum(len(p) for p in final_sub_splits.values()))
+
+    ok_count = sum(1 for i, t in enumerate(translated) if t != "[翻译失败]" or not texts[i].strip())
+    return final_sub_splits, ok_count
+
+
 def _translate_whole_with_markers(
     texts: list[str],
     llm: TranslationBackend,
@@ -579,122 +727,32 @@ def _translate_whole_with_markers(
                  len(terminology) if terminology else 0,
                  f"'{context_summary[:50]}...'" if context_summary else "空")
 
-    translated = ["[翻译失败]"] * len(texts)
-    non_empty = []
-    for i, t in enumerate(texts):
-        if not t.strip():
-            translated[i] = ""
-        else:
-            non_empty.append((i, t.strip()))
+    translated, non_empty = _initialize_whole_translation(texts)
 
     if not non_empty:
         return translated, None, {}
 
-    # Build chunks with overlap
-    chunk_size = _compute_chunk_size(llm)
-    overlap_size = int(chunk_size * _OVERLAP_RATIO)
-    step = chunk_size - overlap_size
-    chunks = []
-    for s in range(0, len(non_empty), step):
-        chunk = non_empty[s:s + chunk_size]
-        if chunk:
-            chunks.append(chunk)
-        if s + chunk_size >= len(non_empty):
-            break
-
+    chunks = _build_overlapping_chunks(non_empty, llm)
     total_chunks = len(chunks)
-    token_usage_total = None
     sub_splits: dict[int, list[str]] = {}
 
-    # Build prompt sections
-    term_section = ""
-    if terminology:
-        term_lines = "\n".join(f"- {k} → {v}" for k, v in list(terminology.items())[:30])
-        term_section = f"【术语表（翻译时必须使用）】\n{term_lines}\n\n"
-
-    summary_section = ""
-    if context_summary:
-        summary_section = f"【内容摘要】\n{context_summary}\n\n"
-        _log.info("翻译策略已启用（内容摘要 %d 字）", len(context_summary))
-
-    prompt_prefix = _SUBTITLE_PROMPT + term_section + summary_section
-    chunk_results = [{} for _ in range(total_chunks)]
-    translated_lock = threading.Lock()
-
-    completed = 0
-    with ThreadPoolExecutor(max_workers=min(total_chunks, 5)) as executor:
-        futures = {
-            executor.submit(_translate_one_chunk, chunks[ci], prompt_prefix, llm, ci, total_chunks): ci
-            for ci in range(total_chunks)
-        }
-        for future in as_completed(futures):
-            ci, chunk_result, chunk_tokens = future.result()
-            chunk_results[ci] = chunk_result
-            with translated_lock:
-                for idx, zh in chunk_result.items():
-                    if 0 <= idx < len(texts) and zh:
-                        translated[idx] = zh
-            token_usage_total = _merge_tokens(token_usage_total, chunk_tokens)
-            completed += 1
-            if progress_callback and total_chunks > 1:
-                pct = int(completed / total_chunks * 80)
-                progress_callback(pct, f"LLM 翻译第 {completed}/{total_chunks} 段…")
+    prompt_prefix = _build_whole_translation_prompt_prefix(terminology, context_summary)
+    chunk_results, token_usage_total = _translate_chunks_with_prompt(
+        chunks, texts, translated, prompt_prefix, llm, progress_callback
+    )
 
     if progress_callback:
         progress_callback(80, f"LLM 翻译完成 ({total_chunks}/{total_chunks} 段)")
 
     # Seam review for overlap zones (only when multiple chunks exist)
     if total_chunks > 1 and terminology is not None:
-        if progress_callback:
-            progress_callback(82, "接缝审查中…")
-
-        for ci in range(1, len(chunks)):
-            prev_chunk = chunks[ci - 1]
-            curr_chunk = chunks[ci]
-
-            prev_indices = {idx for idx, _ in prev_chunk}
-            curr_indices = {idx for idx, _ in curr_chunk}
-            overlap_indices = sorted(prev_indices & curr_indices)
-
-            if len(overlap_indices) < 3:
-                continue
-
-            overlap_start = overlap_indices[0]
-            overlap_end = overlap_indices[-1] + 1
-
-            version_a = chunk_results[ci - 1]
-            version_b = chunk_results[ci]
-
-            reviewed = _review_seam(
-                translated, overlap_start, overlap_end,
-                version_a, version_b, terminology or {}, llm,
-            )
-            if reviewed:
-                for idx, zh in reviewed.items():
-                    translated[idx] = zh
-                token_usage_total = _merge_tokens(
-                    token_usage_total, {"seam_reviews": 1}
-                )
-
-        if progress_callback:
-            progress_callback(90, "接缝审查完成")
+        token_usage_total = _review_translation_seams(
+            chunks, chunk_results, translated, terminology, llm, token_usage_total, progress_callback
+        )
 
     # Phase 1C: finalize sub_splits — join parts into translated list,
     # keep only multi-part splits for downstream use
-    final_sub_splits: dict[int, list[str]] = {}
-    for idx, parts in sorted(sub_splits.items()):
-        if len(parts) >= 2:
-            translated[idx] = " ".join(parts)
-            final_sub_splits[idx] = parts
-        elif len(parts) == 1:
-            # Single sub-part — treat as regular translation (override if needed)
-            if translated[idx] == "[翻译失败]":
-                translated[idx] = parts[0]
-    if final_sub_splits:
-        _log.info("LLM 已预拆分段: %d 条 (%d 个子句)",
-                  len(final_sub_splits), sum(len(p) for p in final_sub_splits.values()))
-
-    ok_count = sum(1 for i, t in enumerate(translated) if t != "[翻译失败]" or not texts[i].strip())
+    final_sub_splits, ok_count = _finalize_whole_translation(texts, translated, sub_splits)
     if ok_count == 0:
         raise RuntimeError("LLM 整篇翻译失败：完全无法解析返回格式")
 

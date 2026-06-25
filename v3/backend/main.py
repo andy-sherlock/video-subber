@@ -619,146 +619,177 @@ def _cleanup_hash_index(job_id: str):
 # ── POST /api/jobs — the core: upload/path → hash → dedup → create or restore ──
 
 
-@app.post("/api/jobs")
-async def create_job(request: Request):
-    import shutil as _shutil, os as _os_module
+def _normalize_job_config(cfg):
+    if isinstance(cfg, str):
+        cfg = json.loads(cfg)
+    cfg.pop("tier", None)
+    cfg.pop("local_path", None)
+    return cfg
 
-    content_type = request.headers.get("content-type", "")
 
-    # ── 模式 1：本地路径（JSON body）──
-    if content_type and "json" in content_type:
-        body = await request.json()
-        cfg = body.get("config", {})
-        if isinstance(cfg, str):
-            cfg = json.loads(cfg)
-        cfg.pop("tier", None)
-        cfg.pop("local_path", None)
-        local_path = body.get("local_path", "")
-        source_url = body.get("url", "").strip()
+def _new_job_dir():
+    jid = uuid.uuid4().hex[:10]
+    job_dir = JOBS_DIR / jid
+    job_dir.mkdir(parents=True)
+    return jid, job_dir
 
-        if source_url:
-            # P188: reject non-http/https URLs
-            if not source_url.startswith(("http://", "https://")):
-                return JSONResponse(
-                    {"error": "仅支持 http/https 链接"},
-                    status_code=400,
-                )
-            # P174: URL mode — worker subprocess handles download
-            cfg["source_url"] = source_url
-            url_fname = source_url.split("/")[-1].split("?")[0]
-            cfg["video_filename"] = url_fname or "download.mp4"
 
-            jid = uuid.uuid4().hex[:10]
-            job_dir = JOBS_DIR / jid
-            job_dir.mkdir(parents=True)
+def _prepare_url_job(cfg: dict, source_url: str):
+    if not source_url.startswith(("http://", "https://")):
+        return JSONResponse(
+            {"error": "仅支持 http/https 链接"},
+            status_code=400,
+        )
 
-            file_hash = hashlib.sha256(source_url.encode()).hexdigest()
-            video_path = ""
-        else:
-            if not local_path or not _os_module.path.isfile(local_path):
-                return JSONResponse(
-                    {"error": f"找不到文件：{local_path or '(空路径)'}"},
-                    status_code=400,
-                )
+    # P174: URL mode — worker subprocess handles download
+    cfg["source_url"] = source_url
+    url_fname = source_url.split("/")[-1].split("?")[0]
+    cfg["video_filename"] = url_fname or "download.mp4"
 
-            filename = Path(local_path).name
-            cfg["video_filename"] = filename
-            cfg["source_dir"] = str(Path(local_path).parent)
+    jid, job_dir = _new_job_dir()
+    return {
+        "cfg": cfg,
+        "jid": jid,
+        "job_dir": job_dir,
+        "file_hash": hashlib.sha256(source_url.encode()).hexdigest(),
+        "video_path": "",
+    }
 
-            jid = uuid.uuid4().hex[:10]
-            job_dir = JOBS_DIR / jid
-            job_dir.mkdir(parents=True)
 
-            # 流式读取计算 SHA256（不复制文件，直接引用原始路径）
-            hasher = hashlib.sha256()
-            try:
-                with open(local_path, "rb") as src:
-                    while True:
-                        chunk = src.read(8 * 1024 * 1024)
-                        if not chunk:
-                            break
-                        hasher.update(chunk)
-                file_hash = hasher.hexdigest()
-            except Exception:
-                _shutil.rmtree(job_dir, ignore_errors=True)
-                return JSONResponse({"error": "读取本地文件失败，请检查文件是否可访问"}, status_code=500)
+def _hash_local_file(local_path: str) -> str:
+    hasher = hashlib.sha256()
+    with open(local_path, "rb") as src:
+        while True:
+            chunk = src.read(8 * 1024 * 1024)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
-            video_path = local_path
 
-    # ── 模式 2：文件上传（multipart/form-data）──
-    else:
-        form = await request.form()
-        file = form.get("file")
-        config_str = form.get("config", "{}")
-        cfg = json.loads(config_str)
-        cfg.pop("tier", None)
-        cfg["video_filename"] = file.filename if file else ""
+def _prepare_local_path_job(cfg: dict, local_path: str):
+    import os as _os_module
+    import shutil as _shutil
 
-        jid = uuid.uuid4().hex[:10]
-        job_dir = JOBS_DIR / jid
-        job_dir.mkdir(parents=True)
-        video_path = job_dir / f"input{Path(file.filename).suffix}" if file else job_dir / "input.mp4"
+    if not local_path or not _os_module.path.isfile(local_path):
+        return JSONResponse(
+            {"error": f"找不到文件：{local_path or '(空路径)'}"},
+            status_code=400,
+        )
 
-        if not file:
-            return JSONResponse({"error": "请选择视频文件或输入本地路径"}, status_code=400)
+    filename = Path(local_path).name
+    cfg["video_filename"] = filename
+    cfg["source_dir"] = str(Path(local_path).parent)
 
-        # 流式写入 + SHA256（8MB 分块，恒定内存）
-        hasher = hashlib.sha256()
+    jid, job_dir = _new_job_dir()
+    try:
+        file_hash = _hash_local_file(local_path)
+    except Exception:
+        _shutil.rmtree(job_dir, ignore_errors=True)
+        return JSONResponse({"error": "读取本地文件失败，请检查文件是否可访问"}, status_code=500)
+
+    return {
+        "cfg": cfg,
+        "jid": jid,
+        "job_dir": job_dir,
+        "file_hash": file_hash,
+        "video_path": local_path,
+    }
+
+
+async def _prepare_json_job(request: Request):
+    body = await request.json()
+    cfg = _normalize_job_config(body.get("config", {}))
+    local_path = body.get("local_path", "")
+    source_url = body.get("url", "").strip()
+
+    if source_url:
+        return _prepare_url_job(cfg, source_url)
+    return _prepare_local_path_job(cfg, local_path)
+
+
+async def _prepare_upload_job(request: Request):
+    import shutil as _shutil
+
+    form = await request.form()
+    file = form.get("file")
+    config_str = form.get("config", "{}")
+    cfg = json.loads(config_str)
+    cfg.pop("tier", None)
+    cfg["video_filename"] = file.filename if file else ""
+
+    jid, job_dir = _new_job_dir()
+    video_path = job_dir / f"input{Path(file.filename).suffix}" if file else job_dir / "input.mp4"
+
+    if not file:
+        return JSONResponse({"error": "请选择视频文件或输入本地路径"}, status_code=400)
+
+    # 流式写入 + SHA256（8MB 分块，恒定内存）
+    hasher = hashlib.sha256()
+    try:
+        with open(video_path, "wb") as f:
+            while chunk := await file.read(8 * 1024 * 1024):
+                hasher.update(chunk)
+                f.write(chunk)
+        file_hash = hasher.hexdigest()
+    except Exception:
+        _shutil.rmtree(job_dir, ignore_errors=True)
+        return JSONResponse({"error": "上传失败，请重试"}, status_code=500)
+
+    return {
+        "cfg": cfg,
+        "jid": jid,
+        "job_dir": job_dir,
+        "file_hash": file_hash,
+        "video_path": video_path,
+    }
+
+
+def _handle_existing_job(existing: dict, job_dir: Path, video_path, cfg: dict):
+    import shutil as _shutil
+
+    old_jid = existing["job_id"]
+    status = existing["status"]
+    old_job_dir = JOBS_DIR / old_jid
+
+    # Stale index entry — disk was cleared while server was running
+    if not old_job_dir.is_dir():
+        _cleanup_hash_index(old_jid)
+        return None
+    if status in ("interrupted", "error"):
+        _shutil.rmtree(job_dir, ignore_errors=True)
+        job_dir = old_job_dir
         try:
-            with open(video_path, "wb") as f:
-                while chunk := await file.read(8 * 1024 * 1024):
-                    hasher.update(chunk)
-                    f.write(chunk)
-            file_hash = hasher.hexdigest()
-        except Exception:
-            _shutil.rmtree(job_dir, ignore_errors=True)
-            return JSONResponse({"error": "上传失败，请重试"}, status_code=500)
+            video_path = next(job_dir.glob("input.*"))
+        except StopIteration:
+            pass
 
-    # ── 以下为共享的去重 + 任务创建逻辑 ──
-    # v2.09: config-aware dedup — same video + same settings = reuse, different settings = new task
+        JOBS[old_jid] = {
+            "id": old_jid, "status": "running", "progress": 0,
+            "stage": "", "message": "服务重启，正在恢复…",
+            "result_video": None, "result_srt": None, "error": None,
+            "config": existing["config"],
+            "last_progress": time.time(),
+        }
+        existing["status"] = "running"
+        _persist_job_status(old_jid, "running")
+        worker_manager.start(old_jid, job_dir, str(video_path), existing["config"])
+        return {"found": True, "job_id": old_jid, "status": "running",
+                "config": existing["config"]}
+    if status == "done" and not cfg.get("force"):
+        _shutil.rmtree(job_dir, ignore_errors=True)
+        return {"found": True, "job_id": old_jid, "status": "done",
+                "config": existing["config"]}
+    if status in ("queued", "running"):
+        _shutil.rmtree(job_dir, ignore_errors=True)
+        return {"found": True, "job_id": old_jid, "status": status,
+                "config": existing["config"]}
 
-    tk = _task_key(file_hash, cfg)
-    existing = GLOBAL_HASH_INDEX.get(tk)
+    _cleanup_hash_index(old_jid)
+    return None
 
-    if existing:
-        old_jid = existing["job_id"]
-        status = existing["status"]
-        old_job_dir = JOBS_DIR / old_jid
 
-        # Stale index entry — disk was cleared while server was running
-        if not old_job_dir.is_dir():
-            _cleanup_hash_index(old_jid)
-        elif status in ("interrupted", "error"):
-            _shutil.rmtree(job_dir, ignore_errors=True)
-            job_dir = old_job_dir
-            try:
-                video_path = next(job_dir.glob("input.*"))
-            except StopIteration:
-                pass
-
-            JOBS[old_jid] = {
-                "id": old_jid, "status": "running", "progress": 0,
-                "stage": "", "message": "服务重启，正在恢复…",
-                "result_video": None, "result_srt": None, "error": None,
-                "config": existing["config"],
-                "last_progress": time.time(),
-            }
-            existing["status"] = "running"
-            _persist_job_status(old_jid, "running")
-            worker_manager.start(old_jid, job_dir, str(video_path), existing["config"])
-            return {"found": True, "job_id": old_jid, "status": "running",
-                    "config": existing["config"]}
-        elif status == "done" and not cfg.get("force"):
-            _shutil.rmtree(job_dir, ignore_errors=True)
-            return {"found": True, "job_id": old_jid, "status": "done",
-                    "config": existing["config"]}
-        elif status in ("queued", "running"):
-            _shutil.rmtree(job_dir, ignore_errors=True)
-            return {"found": True, "job_id": old_jid, "status": status,
-                    "config": existing["config"]}
-        else:
-            _cleanup_hash_index(old_jid)
-
+def _start_new_job(jid: str, job_dir: Path, video_path, cfg: dict, file_hash: str, tk: str):
     meta = {"file_hash": file_hash, "task_key": tk, "config": cfg,
             "video_filename": cfg.get("video_filename", ""), "status": "queued"}
     (job_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
@@ -776,6 +807,37 @@ async def create_job(request: Request):
     }
     worker_manager.start(jid, job_dir, str(video_path), cfg)
     return {"id": jid, "found": False}
+
+
+@app.post("/api/jobs")
+async def create_job(request: Request):
+    content_type = request.headers.get("content-type", "")
+    prepared = (
+        await _prepare_json_job(request)
+        if content_type and "json" in content_type
+        else await _prepare_upload_job(request)
+    )
+    if isinstance(prepared, JSONResponse):
+        return prepared
+
+    cfg = prepared["cfg"]
+    jid = prepared["jid"]
+    job_dir = prepared["job_dir"]
+    file_hash = prepared["file_hash"]
+    video_path = prepared["video_path"]
+
+    # ── 以下为共享的去重 + 任务创建逻辑 ──
+    # v2.09: config-aware dedup — same video + same settings = reuse, different settings = new task
+
+    tk = _task_key(file_hash, cfg)
+    existing = GLOBAL_HASH_INDEX.get(tk)
+
+    if existing:
+        response = _handle_existing_job(existing, job_dir, video_path, cfg)
+        if response is not None:
+            return response
+
+    return _start_new_job(jid, job_dir, video_path, cfg, file_hash, tk)
 
 
 # ── v2.05: Active jobs recovery (fallback when localStorage is empty) ──

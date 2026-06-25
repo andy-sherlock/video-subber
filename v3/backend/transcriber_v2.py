@@ -219,65 +219,51 @@ def summarize_voice_timeline_quality(segments, voice_timeline, lang="auto"):
     }
 
 
-def _detect_speaker_changes(audio_path: str, segments: list) -> list:
-    """Compare adjacent segment voiceprints via resemblyzer.
-    Sets segment.speaker_change=True where voice changes.
-    Threshold is auto-detected from score distribution — no magic number.
-    """
+def _load_speaker_change_dependencies():
     try:
         from resemblyzer import VoiceEncoder, preprocess_wav
         import librosa
     except ImportError:
         _log.warning("未安装 resemblyzer/librosa，跳过说话人检测")
-        return segments
+        return None
+    return VoiceEncoder, preprocess_wav, librosa
 
+
+def _create_voice_encoder(VoiceEncoder):
     try:
-        encoder = VoiceEncoder()
+        return VoiceEncoder()
     except Exception:
-        return segments
+        return None
 
-    def _get_emb(start: float, end: float):
-        try:
-            dur = end - start
-            if dur < 1.0:
-                return None
-            y, _sr = librosa.load(audio_path, sr=16000, offset=start, duration=dur)
-            if len(y) < 16000 * 1.0:
-                return None
-            wav = preprocess_wav(y, source_sr=16000)
-            return encoder.embed_utterance(wav)
-        except Exception:
+
+def _get_speaker_embedding(audio_path, start, end, encoder, preprocess_wav, librosa):
+    try:
+        dur = end - start
+        if dur < 1.0:
             return None
+        y, _sr = librosa.load(audio_path, sr=16000, offset=start, duration=dur)
+        if len(y) < 16000 * 1.0:
+            return None
+        wav = preprocess_wav(y, source_sr=16000)
+        return encoder.embed_utterance(wav)
+    except Exception:
+        return None
 
-    # ── Pass 1: collect all similarity scores ──
+
+def _collect_speaker_similarities(audio_path, segments, encoder, preprocess_wav, librosa):
     prev_emb = None
     sims = []  # (segment_index, similarity_score)
     for seg in segments:
-        emb = _get_emb(seg.start, seg.end)
+        emb = _get_speaker_embedding(audio_path, seg.start, seg.end, encoder, preprocess_wav, librosa)
         if emb is not None and prev_emb is not None:
             sim = float(np.dot(emb, prev_emb))
             sims.append((seg, sim))
         if emb is not None:
             prev_emb = emb
+    return sims
 
-    if len(sims) < 2:
-        _log.info("说话人检测: 有效相似度不足，跳过")
-        return segments
 
-    # ── Guard B: skip detection for short videos (< 5 segments) ──
-    if len(segments) < 5:
-        _log.info("说话人检测: 段数不足5（%d段），跳过", len(segments))
-        return segments
-
-    scores = np.array([s for _, s in sims], dtype=np.float64)
-    score_range = float(scores.max() - scores.min())
-
-    # ── Solo-speaker check: tight cluster → no split needed ──
-    if score_range < 0.01 or float(scores.std()) < score_range * 0.15:
-        _log.info("说话人检测: 单人（std=%.3f, range=%.3f），无横杠", float(scores.std()), score_range)
-        return segments
-
-    # ── Multi-speaker: find natural split via minimum within-group variance ──
+def _find_speaker_change_threshold(scores):
     sorted_scores = np.sort(scores)
     best_thr = sorted_scores[len(sorted_scores) // 2]  # fallback
     best_var = float("inf")
@@ -288,21 +274,28 @@ def _detect_speaker_changes(audio_path: str, segments: list) -> list:
         if var_sum < best_var:
             best_var = var_sum
             best_thr = float((left[-1] + right[0]) / 2.0)
+    return best_thr
 
-    # ── Pass 2: apply found threshold ──
+
+def _apply_speaker_change_threshold(sims, best_thr):
     changes = 0
     for seg, sim in sims:
         if sim < best_thr:
             seg.speaker_change = True
             changes += 1
+    return changes
 
-    # ── Guard C: two independent checks — either can cancel ──
+
+def _clear_speaker_changes(sims):
+    for seg, _ in sims:
+        seg.speaker_change = False
+
+
+def _speaker_gap_check_allows_split(scores, sims):
     sorted_all = np.sort(scores)
     score_gaps = np.diff(sorted_all)
     gap_ratio = 0.0
-    group_gap = 0.0
 
-    # Check 1: gap detection — is there a real crack in the distribution?
     if len(score_gaps) >= 3:
         median_gap = float(np.median(score_gaps))
         max_gap = float(score_gaps.max())
@@ -310,20 +303,65 @@ def _detect_speaker_changes(audio_path: str, segments: list) -> list:
             gap_ratio = max_gap / median_gap
             if gap_ratio < 3.0:
                 _log.info("说话人检测: 间隙检测未通过（%.1f倍 < 3倍），判定语气波动，全部取消", gap_ratio)
-                for seg, _ in sims:
-                    seg.speaker_change = False
-                return segments
+                _clear_speaker_changes(sims)
+                return False, gap_ratio
+    return True, gap_ratio
 
-    # Check 2: safety clamp — absolute group distance
+
+def _speaker_group_gap_allows_split(scores, best_thr, sims):
+    group_gap = 0.0
     above = [s for s in scores if s >= best_thr]
     below = [s for s in scores if s < best_thr]
     if above and below:
         group_gap = float(np.mean(above) - np.mean(below))
         if group_gap < 0.15:
             _log.info("说话人检测: 安全钳未通过（组间距%.3f < 0.15），判定语气波动，全部取消", group_gap)
-            for seg, _ in sims:
-                seg.speaker_change = False
-            return segments
+            _clear_speaker_changes(sims)
+            return False, group_gap
+    return True, group_gap
+
+
+def _detect_speaker_changes(audio_path: str, segments: list) -> list:
+    """Compare adjacent segment voiceprints via resemblyzer.
+    Sets segment.speaker_change=True where voice changes.
+    Threshold is auto-detected from score distribution — no magic number.
+    """
+    deps = _load_speaker_change_dependencies()
+    if deps is None:
+        return segments
+    VoiceEncoder, preprocess_wav, librosa = deps
+
+    encoder = _create_voice_encoder(VoiceEncoder)
+    if encoder is None:
+        return segments
+
+    sims = _collect_speaker_similarities(audio_path, segments, encoder, preprocess_wav, librosa)
+    if len(sims) < 2:
+        _log.info("说话人检测: 有效相似度不足，跳过")
+        return segments
+
+    if len(segments) < 5:
+        _log.info("说话人检测: 段数不足5（%d段），跳过", len(segments))
+        return segments
+
+    scores = np.array([s for _, s in sims], dtype=np.float64)
+    score_range = float(scores.max() - scores.min())
+    score_std = float(scores.std())
+
+    if score_range < 0.01 or score_std < score_range * 0.15:
+        _log.info("说话人检测: 单人（std=%.3f, range=%.3f），无横杠", score_std, score_range)
+        return segments
+
+    best_thr = _find_speaker_change_threshold(scores)
+    changes = _apply_speaker_change_threshold(sims, best_thr)
+
+    split_allowed, gap_ratio = _speaker_gap_check_allows_split(scores, sims)
+    if not split_allowed:
+        return segments
+
+    split_allowed, group_gap = _speaker_group_gap_allows_split(scores, best_thr, sims)
+    if not split_allowed:
+        return segments
 
     _log.info("说话人检测完成: %d 处变化 (阈值=%.3f, 间隙比=%.1f, 组间差=%.3f)",
               changes, best_thr, gap_ratio, group_gap)
@@ -484,13 +522,13 @@ def _is_repetition_pattern(text):
     return False
 
 
-def _whisper_is_usable(whisper_segments, total_end=None):
-    if not whisper_segments:
-        return False
-
+def _resolve_whisper_total_end(whisper_segments, total_end):
     if total_end is None:
         total_end = max((getattr(s, "end", 0.0) for s in whisper_segments), default=0.0)
+    return total_end
 
+
+def _whisper_has_enough_long_media_coverage(whisper_segments, total_end):
     # Tiny/failed Whisper on long media often returns only a few broad segments.
     if total_end >= 300 and len(whisper_segments) < 20:
         return False
@@ -500,28 +538,29 @@ def _whisper_is_usable(whisper_segments, total_end=None):
                       for s in whisper_segments)
         if total_end > 0 and covered / total_end < 0.30:
             return False
+    return True
 
-    non_empty = [s for s in whisper_segments if getattr(s, "text", "").strip()]
-    if not non_empty:
-        return False
 
-    if len(whisper_segments) < 5:
-        return True
-
+def _collect_digit_whisper_segments(whisper_segments):
     digit_segs = []
     for i, s in enumerate(whisper_segments):
         cleaned = unicodedata.normalize("NFKC", s.text.strip())
         if cleaned.isdigit():
             digit_segs.append((i, int(cleaned)))
+    return digit_segs
 
-    if len(digit_segs) / len(whisper_segments) >= 0.2:
-        return False
 
+def _has_too_many_digit_segments(digit_segs, total_segments):
+    return len(digit_segs) / total_segments >= 0.2
+
+
+def _has_repeated_whisper_texts(non_empty):
     texts = [unicodedata.normalize("NFKC", s.text.strip()) for s in non_empty]
     top_count = Counter(texts).most_common(1)[0][1]
-    if top_count / len(texts) >= 0.30:
-        return False
+    return top_count / len(texts) >= 0.30
 
+
+def _has_long_sequential_digit_run(digit_segs):
     max_run = 0
     run = 0
     for j in range(1, len(digit_segs)):
@@ -533,7 +572,32 @@ def _whisper_is_usable(whisper_segments, total_end=None):
         else:
             run = 0
 
-    return max_run < 5
+    return max_run >= 5
+
+
+def _whisper_is_usable(whisper_segments, total_end=None):
+    if not whisper_segments:
+        return False
+
+    total_end = _resolve_whisper_total_end(whisper_segments, total_end)
+    if not _whisper_has_enough_long_media_coverage(whisper_segments, total_end):
+        return False
+
+    non_empty = [s for s in whisper_segments if getattr(s, "text", "").strip()]
+    if not non_empty:
+        return False
+
+    if len(whisper_segments) < 5:
+        return True
+
+    digit_segs = _collect_digit_whisper_segments(whisper_segments)
+    if _has_too_many_digit_segments(digit_segs, len(whisper_segments)):
+        return False
+
+    if _has_repeated_whisper_texts(non_empty):
+        return False
+
+    return not _has_long_sequential_digit_run(digit_segs)
 
 
 def _pause_segment(words, start_id, lang, pause_threshold=0.5):
@@ -654,14 +718,48 @@ def _find_uncovered_gaps(segments, total_start, total_end, min_gap=3.0):
     return gaps
 
 
-def _assemble_qwen_primary(qwen_words, whisper_segments, lang):
-    if not qwen_words:
-        return []
-
+def _qwen_primary_assembly_params(lang):
     joiner = "" if lang in ("ja", "zh", "ko") else " "
     base_pause = 0.5
     max_span = 5.0 if lang == "ja" else 8.0
     max_chars = 25 if lang == "ja" else 40
+    return joiner, base_pause, max_span, max_chars
+
+
+def _qwen_primary_pause_threshold(prev, curr, whisper_segments, ws_starts, base_pause):
+    gap = curr["start"] - prev["end"]
+    threshold = base_pause
+    if ws_starts and gap > 0:
+        mid = (prev["end"] + curr["start"]) / 2
+        tag = _sv_tag_at(mid, whisper_segments, ws_starts)
+        if tag in ("<|Breath|>", "<|Crying|>", "<|Laughter|>"):
+            threshold = base_pause * 1.5
+    return threshold
+
+
+def _qwen_primary_buffer_exceeds_limits(buf, curr, joiner, max_span, max_chars):
+    text_so_far = joiner.join(w["text"] for w in buf)
+    span = curr["start"] - buf[0]["start"]
+    return span >= max_span or len(text_so_far) >= max_chars
+
+
+def _should_break_qwen_primary(prev, curr, buf, lang, params, whisper_segments, ws_starts):
+    joiner, base_pause, max_span, max_chars = params
+    gap = curr["start"] - prev["end"]
+    threshold = _qwen_primary_pause_threshold(prev, curr, whisper_segments, ws_starts, base_pause)
+
+    if gap >= threshold:
+        return True
+    if prev["text"].rstrip().endswith(_SENTENCE_ENDERS):
+        return True
+    if lang == "ja" and _should_break_ja_sentence(prev.get("text", ""), gap):
+        return True
+    return _qwen_primary_buffer_exceeds_limits(buf, curr, joiner, max_span, max_chars)
+
+
+def _split_qwen_primary_words(qwen_words, whisper_segments, lang):
+    params = _qwen_primary_assembly_params(lang)
+    joiner = params[0]
     ws_starts = [ws.start for ws in whisper_segments] if whisper_segments else []
 
     segments = []
@@ -669,27 +767,7 @@ def _assemble_qwen_primary(qwen_words, whisper_segments, lang):
 
     for i in range(1, len(qwen_words)):
         prev, curr = qwen_words[i - 1], qwen_words[i]
-        gap = curr["start"] - prev["end"]
-
-        threshold = base_pause
-        if ws_starts and gap > 0:
-            mid = (prev["end"] + curr["start"]) / 2
-            tag = _sv_tag_at(mid, whisper_segments, ws_starts)
-            if tag in ("<|Breath|>", "<|Crying|>", "<|Laughter|>"):
-                threshold = base_pause * 1.5
-
-        should_break = gap >= threshold
-        if prev["text"].rstrip().endswith(_SENTENCE_ENDERS):
-            should_break = True
-        if lang == "ja" and _should_break_ja_sentence(prev.get("text", ""), gap):
-            should_break = True
-
-        text_so_far = joiner.join(w["text"] for w in buf)
-        span = curr["start"] - buf[0]["start"]
-        if span >= max_span or len(text_so_far) >= max_chars:
-            should_break = True
-
-        if should_break:
+        if _should_break_qwen_primary(prev, curr, buf, lang, params, whisper_segments, ws_starts):
             segments.append(_words_to_segment(buf, len(segments), joiner))
             buf = [curr]
         else:
@@ -698,6 +776,10 @@ def _assemble_qwen_primary(qwen_words, whisper_segments, lang):
     if buf:
         segments.append(_words_to_segment(buf, len(segments), joiner))
 
+    return segments
+
+
+def _backfill_qwen_primary_whisper_text(segments, whisper_segments):
     for seg in segments:
         if whisper_segments:
             overlapping = [
@@ -708,6 +790,13 @@ def _assemble_qwen_primary(qwen_words, whisper_segments, lang):
         else:
             seg.whisper_text = ""
 
+
+def _assemble_qwen_primary(qwen_words, whisper_segments, lang):
+    if not qwen_words:
+        return []
+
+    segments = _split_qwen_primary_words(qwen_words, whisper_segments, lang)
+    _backfill_qwen_primary_whisper_text(segments, whisper_segments)
     return segments
 
 

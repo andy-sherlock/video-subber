@@ -1740,3 +1740,59 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 - 详细记录见 `pipelines/refactor-pipeline-2026-06-22-remaining5.md`。
 - **遗留新会话**：④ `translate_with_orchestrator` F(61)、211 行 + ⑤ `build_ass_styled` + 启动健康检查。
 - **教训**：源码文本检查测试（inspect.getsource+assertIn）与重构天生冲突，应改行为测试；工具调用里 `| grep` 正则和超大 Edit 易触发解析退化，命令保持极简、改动拆小步。
+
+## 2026-06-25 V3.08 函数复杂度拆分对话 C（orchestrator）
+
+**本轮范围**：纯重构 `v3/backend/translation/orchestrator.py::_translate_whole_with_markers`，只搬代码，不改翻译逻辑、不改分块规则、不改接缝审查规则。
+
+**完成事项**：
+- `_translate_whole_with_markers` **F(44) → B(10)**。
+- 抽出 7 个 helper：`_initialize_whole_translation`、`_build_overlapping_chunks`、`_build_whole_translation_prompt_prefix`、`_translate_chunks_with_prompt`、`_review_translation_seams`、`_finalize_whole_translation`。
+- `test_arch9_dynamic_chunk.py` 中一条源码文本检查改为行为测试：patch `_compute_chunk_size=3`，确认 7 条字幕实际分成 3 次 LLM 调用。
+- 新增管道文件：`pipelines/refactor-pipeline-orchestrator-whole-markers-2026-06-25.md`。
+- 更新剩余规划：`pipelines/refactor-remaining-plan.md` 中对话 C 已打勾。
+
+**验证**：
+- 拆前基线：`624 passed, 8 warnings in 116.62s`
+- 第一刀后：`624 passed, 8 warnings in 101.10s`
+- 第二刀后：`624 passed, 8 warnings in 101.76s`
+- 第三刀后：`624 passed, 8 warnings in 100.26s`
+- 最终：`624 passed, 8 warnings in 98.63s`
+
+**下一步**：剩余 B 组 `transcriber_v2.py` 三个函数，或 D 组 `main.py::create_job` + `sentence_splitter.py::llm_split_segments`。本轮未提交。
+
+## 2026-06-25 V3.08 函数复杂度拆分对话 B（transcriber_v2）
+
+**本轮范围**：纯重构 `v3/backend/transcriber_v2.py` 三个目标函数，只搬代码，不改转录逻辑、不改断句规则、不改模型路由、不改对外函数名。
+
+**完成事项**：
+- `_detect_speaker_changes` **D(28) → B(10)**。
+- `_assemble_qwen_primary` **D(25) → A(2)**。
+- `_whisper_is_usable` **D(22) → B(9)**。
+- 新增管道文件：`pipelines/refactor-pipeline-transcriber-v2-2026-06-25.md`。
+- 更新剩余规划：`pipelines/refactor-remaining-plan.md` 中对话 B 已打勾。
+
+**验证**：
+- 拆前基线：`624 passed, 8 warnings in 104.98s`
+- `_whisper_is_usable` 拆后：`624 passed, 8 warnings in 105.24s`
+- `_assemble_qwen_primary` 拆后：`624 passed, 8 warnings in 107.56s`
+- `_detect_speaker_changes` 拆后：`624 passed, 8 warnings in 103.31s`
+
+**下一步**：剩余 D 组 `v3/backend/main.py::create_job` + `v3/backend/core/sentence_splitter.py::llm_split_segments`。本轮未提交。
+
+## 2026-06-26 V3.08 函数复杂度拆分对话 D（main + sentence_splitter）
+
+**本轮范围**：纯重构 `v3/backend/main.py::create_job` 和 `v3/backend/core/sentence_splitter.py::llm_split_segments`，只搬代码，不改任务创建逻辑、不改断句规则、不改对外函数名。
+
+**完成事项**：
+- `llm_split_segments` **D(23) → A(3)**。
+- `create_job` **D(25) → B(6)**。
+- 新增管道文件：`pipelines/refactor-pipeline-main-sentence-splitter-2026-06-26.md`。
+- 更新剩余规划：`pipelines/refactor-remaining-plan.md` 中对话 D 已打勾，A/B/C/D 四组全部完成。
+
+**验证**：
+- 拆前基线：`624 passed, 8 warnings in 115.10s`
+- `llm_split_segments` 拆后：`624 passed, 8 warnings in 111.77s`
+- `create_job` 拆后：`624 passed, 8 warnings in 109.84s`
+
+**下一步**：按 `pipelines/refactor-remaining-plan.md` 跑调用图验证：`ln-021-codegraph analyze_architecture` + `ln-021-codegraph audit_workspace`。本轮未提交。

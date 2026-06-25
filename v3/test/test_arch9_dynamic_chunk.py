@@ -4,6 +4,7 @@ Run: cd v2 && .venv/bin/python -m pytest test/test_arch9_dynamic_chunk.py -v
 """
 import sys
 from pathlib import Path
+import re
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -135,11 +136,39 @@ class TestComputeChunkSize(unittest.TestCase):
 class TestChunkSizeIntegration(unittest.TestCase):
 
     def test_translate_function_uses_compute_chunk_size(self):
-        """_translate_whole_with_markers body references _compute_chunk_size."""
+        """_translate_whole_with_markers uses _compute_chunk_size for chunking."""
         from backend.translation.orchestrator import _translate_whole_with_markers
-        import inspect
-        src = inspect.getsource(_translate_whole_with_markers)
-        self.assertIn("_compute_chunk_size", src)
+        from backend.translation.base import TranslationResult
+
+        class _RecordingLLM:
+            name = "recording"
+            max_input_tokens = 32768
+
+            def __init__(self):
+                self.prompts = []
+
+            def translate_raw(self, prompt, max_tokens=16384):
+                self.prompts.append(prompt)
+                lines = []
+                for idx in re.findall(r"\[(\d+)\]", prompt.split("【待翻译字幕】")[-1]):
+                    lines.append(f"[{idx}] 译文{idx}")
+                return TranslationResult(
+                    translated=["\n".join(lines)],
+                    backend_name=self.name,
+                    tokens_used={"calls": 1},
+                )
+
+        llm = _RecordingLLM()
+        with patch("backend.translation.orchestrator._compute_chunk_size", return_value=3):
+            translated, token_usage, sub_splits = _translate_whole_with_markers(
+                ["a", "b", "c", "d", "e", "f", "g"],
+                llm,
+            )
+
+        self.assertEqual(len(llm.prompts), 3)
+        self.assertEqual(translated, ["译文0", "译文1", "译文2", "译文3", "译文4", "译文5", "译文6"])
+        self.assertEqual(token_usage, {"calls": 3})
+        self.assertEqual(sub_splits, {})
 
 
 if __name__ == "__main__":

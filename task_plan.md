@@ -273,7 +273,13 @@
 | 5 | [orchestrator.py](v3/backend/translation/orchestrator.py) | `translate_with_orchestrator` | 17 | ⬜ |
 | 6 | [subtitle_style.py](v3/backend/subtitle_style.py) | `build_ass_styled` | 16 | ⬜ |
 
-**补充记录（2026-06-25）**：剩余复杂度拆分对话 A 已完成。`v3/backend/core/hallucination_filter.py` 四个目标均降级：`LightweightStemmer` F(46)→B(8)，`clean_and_stem` F(45)→B(7)，`_extract_qwen_sentences` D(21)→A(4)，`filter_hallucinations` D(24)→B(8)。纯重构零行为变更；每步全量测试，最终 **624 passed, 8 warnings**。记录见 `pipelines/refactor-pipeline-hallucination-filter-2026-06-25.md`，剩余 B/C/D 三组见 `pipelines/refactor-remaining-plan.md`。
+**补充记录（2026-06-25）**：剩余复杂度拆分对话 A 已完成。`v3/backend/core/hallucination_filter.py` 四个目标均降级：`LightweightStemmer` F(46)→B(8)，`clean_and_stem` F(45)→B(7)，`_extract_qwen_sentences` D(21)→A(4)，`filter_hallucinations` D(24)→B(8)。纯重构零行为变更；每步全量测试，最终 **624 passed, 8 warnings**。记录见 `pipelines/refactor-pipeline-hallucination-filter-2026-06-25.md`。
+
+**补充记录（2026-06-25）**：剩余复杂度拆分对话 C 已完成。`v3/backend/translation/orchestrator.py::_translate_whole_with_markers` **F(44)→B(10)**，抽出 7 个 helper，纯重构零行为变更；每步全量测试，最终 **624 passed, 8 warnings**。记录见 `pipelines/refactor-pipeline-orchestrator-whole-markers-2026-06-25.md`，剩余 B/D 两组见 `pipelines/refactor-remaining-plan.md`。
+
+**补充记录（2026-06-25）**：剩余复杂度拆分对话 B 已完成。`v3/backend/transcriber_v2.py` 三个目标均降级：`_detect_speaker_changes` D(28)→B(10)，`_assemble_qwen_primary` D(25)→A(2)，`_whisper_is_usable` D(22)→B(9)。纯重构零行为变更；每步全量测试，最终 **624 passed, 8 warnings**。记录见 `pipelines/refactor-pipeline-transcriber-v2-2026-06-25.md`，剩余 D 组见 `pipelines/refactor-remaining-plan.md`。
+
+**补充记录（2026-06-26）**：剩余复杂度拆分对话 D 已完成。`v3/backend/main.py::create_job` **D(25)→B(6)**，`v3/backend/core/sentence_splitter.py::llm_split_segments` **D(23)→A(3)**。纯重构零行为变更；每步全量测试，最终 **624 passed, 8 warnings**。记录见 `pipelines/refactor-pipeline-main-sentence-splitter-2026-06-26.md`。A/B/C/D 四组全部完成，下一步按 `pipelines/refactor-remaining-plan.md` 跑调用图验证。
 
 **V3.07 双签 diff 遗留项（2026-06-21 版本收尾审查发现，归入 V3.08 一起做）**：
 

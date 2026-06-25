@@ -9,7 +9,10 @@
 - **已拆完**：`worker.py` 的 `main()` **F(109) → C(15)**，抽出 12 个 helper，纯重构零行为变更。
   已提交 `79c9d1e`（本地 main，**未 push**）。详见 `pipelines/refactor-pipeline-worker-main-2026-06-23.md`。
 - **已拆完**：对话 A `v3/backend/core/hallucination_filter.py` 四个目标已拆完，纯重构零行为变更，最终 **624 passed**。详见 `pipelines/refactor-pipeline-hallucination-filter-2026-06-25.md`。
-- **本规划针对**：上个会话全扫 `v3/backend/` 发现的 10 个复杂度热点中，剩余未拆的是 B/C/D 三组。
+- **已拆完**：对话 C `v3/backend/translation/orchestrator.py::_translate_whole_with_markers` 已拆完，**F(44) → B(10)**，纯重构零行为变更，最终 **624 passed**。详见 `pipelines/refactor-pipeline-orchestrator-whole-markers-2026-06-25.md`。
+- **已拆完**：对话 B `v3/backend/transcriber_v2.py` 三个目标已拆完，`_detect_speaker_changes` **D(28) → B(10)**，`_assemble_qwen_primary` **D(25) → A(2)**，`_whisper_is_usable` **D(22) → B(9)**，纯重构零行为变更，最终 **624 passed**。详见 `pipelines/refactor-pipeline-transcriber-v2-2026-06-25.md`。
+- **已拆完**：对话 D `v3/backend/main.py::create_job` + `v3/backend/core/sentence_splitter.py::llm_split_segments` 已拆完，`create_job` **D(25) → B(6)**，`llm_split_segments` **D(23) → A(3)**，纯重构零行为变更，最终 **624 passed**。详见 `pipelines/refactor-pipeline-main-sentence-splitter-2026-06-26.md`。
+- **本规划针对**：上个会话全扫 `v3/backend/` 发现的 10 个复杂度热点。A/B/C/D 四组已全部拆完，下一步是调用图验证。
 
 ## ⚠️ 重要前提
 
@@ -24,15 +27,16 @@
 | 对话 | 文件 | 函数（radon 复杂度） | 个数 |
 |------|------|---------------------|------|
 | ✅ **A**（已完成） | `backend/core/hallucination_filter.py` | `LightweightStemmer` F(46)→B(8) / `clean_and_stem` F(45)→B(7) / `filter_hallucinations` D(24)→B(8) / `_extract_qwen_sentences` D(21)→A(4) | 4 |
-| **B** | `backend/transcriber_v2.py` | `_detect_speaker_changes` D(28) / `_assemble_qwen_primary` D(25) / `_whisper_is_usable` D(22) | 3 |
-| **C** | `backend/translation/orchestrator.py` | `_translate_whole_with_markers` F(44) | 1 |
-| **D** | `backend/main.py` `create_job` D(25) + `backend/core/sentence_splitter.py` `llm_split_segments` D(23) | 两个小的凑一组 | 2 |
+| ✅ **B**（已完成） | `backend/transcriber_v2.py` | `_detect_speaker_changes` D(28)→B(10) / `_assemble_qwen_primary` D(25)→A(2) / `_whisper_is_usable` D(22)→B(9) | 3 |
+| ✅ **C**（已完成） | `backend/translation/orchestrator.py` | `_translate_whole_with_markers` F(44)→B(10) | 1 |
+| ✅ **D**（已完成） | `backend/main.py` `create_job` D(25)→B(6) + `backend/core/sentence_splitter.py` `llm_split_segments` D(23)→A(3) | 两个小的凑一组 | 2 |
 
 ### 推荐顺序：A → C → B → D
 
 - **A 已完成**：词干器、Qwen 句子提取、五层过滤主编排已拆清楚。
-- **C 次之**：orchestrator F44 是滑窗翻译主逻辑，单文件单函数，干净。
-- **B、D**：D 级，体量较小，靠后。D 组两个函数在两个文件，是收尾的零头。
+- **C 已完成**：orchestrator 滑窗翻译主逻辑已拆成编排函数。
+- **B 已完成**：转录组装、Whisper 可用性判断、说话人检测已拆清楚。
+- **D 已完成**：任务创建入口和断句入口已拆成 helper，D 组收尾完成。
 
 ## 统一拆法（和已拆 main/transcribe 一致）
 
@@ -82,7 +86,7 @@ cd v3 && ln-021-codegraph analyze_architecture
 ## 进度勾选
 
 - [x] 对话 A — hallucination_filter.py（4 个）
-- [ ] 对话 B — transcriber_v2.py（3 个）
-- [ ] 对话 C — orchestrator.py（1 个）
-- [ ] 对话 D — main.py + sentence_splitter.py（2 个）
+- [x] 对话 B — transcriber_v2.py（3 个）
+- [x] 对话 C — orchestrator.py（1 个）
+- [x] 对话 D — main.py + sentence_splitter.py（2 个）
 - [ ] 🔴 调用图验证 — codegraph analyze_architecture + audit_workspace
