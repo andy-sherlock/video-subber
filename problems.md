@@ -6475,3 +6475,30 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 - 全量 624 passed。
 
 **状态**：✅ 已修（2026-06-22 主修 0d940f3 + 2026-06-23 占位追加；无 Metal 环境复验待工程师确认全量可收集）
+
+## P300 | 2026-06-26 | V3.08 调用图验证 | worker_manager 反向导入 main.JOBS 形成循环依赖
+
+**问题**：调用图验证发现旧结构 bug：`v3/backend/main.py` 顶部导入 `worker_manager`，但 `v3/backend/worker_manager.py::_forward()` 运行时又 `from .main import JOBS`，形成 `main -> worker_manager -> main` 循环依赖。热重载、测试导入顺序、启动顺序变化时，`worker_manager` 可能拿到尚未初始化完整的 `main` 状态。
+
+**原因**：职责边界放错了。`worker_manager` 本应只负责 worker 子进程生命周期、读取 stdout、转发 JSON 消息；但它直接认识并修改主服务全局变量 `JOBS`。同时 `main.py` 已经用 `_tracking_send()` 包住 `ws_manager.send()` 同步 `JOBS`，导致同一件事有两条路径。
+
+**涉及文件**：
+- `v3/backend/main.py:1013-1047`
+- `v3/backend/worker_manager.py:12-127`
+- `v3/test/test_p193_p194_p195.py`
+
+**解决方案**：
+1. 给 `WorkerManager` 增加 `set_progress_callback(callback)`。
+2. `main.py` 新增 `_sync_job_from_worker_message(job_id, message)`，注册给 `worker_manager`。
+3. `worker_manager._forward()` 删除 `from .main import JOBS`，改为调用注册回调后继续 `ws_manager.send()`。
+4. 删除 `main.py` 对 `ws_manager.send` 的 monkeypatch，让 `ws_manager` 只负责 WebSocket 推送。
+
+**验证**：
+- TDD 红灯：`2 failed, 4 passed, 2 warnings`，失败点为缺少 `set_progress_callback()` 和 `_sync_job_from_worker_message()`。
+- 修复后目标测试：`6 passed, 2 warnings`。
+- 追加状态同步覆盖后目标测试：`7 passed, 2 warnings`，覆盖 `progress`、`token_usage`、`done`、`error` 四类消息。
+- 全量测试：`627 passed, 8 warnings in 130.25s`。
+- 静态扫描：无剩余 `from .main import JOBS`，无 `ws_manager.send = ...` monkeypatch。
+- 运行态：旧 8766 服务 PID `78466` 已停止；新服务由 `screen` 会话 `25302.video-subtitle-v308-cycle` 托管，PID `25324` 监听 `*:8766`；`/api/health` 返回 `{"ok":true,"version":"3.07"}`。
+
+**状态**：✅ 已修

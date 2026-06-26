@@ -1012,10 +1012,7 @@ async def websocket_progress(websocket: WebSocket, job_id: str):
 
 # ── Tracking: sync JOBS dict from worker messages ──
 
-_original_send = ws_manager.send
-
-
-async def _tracking_send(job_id: str, message: dict):
+def _sync_job_from_worker_message(job_id: str, message: dict):
     j = JOBS.get(job_id)
     if j:
         j["last_progress"] = time.time()
@@ -1041,10 +1038,9 @@ async def _tracking_send(job_id: str, message: dict):
             j["status"] = "error"
             j["error"] = message.get("message")
             _persist_job_status(job_id, "error")
-    await _original_send(job_id, message)
 
 
-ws_manager.send = _tracking_send  # type: ignore[method-assign]
+worker_manager.set_progress_callback(_sync_job_from_worker_message)
 
 
 # ── Frontend static files ──

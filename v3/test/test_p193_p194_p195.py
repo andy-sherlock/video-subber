@@ -99,6 +99,116 @@ class TestP194_ErrorMessageExitCode(unittest.TestCase):
                        "错误消息应包含退出码")
 
 
+class TestWorkerManagerNoMainImport(unittest.IsolatedAsyncioTestCase):
+
+    async def test_forward_uses_registered_callback_without_importing_main(self):
+        """WorkerManager 不应反向导入 backend.main 才能转发进度。"""
+        from unittest.mock import AsyncMock, patch
+        import importlib.abc
+        import sys
+        from backend.worker_manager import WorkerManager
+
+        class BlockBackendMain(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname == "backend.main":
+                    raise AssertionError("worker_manager must not import backend.main")
+                return None
+
+        saved_main = sys.modules.pop("backend.main", None)
+        blocker = BlockBackendMain()
+        sys.meta_path.insert(0, blocker)
+        try:
+            wm = WorkerManager()
+            captured = []
+            msg = {"type": "progress", "percent": 17, "stage": "asr", "message": "running"}
+            wm.set_progress_callback(lambda job_id, message: captured.append((job_id, message)))
+
+            with patch("backend.ws_manager.ws_manager.send", new=AsyncMock()) as send:
+                await wm._forward("job-1", msg)
+
+            self.assertEqual(captured, [("job-1", msg)])
+            send.assert_awaited_once_with("job-1", msg)
+        finally:
+            sys.meta_path.remove(blocker)
+            if saved_main is not None:
+                sys.modules["backend.main"] = saved_main
+
+
+class TestMainWorkerProgressCallback(unittest.TestCase):
+
+    def test_sync_job_from_worker_message_updates_jobs(self):
+        """main 注册给 WorkerManager 的回调应保持原有 JOBS 同步行为。"""
+        import backend.main as main
+
+        old_jobs = dict(main.JOBS)
+        try:
+            main.JOBS.clear()
+            main.JOBS["job-1"] = {
+                "id": "job-1",
+                "status": "queued",
+                "progress": 0,
+                "stage": "",
+                "message": "",
+            }
+
+            main._sync_job_from_worker_message(
+                "job-1",
+                {"type": "progress", "percent": 17, "stage": "asr", "message": "running"},
+            )
+
+            self.assertEqual(main.JOBS["job-1"]["progress"], 17)
+            self.assertEqual(main.JOBS["job-1"]["stage"], "asr")
+            self.assertEqual(main.JOBS["job-1"]["message"], "running")
+            self.assertEqual(main.JOBS["job-1"]["status"], "running")
+        finally:
+            main.JOBS.clear()
+            main.JOBS.update(old_jobs)
+
+    def test_sync_job_from_worker_message_preserves_done_error_and_token_usage(self):
+        """main 回调应保留原有 done/error/token_usage 同步行为。"""
+        import backend.main as main
+
+        old_jobs = dict(main.JOBS)
+        try:
+            main.JOBS.clear()
+            main.JOBS["job-1"] = {"id": "job-1", "status": "running", "progress": 50}
+
+            main._sync_job_from_worker_message(
+                "job-1",
+                {"type": "token_usage", "usage": {"total_tokens": 123}},
+            )
+            self.assertEqual(main.JOBS["job-1"]["token_usage"], {"total_tokens": 123})
+
+            main._sync_job_from_worker_message(
+                "job-1",
+                {
+                    "type": "done",
+                    "result_video": "out.mp4",
+                    "result_srt": "out.srt",
+                    "failed_segments": 2,
+                    "segment_count": 10,
+                    "success_count": 8,
+                },
+            )
+            self.assertEqual(main.JOBS["job-1"]["status"], "done")
+            self.assertEqual(main.JOBS["job-1"]["progress"], 100)
+            self.assertEqual(main.JOBS["job-1"]["result_video"], "out.mp4")
+            self.assertEqual(main.JOBS["job-1"]["result_srt"], "out.srt")
+            self.assertEqual(main.JOBS["job-1"]["failed_segments"], 2)
+            self.assertEqual(main.JOBS["job-1"]["segment_count"], 10)
+            self.assertEqual(main.JOBS["job-1"]["success_count"], 8)
+
+            main._sync_job_from_worker_message(
+                "job-1",
+                {"type": "error", "message": "boom"},
+            )
+            self.assertEqual(main.JOBS["job-1"]["status"], "error")
+            self.assertEqual(main.JOBS["job-1"]["error"], "boom")
+        finally:
+            main.JOBS.clear()
+            main.JOBS.update(old_jobs)
+
+
 # ── P195: 翻译引擎加载失败应写日志 ──
 
 class TestP195_LLMBackendWarning(unittest.TestCase):

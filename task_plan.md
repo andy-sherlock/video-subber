@@ -281,6 +281,8 @@
 
 **补充记录（2026-06-26）**：剩余复杂度拆分对话 D 已完成。`v3/backend/main.py::create_job` **D(25)→B(6)**，`v3/backend/core/sentence_splitter.py::llm_split_segments` **D(23)→A(3)**。纯重构零行为变更；每步全量测试，最终 **624 passed, 8 warnings**。记录见 `pipelines/refactor-pipeline-main-sentence-splitter-2026-06-26.md`。A/B/C/D 四组全部完成，下一步按 `pipelines/refactor-remaining-plan.md` 跑调用图验证。
 
+**补充记录（2026-06-26）**：调用图验证发现并修复 P300：`worker_manager.py::_forward()` 反向导入 `.main.JOBS`，与 `main.py -> worker_manager.py` 形成循环依赖。修复为 `WorkerManager.set_progress_callback()` 显式回调，`main.py` 注册 `_sync_job_from_worker_message()`，并取消 `ws_manager.send` monkeypatch。TDD 红绿通过，追加覆盖 `done/error/token_usage` 状态同步，最终 **627 passed, 8 warnings**。新 8766 服务已重启到 `screen` 会话 `video-subtitle-v308-cycle`。记录见 `pipelines/bug-pipeline-2026-06-26-worker-manager-cycle.md`。下一步：进入 V3.08 版本收尾 HARDEN 流程。
+
 **V3.07 双签 diff 遗留项（2026-06-21 版本收尾审查发现，归入 V3.08 一起做）**：
 
 | # | 类型 | 内容 | 来源 |

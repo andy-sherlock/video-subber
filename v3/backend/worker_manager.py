@@ -14,10 +14,15 @@ class WorkerManager:
         self._processes: dict[str, subprocess.Popen] = {}
         self._job_dirs: dict[str, Path] = {}
         self._main_loop = None
+        self._progress_callback = None
 
     def set_main_loop(self, loop):
         """Store the main event loop so reader threads can schedule coroutines on it."""
         self._main_loop = loop
+
+    def set_progress_callback(self, callback):
+        """Register the main-service hook that syncs worker messages to job state."""
+        self._progress_callback = callback
 
     def _kill_if_alive(self, job_id: str, timeout: float = 5):
         """Pop, kill, and wait for a worker process if one exists for this job_id.
@@ -116,15 +121,11 @@ class WorkerManager:
     async def _forward(self, job_id: str, msg: dict):
         """Forward a progress message to all WebSocket clients for this job.
         This runs on the main event loop, so send_json is safe.
-        Also syncs progress to JOBS dict so polling returns fresh data after restart."""
+        Also notifies the registered progress callback so polling returns fresh data."""
         from .ws_manager import ws_manager
-        from .main import JOBS
+        if self._progress_callback:
+            self._progress_callback(job_id, msg)
         await ws_manager.send(job_id, msg)
-        # Sync progress to JOBS for polling fallback
-        if msg.get("type") == "progress" and job_id in JOBS:
-            JOBS[job_id]["progress"] = msg.get("percent", 0)
-            JOBS[job_id]["stage"] = msg.get("stage", "")
-            JOBS[job_id]["message"] = msg.get("message", "")
 
     def _read_stderr(self, job_id: str, proc: subprocess.Popen):
         for line in proc.stderr:

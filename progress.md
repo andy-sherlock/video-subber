@@ -3,6 +3,17 @@
 **日期**：2026-06-21
 **版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
 
+## 2026-06-26 V3.08：P300 worker_manager 循环依赖修复
+
+调用图验证发现旧结构 bug：`v3/backend/main.py` 顶部导入 `worker_manager`，而 `v3/backend/worker_manager.py::_forward()` 运行时又反向导入 `.main.JOBS`，形成 `main -> worker_manager -> main` 循环依赖。
+
+- **根因**：`worker_manager` 既负责 worker 子进程 stdout 转发，又直接认识并修改主服务 `JOBS`；同时 `main.py` 还用 `_tracking_send()` 包住 `ws_manager.send` 同步 `JOBS`，同一件事有两条路径。
+- **修复**：给 `WorkerManager` 增加 `set_progress_callback()`；`main.py` 注册 `_sync_job_from_worker_message()`；删除 `worker_manager` 对 `.main.JOBS` 的反向导入；取消 `ws_manager.send` monkeypatch。
+- **验证**：TDD 红灯 `2 failed, 4 passed` → 修复后目标测试 `6 passed, 2 warnings`；追加 `done/error/token_usage` 状态同步覆盖后目标测试 `7 passed, 2 warnings`；最终全量测试 `627 passed, 8 warnings in 130.25s`。
+- **服务**：旧 8766 服务 PID `78466` 为 6 月 21 日启动且无 `--reload`，已停止；新服务由 `screen` 会话 `25302.video-subtitle-v308-cycle` 托管，PID `25324` 监听 `*:8766`；`/api/health` 返回 `{"ok":true,"version":"3.07"}`。
+- **记录**：详见 `pipelines/bug-pipeline-2026-06-26-worker-manager-cycle.md`。
+- **判断**：这个循环依赖 bug 已修，可回到 V3.08 收尾；下一步仍是按收尾流程做全项目 HARDEN。
+
 ## 2026-06-25 V3.08：hallucination_filter 对话 A 函数复杂度拆分
 
 承接 `pipelines/refactor-remaining-plan.md`，本轮只拆 `v3/backend/core/hallucination_filter.py` 四个目标函数，纯重构，只搬代码不改逻辑。
