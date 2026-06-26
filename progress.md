@@ -3,6 +3,20 @@
 **日期**：2026-06-21
 **版本**：V3.08（搬家完成 ✅ → transcribe 拆分完成 ✅ → 余下 5 函数 + 健康检查待做）
 
+## 2026-06-26 V3.08 发布线完成
+
+**发布结果**：V3.08 已发布。
+
+- 发布前完整全量测试：`633 passed, 8 warnings in 93.75s`。
+- 版本号：`v3/pyproject.toml` 已 bump 到 `3.08`。
+- 发布提交：`690e8bc release: V3.08`。
+- 发布 tag：`v3.08`。
+- 只读快照：`snapshots/v3.08/`，大小 `5.2M`，已排除 `.venv/` 和缓存目录，权限已设为只读。
+- 发布线记录：`pipelines/release-pipeline-2026-06-26-v308.md`。
+- 选择性提交边界：未使用 `git add .`；未纳入工作区里已有的无关删除 `v1.2/video_subber/subtitler.py`。
+
+**下一步**：进入 V3.09，做 PyWebView 桌面壳 + 精度报告。V3.08 不再继续加功能。
+
 ## 2026-06-26 V3.08：P300 worker_manager 循环依赖修复
 
 调用图验证发现旧结构 bug：`v3/backend/main.py` 顶部导入 `worker_manager`，而 `v3/backend/worker_manager.py::_forward()` 运行时又反向导入 `.main.JOBS`，形成 `main -> worker_manager -> main` 循环依赖。

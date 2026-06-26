@@ -6563,6 +6563,7 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 - P303 目标测试：`2 passed, 2 warnings`
 - 相关回归：`51 passed, 2 warnings`
 - 完整全量测试：`633 passed, 8 warnings in 97.44s`
+- 发布线复验：`633 passed, 8 warnings in 93.75s`
 - 重启 8766 后 `/api/active-jobs` 返回 `{"jobs":[]}`
 
 **状态**：✅ 已修
