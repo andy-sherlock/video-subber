@@ -14,6 +14,8 @@
 - 只读快照：`snapshots/v3.08/`，大小 `5.2M`，已排除 `.venv/` 和缓存目录，权限已设为只读。
 - 发布线记录：`pipelines/release-pipeline-2026-06-26-v308.md`。
 - 选择性提交边界：未使用 `git add .`；未纳入工作区里已有的无关删除 `v1.2/video_subber/subtitler.py`。
+- 远端同步：`main` 已推到 GitHub，`origin/main` 指向 `411128d`；tag `v3.08` 已推到 GitHub，指向 `690e8bc`。
+- 无关改动处理：`v1.2/video_subber/subtitler.py` 是旧版本快照文件，按旧版本目录只读保留规则已恢复，不再留在工作区。
 
 **下一步**：进入 V3.09，做 PyWebView 桌面壳 + 精度报告。V3.08 不再继续加功能。
 
