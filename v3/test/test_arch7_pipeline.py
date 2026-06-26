@@ -1,6 +1,6 @@
 """Tests for ARCH ⑦: P152 streaming pipeline + P144/P168/P169/P173 fixes.
 
-Run: cd v2 && .venv/bin/python -m unittest test.test_arch7_pipeline -v
+Run: cd v3 && .venv/bin/python -m unittest test.test_arch7_pipeline -v
 """
 import sys
 from pathlib import Path

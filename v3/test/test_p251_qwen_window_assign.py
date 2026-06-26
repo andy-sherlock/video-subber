@@ -7,7 +7,7 @@ assigns each sentence to the best-matching 30s window by stem similarity
 (monotonic cursor, search limited to the chunk's time span). No data dropped.
 Pure text logic — identical on MLX (Mac) and PyTorch (Windows).
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p251_qwen_window_assign.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p251_qwen_window_assign.py -v
 """
 import sys
 from pathlib import Path

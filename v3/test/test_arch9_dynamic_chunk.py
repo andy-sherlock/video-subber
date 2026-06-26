@@ -1,6 +1,6 @@
 """Tests for ARCH ⑨: Dynamic chunk size — read context window from LiteLLM cache.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_arch9_dynamic_chunk.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_arch9_dynamic_chunk.py -v
 """
 import sys
 from pathlib import Path

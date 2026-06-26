@@ -1,8 +1,8 @@
-"""P277: real long-video tests must use v2/.venv without uvicorn reload."""
+"""P277: real long-video tests must use v3/.venv without uvicorn reload."""
 from pathlib import Path
 
 
-def test_real_test_runner_uses_v2_venv_without_reload():
+def test_real_test_runner_uses_v3_venv_without_reload():
     script = Path(__file__).resolve().parent.parent / "run-test.sh"
 
     assert script.exists()

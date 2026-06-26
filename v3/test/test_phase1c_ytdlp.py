@@ -1,6 +1,6 @@
 """TDD tests for #9: yt-dlp video download.
 
-Run: cd v2 && .venv/bin/python -m unittest test.test_phase1c_ytdlp -v
+Run: cd v3 && .venv/bin/python -m unittest test.test_phase1c_ytdlp -v
 """
 import sys
 import unittest

@@ -1,6 +1,6 @@
 """Tests for V3.07 HARDEN: P170 + P172 + P178 fixes.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_harden_v307.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_harden_v307.py -v
 """
 import sys
 from pathlib import Path

@@ -1,6 +1,6 @@
 """TDD tests for #7: Translation reflection optimization.
 
-Run: cd v2 && .venv/bin/python -m unittest test.test_phase1c_reflection -v
+Run: cd v3 && .venv/bin/python -m unittest test.test_phase1c_reflection -v
 """
 import sys
 import unittest

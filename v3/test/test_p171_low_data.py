@@ -2,7 +2,7 @@
 
 P251: Qwen text reaches L2 via a qwen_chunks list, not per-segment qwen_text.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p171_low_data.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p171_low_data.py -v
 """
 import sys
 from pathlib import Path

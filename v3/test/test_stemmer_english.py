@@ -1,6 +1,6 @@
 """TDD tests for English stemmer suffix improvements.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_stemmer_english.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_stemmer_english.py -v
 """
 import sys
 from pathlib import Path

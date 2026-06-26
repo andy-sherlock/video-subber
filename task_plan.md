@@ -283,6 +283,12 @@
 
 **补充记录（2026-06-26）**：调用图验证发现并修复 P300：`worker_manager.py::_forward()` 反向导入 `.main.JOBS`，与 `main.py -> worker_manager.py` 形成循环依赖。修复为 `WorkerManager.set_progress_callback()` 显式回调，`main.py` 注册 `_sync_job_from_worker_message()`，并取消 `ws_manager.send` monkeypatch。TDD 红绿通过，追加覆盖 `done/error/token_usage` 状态同步，最终 **627 passed, 8 warnings**。新 8766 服务已重启到 `screen` 会话 `video-subtitle-v308-cycle`。记录见 `pipelines/bug-pipeline-2026-06-26-worker-manager-cycle.md`。下一步：进入 V3.08 版本收尾 HARDEN 流程。
 
+**补充记录（2026-06-26）**：V3.08 版本收尾 HARDEN 已跑到第 7 步并记录到 `pipelines/harden-v308-2026-06-26.md`。审查修复 P301（视频 URL 内网访问拦截缺失）和 P302（job 路径字符串前缀判断绕过），并清理 V2 标题/测试运行说明残留。普通测试面通过：安全回归 `14 passed`，排除 P207/P212 真实 ForcedAligner 模型测试后 `616 passed, 4 warnings`。但完整全量测试、Web 服务重启验证、真实短视频 standard E2E 均受当前会话无 Metal/无法停止旧 PID 限制，未拿到发布前通过证据。**下一步不是发布线**，而是在本机可访问 Metal 的环境补跑完整全量、重启 8766、重跑短视频 E2E。
+
+**补充记录（2026-06-26）**：已补齐前两个发布前证据。旧 8766 PID `25324` 已停止，新服务从 `/Users/andy/Andy-agent/video-subtitle/v3` 启动，screen 会话 `88733.video-subtitle-v308-harden-verify`，监听 PID `88755`；`/api/health` 正常，首页 HTTP `200 OK`。完整全量测试在可访问本机模型缓存/网络/Metal 的权限下通过：`631 passed, 8 warnings in 101.94s`。下一步只剩真实短视频 standard E2E 和人工检查 SRT/日志；通过后再进入发布线。
+
+**补充记录（2026-06-26）**：P303 已按 bug 修复流水线修复。根因是旧 URL 安全测试任务 `cc7d373829` / `e25373d4d3` 的磁盘状态仍为 `queued`，服务启动扫描后在内存里推断成 `interrupted`，再被 `/api/active-jobs` 自动恢复到前端。修复为 `/api/active-jobs` 只返回可恢复的 `interrupted`：有 `input.*` 或安全 `source_url` 才返回；本机/内网 URL 且无真实输入文件的旧任务不再返回。验证：P303 目标测试 `2 passed`，相关回归 `51 passed`，完整全量 `633 passed, 8 warnings`，重启 8766 后 `/api/active-jobs` 返回 `{"jobs":[]}`。记录见 `pipelines/bug-pipeline-2026-06-26-p303-active-jobs.md`。下一步：可进入发布线前置 verification。
+
 **V3.07 双签 diff 遗留项（2026-06-21 版本收尾审查发现，归入 V3.08 一起做）**：
 
 | # | 类型 | 内容 | 来源 |

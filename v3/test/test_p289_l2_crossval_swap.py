@@ -4,7 +4,7 @@ When Qwen is the primary engine, segments[].text contains Qwen text.
 L2 must accept alt_segments (Whisper raw segments) and use them for
 primary_windows, so it actually cross-validates two different sources.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p289_l2_crossval_swap.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p289_l2_crossval_swap.py -v
 """
 import sys
 from pathlib import Path

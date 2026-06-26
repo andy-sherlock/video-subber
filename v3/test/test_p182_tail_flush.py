@@ -5,7 +5,7 @@ independently (no queue, no Whisper segment dependency), these tests verify
 that run_qwen_asr's time-based chunking covers the full audio — no trailing
 audio is dropped.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p182_tail_flush.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p182_tail_flush.py -v
 """
 import sys
 from pathlib import Path

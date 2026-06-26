@@ -1,6 +1,6 @@
 """TDD tests for LightweightStemmer (P160 Phase 2 - Chinese first).
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p160_stemmer.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p160_stemmer.py -v
 """
 import sys
 from pathlib import Path

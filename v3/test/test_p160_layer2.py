@@ -3,7 +3,7 @@
 P251: Qwen text reaches L2 via a qwen_chunks list ({text, t_start, t_end}),
 not per-segment qwen_text. Tests build chunks with _qc() instead.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p160_layer2.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p160_layer2.py -v
 """
 import sys
 from pathlib import Path

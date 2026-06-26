@@ -1,6 +1,6 @@
 """Tests for Phase 1C: long-audio chunking for Qwen3-ASR and SenseVoice.
 
-Run: cd v2 && .venv/bin/python -m unittest discover -s test -p "test_*.py" -v
+Run: cd v3 && .venv/bin/python -m unittest discover -s test -p "test_*.py" -v
 """
 import sys
 import types

@@ -4,7 +4,7 @@ Bug: In _layer1_dual_signal(), when aligner_result is None/empty, it returns Fal
 (skip L1) without checking SenseVoice tags. Non-human audio tagged by SenseVoice
 (e.g., "Music", "BGM", "Laughter") is NOT filtered when FA is unavailable.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p183_l1_fallback.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p183_l1_fallback.py -v
 """
 import sys
 from pathlib import Path

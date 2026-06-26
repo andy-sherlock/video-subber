@@ -7,7 +7,7 @@ words/sec) fires on normal speech. Fix: count_speech_units() counts CJK by
 character (1 char = 1 syllable) and others by whitespace-split words, with the
 threshold table re-expressed in speech-units/sec.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p250_speech_rate_units.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p250_speech_rate_units.py -v
 """
 import sys
 from pathlib import Path

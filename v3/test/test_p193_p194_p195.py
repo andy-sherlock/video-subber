@@ -1,6 +1,6 @@
 """回归测试：P193 L2 Pass 1 删除 / P194 错误消息 / P195 静默异常
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p193_p194_p195.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p193_p194_p195.py -v
 """
 import sys
 from pathlib import Path

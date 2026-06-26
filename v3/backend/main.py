@@ -1,4 +1,4 @@
-"""V2 Web App — FastAPI backend."""
+"""V3 Web App — FastAPI backend."""
 import sys, json, uuid, asyncio, time, hashlib, threading, logging
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from .env_check import check_all, preload_resemblyzer, health_summary_line, miss
 from .ws_manager import ws_manager
 from .worker_manager import worker_manager
 
-app = FastAPI(title="Video Subber V2")
+app = FastAPI(title="Video Subber V3")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -36,7 +36,9 @@ def _validate_job_path(job_id: str):
     """Return resolved job directory Path if safe, else None (P240/P244)."""
     job_dir = JOBS_DIR / job_id
     resolved = job_dir.resolve()
-    if not str(resolved).startswith(str(JOBS_DIR.resolve())):
+    try:
+        resolved.relative_to(JOBS_DIR.resolve())
+    except ValueError:
         return None
     return resolved
 
@@ -616,6 +618,24 @@ def _cleanup_hash_index(job_id: str):
         GLOBAL_HASH_INDEX.pop(tk, None)
 
 
+def _is_recoverable_active_job(job_id: str, entry: dict) -> bool:
+    """Return True when an active-job entry can be resumed from disk."""
+    status = entry.get("status")
+    if status in ("queued", "running"):
+        return True
+    if status != "interrupted":
+        return False
+
+    job_dir = _validate_job_path(job_id)
+    if not job_dir or not job_dir.is_dir():
+        return False
+    if any(job_dir.glob("input.*")):
+        return True
+
+    source_url = (entry.get("config") or {}).get("source_url", "")
+    return bool(source_url and _verify_safe_url(source_url))
+
+
 # ── POST /api/jobs — the core: upload/path → hash → dedup → create or restore ──
 
 
@@ -635,9 +655,9 @@ def _new_job_dir():
 
 
 def _prepare_url_job(cfg: dict, source_url: str):
-    if not source_url.startswith(("http://", "https://")):
+    if not _verify_safe_url(source_url):
         return JSONResponse(
-            {"error": "仅支持 http/https 链接"},
+            {"error": "仅支持安全的 http/https 链接"},
             status_code=400,
         )
 
@@ -849,17 +869,18 @@ def get_active_jobs():
     unfinished work — e.g. user cleared browser data or switched browsers."""
     active = []
     for fh, entry in GLOBAL_HASH_INDEX.items():
-        if entry["status"] in ("queued", "running", "interrupted"):
-            jid = entry["job_id"]
-            j = JOBS.get(jid)
-            active.append({
-                "job_id": jid,
-                "status": entry["status"],
-                "config": entry.get("config", {}),
-                "progress": j["progress"] if j else 0,
-                "message": j["message"] if j else "",
-                "stage": j["stage"] if j else "",
-            })
+        jid = entry["job_id"]
+        if not _is_recoverable_active_job(jid, entry):
+            continue
+        j = JOBS.get(jid)
+        active.append({
+            "job_id": jid,
+            "status": entry["status"],
+            "config": entry.get("config", {}),
+            "progress": j["progress"] if j else 0,
+            "message": j["message"] if j else "",
+            "stage": j["stage"] if j else "",
+        })
     return {"jobs": active}
 
 
@@ -986,6 +1007,8 @@ def download_video_endpoint(payload: dict):
     url = payload.get("url", "").strip()
     if not url:
         return JSONResponse({"error": "请提供视频链接"}, status_code=400)
+    if not _verify_safe_url(url):
+        return JSONResponse({"error": "仅支持安全的 http/https 链接"}, status_code=400)
     from .core.video_downloader import download_video, is_ytdlp_available
     if not is_ytdlp_available():
         return JSONResponse({"error": "yt-dlp 未安装，无法下载视频"}, status_code=500)

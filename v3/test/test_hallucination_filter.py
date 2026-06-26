@@ -1,7 +1,7 @@
 """TDD tests for five-layer hallucination filter.
 
-Run: python3 -m pytest v2/test/test_hallucination_filter.py -v
-Or:  cd v2 && python3 -m pytest test/test_hallucination_filter.py -v
+Run: python3 -m pytest v3/test/test_hallucination_filter.py -v
+Or:  cd v3 && python3 -m pytest test/test_hallucination_filter.py -v
 """
 import sys
 from pathlib import Path

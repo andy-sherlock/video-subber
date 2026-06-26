@@ -1,1 +1,1 @@
-"""Video Subber V2 — Web UI backend."""
+"""Video Subber V3 — Web UI backend."""

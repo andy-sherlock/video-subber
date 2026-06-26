@@ -1,6 +1,6 @@
 """TDD tests for P165: Content gate smoke test after P1.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p165_content_gate.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p165_content_gate.py -v
 """
 import sys
 from pathlib import Path

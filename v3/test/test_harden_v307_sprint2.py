@@ -1,6 +1,6 @@
 """Tests for V3.07 HARDEN Sprint 2: P240+P243+P244+P241+P248+P246+P213+P214.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_harden_v307_sprint2.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_harden_v307_sprint2.py -v
 """
 import sys
 import logging
@@ -54,6 +54,12 @@ class TestP240PathTraversal(unittest.TestCase):
     def test_rejects_dot_dot_slash(self):
         from backend.main import _validate_job_path
         result = _validate_job_path("../secrets")
+        self.assertIsNone(result)
+
+    def test_rejects_sibling_with_same_prefix(self):
+        """A sibling path like jobs_evil must not pass a string-prefix check."""
+        from backend.main import _validate_job_path, JOBS_DIR
+        result = _validate_job_path(f"../{JOBS_DIR.name}_evil")
         self.assertIsNone(result)
 
     def test_accepts_valid_job_id(self):
@@ -152,6 +158,85 @@ class TestP244GetJobPathTraversal(unittest.TestCase):
             main.GLOBAL_HASH_INDEX.update(old_global)
             main.JOB_ID_TO_HASH.clear()
             main.JOB_ID_TO_HASH.update(old_reverse)
+
+
+class TestP303ActiveJobsRecovery(unittest.TestCase):
+    """P303: stale interrupted jobs must not create bogus recovery cards."""
+
+    def _with_main_state(self):
+        import backend.main as main
+
+        return {
+            "main": main,
+            "jobs_dir": main.JOBS_DIR,
+            "jobs": dict(main.JOBS),
+            "global_index": dict(main.GLOBAL_HASH_INDEX),
+            "reverse_index": dict(main.JOB_ID_TO_HASH),
+        }
+
+    def _restore_main_state(self, state):
+        main = state["main"]
+        main.JOBS_DIR = state["jobs_dir"]
+        main.JOBS.clear()
+        main.JOBS.update(state["jobs"])
+        main.GLOBAL_HASH_INDEX.clear()
+        main.GLOBAL_HASH_INDEX.update(state["global_index"])
+        main.JOB_ID_TO_HASH.clear()
+        main.JOB_ID_TO_HASH.update(state["reverse_index"])
+
+    def _index_job(self, main, jid, status, cfg):
+        task_key = f"task-{jid}"
+        main.GLOBAL_HASH_INDEX[task_key] = {
+            "job_id": jid,
+            "status": status,
+            "config": cfg,
+            "file_hash": f"hash-{jid}",
+        }
+        main.JOB_ID_TO_HASH[jid] = task_key
+
+    def test_active_jobs_skips_unrecoverable_interrupted_private_url(self):
+        state = self._with_main_state()
+        main = state["main"]
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                main.JOBS_DIR = Path(td)
+                main.JOBS.clear()
+                main.GLOBAL_HASH_INDEX.clear()
+                main.JOB_ID_TO_HASH.clear()
+
+                jid = "old-private-url"
+                (main.JOBS_DIR / jid).mkdir()
+                self._index_job(
+                    main,
+                    jid,
+                    "interrupted",
+                    {"source_url": "http://127.0.0.1:8766/api/config", "video_filename": "config"},
+                )
+
+                self.assertEqual(main.get_active_jobs(), {"jobs": []})
+        finally:
+            self._restore_main_state(state)
+
+    def test_active_jobs_keeps_interrupted_job_with_input_file(self):
+        state = self._with_main_state()
+        main = state["main"]
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                main.JOBS_DIR = Path(td)
+                main.JOBS.clear()
+                main.GLOBAL_HASH_INDEX.clear()
+                main.JOB_ID_TO_HASH.clear()
+
+                jid = "recoverable-upload"
+                job_dir = main.JOBS_DIR / jid
+                job_dir.mkdir()
+                (job_dir / "input.mp4").write_bytes(b"video")
+                self._index_job(main, jid, "interrupted", {"video_filename": "input.mp4"})
+
+                jobs = main.get_active_jobs()["jobs"]
+                self.assertEqual([job["job_id"] for job in jobs], [jid])
+        finally:
+            self._restore_main_state(state)
 
 
 # ═══════════════════════════════════════════════════════════

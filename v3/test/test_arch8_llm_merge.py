@@ -1,6 +1,6 @@
 """Tests for ARCH ⑧: LLM merge — combine terminology + context summary into one call.
 
-Run: cd v2 && .venv/bin/python -m unittest test.test_arch8_llm_merge -v
+Run: cd v3 && .venv/bin/python -m unittest test.test_arch8_llm_merge -v
 """
 import sys
 from pathlib import Path

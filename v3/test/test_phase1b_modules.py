@@ -1,6 +1,6 @@
 """Tests for Phase 1B modules: hardware_detector, sensevoice_runner, qwen_asr_runner.
 
-Run: cd v2 && .venv/bin/python -m unittest discover -s test -p "test_*.py" -v
+Run: cd v3 && .venv/bin/python -m unittest discover -s test -p "test_*.py" -v
 """
 import sys
 from pathlib import Path

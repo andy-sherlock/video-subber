@@ -4,7 +4,7 @@ Bug: create_job() accepts any non-empty string as source_url without checking
 the protocol scheme. file://, ftp://, javascript: URLs are passed to yt-dlp
 which can cause path traversal or unexpected behavior.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p188_url_validation.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p188_url_validation.py -v
 """
 import sys
 from pathlib import Path
@@ -47,6 +47,28 @@ class TestUrlValidation(unittest.TestCase):
     def test_javascript_url_rejected(self):
         """javascript: URL must be rejected with 400."""
         resp = self._make_request("javascript:alert(1)")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_loopback_url_rejected(self):
+        """Loopback URLs must be rejected so yt-dlp cannot call local services."""
+        resp = self._make_request("http://127.0.0.1:8766/api/config")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_private_network_url_rejected(self):
+        """Private-network URLs must be rejected before worker download."""
+        resp = self._make_request("http://192.168.1.1/video.mp4")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_download_video_endpoint_rejects_loopback_before_ytdlp(self):
+        """Standalone download endpoint must share the same URL safety check."""
+        from fastapi.testclient import TestClient
+        from backend.main import app
+
+        client = TestClient(app)
+        resp = client.post(
+            "/api/download-video",
+            json={"url": "http://127.0.0.1:8766/api/config"},
+        )
         self.assertEqual(resp.status_code, 400)
 
     def test_https_url_accepted(self):

@@ -1,6 +1,6 @@
 """TDD tests for P174: URL download integration.
 
-Run: cd v2 && .venv/bin/python -m pytest test/test_p174_url_mode.py -v
+Run: cd v3 && .venv/bin/python -m pytest test/test_p174_url_mode.py -v
 """
 import sys
 from pathlib import Path

@@ -6502,3 +6502,67 @@ LLM 返回每行一段文字。按段号顺序写回 `seg.text`，带 `[?]` 的�
 - 运行态：旧 8766 服务 PID `78466` 已停止；新服务由 `screen` 会话 `25302.video-subtitle-v308-cycle` 托管，PID `25324` 监听 `*:8766`；`/api/health` 返回 `{"ok":true,"version":"3.07"}`。
 
 **状态**：✅ 已修
+
+## P301 | 2026-06-26 | V3.08 HARDEN 安全审查 | 视频 URL 模式未复用内网 URL 拦截
+
+**问题**：`/api/jobs` 的 URL 模式只检查 `http://` / `https://` 前缀，没有复用已有的 `_verify_safe_url()`。结果用户提交 `http://127.0.0.1:8766/...` 或 `http://192.168.1.1/...` 时，后端会把 URL 写进 worker config，后续由 `yt-dlp` 去访问本机或内网地址。单独的 `/api/download-video` 入口也有同样问题。
+
+**原因**：V3.07 已给 LLM 自定义 endpoint 做了 `_verify_safe_url()`，但 P174 视频 URL 入口仍停在旧的协议校验，只防了 `file://` / `ftp://` / `javascript:`，没有防本机/内网地址。
+
+**涉及文件**：
+- `v3/backend/main.py:639-644`
+- `v3/backend/main.py:986-992`
+- `v3/test/test_p188_url_validation.py:52-73`
+
+**解决方案**：`_prepare_url_job()` 和 `/api/download-video` 都改为先调用 `_verify_safe_url()`。新增回归测试覆盖 loopback、本机单独下载入口、内网地址。
+
+**验证**：
+- 先红：新增测试显示 loopback/private URL 被放行，`/api/download-video` 甚至尝试访问 `127.0.0.1`。
+- 后绿：`.venv/bin/python -m pytest test/test_p188_url_validation.py -q` → `8 passed, 2 warnings`。
+
+**状态**：✅ 已修
+
+## P302 | 2026-06-26 | V3.08 HARDEN 安全审查 | job 路径校验用字符串前缀判断，存在同名前缀 sibling 绕过
+
+**问题**：`_validate_job_path()` 用 `str(resolved).startswith(str(JOBS_DIR.resolve()))` 判断路径是否在 job 根目录下。普通 `../secrets` 会被挡住，但类似 `../jobs_evil` 这种同名前缀 sibling 目录会通过字符串前缀判断。
+
+**原因**：字符串前缀不是路径归属判断。`/Users/andy/.video-subber/jobs_evil` 以 `/Users/andy/.video-subber/jobs` 开头，但它不是 `jobs/` 目录里的子目录。
+
+**涉及文件**：
+- `v3/backend/main.py:35-42`
+- `v3/test/test_harden_v307_sprint2.py:58-64`
+
+**解决方案**：改用 `Path.relative_to()` 判断解析后的路径是否真的位于 `JOBS_DIR` 下。新增同名前缀 sibling 回归测试。
+
+**验证**：
+- 先红：`test_rejects_sibling_with_same_prefix` 失败，`_validate_job_path("../jobs_evil")` 返回 sibling 路径。
+- 后绿：`.venv/bin/python -m pytest test/test_harden_v307_sprint2.py::TestP240PathTraversal test/test_p188_url_validation.py -q` → `14 passed, 2 warnings`。
+
+**状态**：✅ 已修
+
+## P303 | 2026-06-26 | V3.08 Web QA | 旧 interrupted 任务反复恢复成页面进度卡片
+
+**问题**：用户打开 `localhost:8766` 后，页面下方出现两个橙色进度条，分别显示 `video.mp4` 和 `config`，文案为“任务中断，可重新提交恢复”。这两个不是当前测试任务，而是旧的 URL 安全测试任务。
+
+**原因**：后端启动时会扫描 `~/.video-subber/jobs/*/meta.json`，把历史 `queued/running` 但没有输出的任务改成内存里的 `interrupted`，但这个状态没有写回 `meta.json`。`/api/active-jobs` 会返回内存里的 `queued/running/interrupted`。前端在 `localStorage.activeJobs` 为空时自动调用 `/api/active-jobs`，再把返回的所有任务都写回 `localStorage` 并渲染成卡片。结果这两个旧测试任务在磁盘上长期保持 `queued`，服务每次重启又在内存里恢复成 `interrupted`，页面每次打开又重新显示橙色卡片。
+
+**证据**：
+- `/api/active-jobs` 返回 `cc7d373829`：`video_filename=video.mp4`，`source_url=http://192.168.1.1/video.mp4`，`status=interrupted`。
+- `/api/active-jobs` 返回 `e25373d4d3`：`video_filename=config`，`source_url=http://127.0.0.1:8766/api/config`，`status=interrupted`。
+- `/Users/andy/.video-subber/jobs/cc7d373829/meta.json` 磁盘状态仍是 `queued`。
+- `/Users/andy/.video-subber/jobs/e25373d4d3/meta.json` 磁盘状态仍是 `queued`。
+- `v3/frontend/index.html:1294-1296` 在本地没有 activeJobs 时拉取 `/api/active-jobs` 并写入本地恢复列表。
+- `v3/frontend/index.html:1044-1057` 对 `interrupted` 任务调用 `addJobCard()`，渲染橙色 50% 进度条。
+- `v3/backend/main.py:223-252` 启动扫描历史 jobs，并把旧 `queued/running` 任务视为 `interrupted`。
+- `v3/backend/main.py:848-866` `/api/active-jobs` 返回 `queued/running/interrupted`。
+- `v3/backend/main.py:884-898` `/api/jobs/{job_id}` 优先返回 `GLOBAL_HASH_INDEX` 里的内存状态，所以前端查询单个 job 时也拿到 `interrupted`。
+
+**解决方案**：后端新增 `_is_recoverable_active_job()`，让 `/api/active-jobs` 只返回可恢复的 `interrupted` 任务。有 `input.*` 的上传/本地任务仍可恢复；有安全 `source_url` 的 URL 任务仍可恢复；本机/内网 URL 且没有真实输入文件的旧测试任务不再返回。没有删除旧 job 目录，也没有改前端恢复逻辑。
+
+**验证**：
+- P303 目标测试：`2 passed, 2 warnings`
+- 相关回归：`51 passed, 2 warnings`
+- 完整全量测试：`633 passed, 8 warnings in 97.44s`
+- 重启 8766 后 `/api/active-jobs` 返回 `{"jobs":[]}`
+
+**状态**：✅ 已修

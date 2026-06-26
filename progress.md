@@ -1807,3 +1807,101 @@ brainstorming ✅ → plan-eng-review ✅ → ln-021-codegraph ✅ → TDD ✅ �
 - `create_job` 拆后：`624 passed, 8 warnings in 109.84s`
 
 **下一步**：按 `pipelines/refactor-remaining-plan.md` 跑调用图验证：`ln-021-codegraph analyze_architecture` + `ln-021-codegraph audit_workspace`。本轮未提交。
+
+## 2026-06-26 V3.08 版本收尾 HARDEN 审查（未放行发布线）
+
+**本轮范围**：V3.08 搬家 + 函数复杂度拆分 + P298/P299/P300 修复后的整体收尾审查。目标是查跨对话改动后的连贯性，不新增功能。
+
+**完成事项**：
+- 新增管道文件：`pipelines/harden-v308-2026-06-26.md`。
+- 双签 diff + 设计一致性走查：主链路未发现 V3.08 拆分导致的漏传字段、顺序错位、状态丢失；P300 状态链方向正确。
+- HARDEN 小修：后端服务标题从 V2 改为 V3；`v3/test/*.py` 顶部运行说明从 `cd v2` 改为 `cd v3`。
+- 安全审查修复 P301：视频 URL 模式和 `/api/download-video` 复用 `_verify_safe_url()`，拦截本机/内网 URL。
+- 安全审查修复 P302：`_validate_job_path()` 改用 `Path.relative_to()`，堵住同名前缀 sibling 路径绕过。
+- 架构审查：`ln-021-codegraph` 当前无可执行命令，已用手工 `rg` + `radon` 降级审查；未发现 `worker_manager -> main` 循环依赖复活；复杂度平均 A。
+
+**验证结果**：
+- 安全相关测试：`14 passed, 2 warnings`。
+- 排除 P207/P212 真实 ForcedAligner 模型测试后的主测试集合：`616 passed, 4 warnings`。
+- 完整 `pytest test/ -q` 未完成：P207/P212 真实模型测试卡在 HuggingFace/Metal 路径；当前会话无 Metal 设备，非沙盒重跑被权限审查拒绝。
+- Web QA：8766 可访问，PID `25324` 工作目录是 `v3`，但当前会话无法停止旧进程，不能证明服务加载了本轮最新改动。
+- 真实短视频 E2E：`test/trump.mp4` 18.4 秒，worker 成功抽音频，但 standard 短 Whisper 探测在 `mlx_whisper` 导入时因无 Metal 设备失败，未生成 SRT。
+
+**结论**：V3.08 目前**不能直接进入发布线**。代码审查和普通测试面通过，但发布前必须在可访问 Metal 的本机环境补跑：完整全量测试、重启 8766 到当前代码、真实短视频 standard E2E 并检查 SRT。
+
+## 2026-06-26 V3.08 HARDEN 补验证（重启服务 + 完整全量测试）
+
+**本轮范围**：只补两件发布前证据：把 8766 重启到当前 `v3` 代码；跑完整全量测试。真实短视频 standard E2E 留给用户手动跑。
+
+**完成事项**：
+- 已停止旧 8766 进程 PID `25324`。
+- 已用当前 `/Users/andy/Andy-agent/video-subtitle/v3` 启动新服务：screen 会话 `88733.video-subtitle-v308-harden-verify`，监听 PID `88755`。
+- `/api/health` 正常返回 `{"ok":true,"version":"3.07"}`；这里的版本号还没进入发布线 bump，不代表旧代码。
+- 页面根路径 `/` 返回 HTTP `200 OK`。
+- 进程工作目录确认是 `/Users/andy/Andy-agent/video-subtitle/v3`。
+
+**验证**：
+- 沙盒内完整测试卡在 HuggingFace/Metal 路径，人工中断时为 `266 passed, 1 skipped, 4 warnings`，不是断言失败。
+- 提升权限后完整全量测试通过：`631 passed, 8 warnings in 101.94s`。
+
+**下一步**：用户用真实短视频跑一次 standard 链路，检查 SRT 和日志正常。通过后再进入发布线。
+
+## 2026-06-26 V3.08 用户真实短视频 standard E2E 监控
+
+**本轮范围**：监控用户在网页上启动的真实短视频 standard 测试，并解释页面下方两个旧进度条的来源。
+
+**测试结果**：
+- 当前真实测试 job：`c6bcf446ec`，输入 `trump_zh.mp4`。
+- 后端状态：`done`，进度 `100`，阶段 `burn`，消息 `完成`。
+- 输出文件：`/Users/andy/.video-subber/jobs/c6bcf446ec/trump_zh.srt` 和 `/Users/andy/.video-subber/jobs/c6bcf446ec/trump_zh_zh_sub.mp4`。
+- SRT 有 6 条中文翻译字幕。
+- 日志显示 standard 链路正常：Whisper 短探测识别英文 → Qwen3-ASR 主引擎 → SenseVoice → Refiner → DeepSeek 翻译 5/5 成功 → 输出封装，总耗时 33 秒。
+
+**新发现**：
+- P303：页面下方两个橙色进度条不是当前任务，而是旧 URL 安全测试任务 `cc7d373829` 和 `e25373d4d3` 被 `/api/active-jobs` 当作 `interrupted` 恢复出来。
+
+**下一步**：发布线前建议先处理 P303，或明确把 P303 记为不阻塞发布的已知 UI 问题；核心 E2E 证据已经补齐。
+
+## 2026-06-26 P303 根因复查 + E2E 产物复核
+
+**P303 根因补充**：
+- 两个橙色旧卡片来自 `cc7d373829` 和 `e25373d4d3`。
+- 它们的磁盘 `meta.json` 仍是 `queued`，不是 `interrupted`。
+- 服务启动扫描历史 job 时，看到 `queued` 且没有 `output.srt`，就在内存 `GLOBAL_HASH_INDEX` 里改成 `interrupted`。
+- `/api/active-jobs` 返回内存里的 `interrupted`。
+- 前端本地 `activeJobs` 为空时拉取 `/api/active-jobs`，再把这些 id 写入本地并渲染卡片。
+- 因为内存状态没有写回磁盘，所以服务重启后会再次重复这条链路。
+
+**E2E 复核**：
+- 最新 job 仍是 `c6bcf446ec`，`/api/jobs/c6bcf446ec` 返回 `done`、进度 `100`、阶段 `burn`。
+- 输出文件存在：`/Users/andy/.video-subber/jobs/c6bcf446ec/trump_zh.srt`、`/Users/andy/.video-subber/jobs/c6bcf446ec/trump_zh_zh_sub.mp4`。
+- 输出也已复制到 `/Users/andy/Downloads/Video-Subber/trump_zh.srt` 和 `/Users/andy/Downloads/Video-Subber/trump_zh_zh_sub.mp4`。
+- 日志未命中 `ERROR`、`Traceback`、`Exception` 或“失败”。
+
+## 2026-06-26 P303 修复完成：旧 interrupted/queued 任务不再自动恢复成页面卡片
+
+**本轮范围**：只修 P303。目标是阻止两个旧 URL 安全测试任务 `cc7d373829`、`e25373d4d3` 在页面下方反复显示成橙色“任务中断”卡片；不新增功能，不改转录/翻译链路。
+
+**流水线记录**：
+- 新增 `pipelines/bug-pipeline-2026-06-26-p303-active-jobs.md`。
+- 已完成 investigate、双签方案审查、双签影响面、diff/简化审查、设计一致性走查、安全审查、TDD、verification、Web QA。
+- `ln-021-codegraph` 当前无可执行命令，本轮影响面按 Skill 降级规则用 `rg` 静态扫描完成。
+
+**修复**：
+- `v3/backend/main.py` 新增 `_is_recoverable_active_job()`。
+- `/api/active-jobs` 对 `interrupted` 任务只返回可恢复任务：
+  - 有 `input.*` 的上传/本地文件任务可以返回。
+  - 有安全 `source_url` 的 URL 任务可以返回。
+  - 本机/内网 URL、且没有真实输入文件的旧任务不再返回。
+- 没有删除旧 job 目录；没有改前端；没有新增状态。
+
+**验证**：
+- TDD 红灯：P303 新测试先失败，证明旧代码会返回私网 URL interrupted job。
+- P303 目标测试：`2 passed, 2 warnings`。
+- 相关回归：`51 passed, 2 warnings`。
+- 完整全量测试：`633 passed, 8 warnings in 97.44s`。
+- 已重启 8766 到当前 `v3` 代码：screen 会话 `17117.video-subtitle-v308-p303-verify`，监听 PID `17139`。
+- `/api/health` 返回 `{"ok":true,"version":"3.07"}`。
+- `/api/active-jobs` 返回 `{"jobs":[]}`。
+
+**状态**：P303 已修。V3.08 发布线前的已知 UI 阻塞项清掉；下一步可按发布线规则先跑 verification，再决定版本号/commit/tag。
