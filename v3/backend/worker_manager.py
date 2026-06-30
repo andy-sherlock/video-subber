@@ -73,6 +73,11 @@ class WorkerManager:
         """
         self._kill_if_alive(job_id)
 
+    def shutdown_all(self, timeout: float = 5):
+        """Kill all tracked workers before the backend process exits."""
+        for job_id in list(self._processes):
+            self._kill_if_alive(job_id, timeout=timeout)
+
     def _read_stdout(self, job_id: str, proc: subprocess.Popen):
         """Read JSON lines from worker stdout.
         Uses run_coroutine_threadsafe to safely forward messages to the main

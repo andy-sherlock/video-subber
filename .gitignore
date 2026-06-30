@@ -25,12 +25,16 @@ _local_archive/
 # Internal planning, reviews, and handoff records are local-only.
 *.md
 !README.md
+!/v3/BUILD.md
 /docs/
 /pipelines/
 /models.json
 /pyproject.toml
 /vs
 /v3/model-download-demo.html
+/v3/node_modules/
+/v3/src-tauri/gen/
+/v3/src-tauri/target/
 v1/
 v1.1/
 v1.2/

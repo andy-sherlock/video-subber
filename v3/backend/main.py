@@ -287,6 +287,11 @@ async def startup():
     threading.Thread(target=_cleanup_old_cache, daemon=True).start()
 
 
+@app.on_event("shutdown")
+async def shutdown():
+    worker_manager.shutdown_all()
+
+
 def _cleanup_old_cache():
     """Delete intermediate cache files not accessed for 30+ days. Never touches final outputs."""
     import time as _time
@@ -1073,13 +1078,33 @@ if FRONTEND.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND), html=True), name="frontend")
 
 
-def run():
-    import sys as _sys
-    reload_flag = "--no-reload" not in _sys.argv
-    print(f"Video Subber V3 -> http://localhost:8766  (reload={'on' if reload_flag else 'off'})")
+def _default_run_port(default: int = 8766) -> int:
+    raw = _os.environ.get("VSUB_PORT")
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _parse_run_args(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=_default_run_port())
+    parser.add_argument("--no-reload", action="store_true")
+    args, _unknown = parser.parse_known_args(argv)
+    return args
+
+
+def run(argv=None):
+    args = _parse_run_args(argv)
+    reload_flag = not args.no_reload
+    print(f"Video Subber V3 -> http://localhost:{args.port}  (reload={'on' if reload_flag else 'off'})")
     uvicorn.run(
         "backend.main:app" if reload_flag else app,
-        host="127.0.0.1", port=8766,
+        host=args.host, port=args.port,
         reload=reload_flag,
         reload_dirs=[str(Path(__file__).parent.parent / "frontend"), str(Path(__file__).parent)] if reload_flag else None,
     )
