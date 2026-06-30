@@ -7,7 +7,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
+use tauri::{Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 
 struct BackendState {
     child: Arc<Mutex<Option<Child>>>,
@@ -31,9 +34,13 @@ fn find_port(start: u16) -> u16 {
 
 fn wait_for_health(port: u16, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
+    let io_timeout = Duration::from_secs(2);
     while Instant::now() < deadline {
         if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
-            let request = b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+            let _ = stream.set_read_timeout(Some(io_timeout));
+            let _ = stream.set_write_timeout(Some(io_timeout));
+            let request =
+                b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
             if stream.write_all(request).is_ok() {
                 let mut response = String::new();
                 if stream.read_to_string(&mut response).is_ok() && response.contains("200 OK") {
@@ -49,7 +56,8 @@ fn wait_for_health(port: u16, timeout: Duration) -> bool {
 fn spawn_backend(port: u16) -> std::io::Result<Child> {
     let root = project_root();
     let python = root.join(".venv/bin/python");
-    Command::new(python)
+    let mut command = Command::new(python);
+    command
         .arg("-m")
         .arg("backend.main")
         .arg("--host")
@@ -60,17 +68,50 @@ fn spawn_backend(port: u16) -> std::io::Result<Child> {
         .current_dir(root)
         .env("VSUB_PORT", port.to_string())
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
+        .stderr(Stdio::inherit());
+    #[cfg(unix)]
+    {
+        command.process_group(0);
+    }
+    command.spawn()
 }
 
 fn kill_backend(state: &BackendState) {
     if let Ok(mut guard) = state.child.lock() {
         if let Some(mut child) = guard.take() {
-            let _ = child.kill();
+            terminate_backend(&mut child);
             let _ = child.wait();
         }
     }
+}
+
+#[cfg(unix)]
+fn terminate_backend(child: &mut Child) {
+    let pgid = child.id() as i32;
+    unsafe {
+        let _ = libc::kill(-pgid, libc::SIGTERM);
+    }
+    std::thread::sleep(Duration::from_secs(5));
+    unsafe {
+        let _ = libc::kill(-pgid, libc::SIGKILL);
+    }
+}
+
+#[cfg(not(unix))]
+fn terminate_backend(child: &mut Child) {
+    let _ = child.kill();
+}
+
+fn show_startup_error<R: Runtime>(manager: &impl Manager<R>) -> tauri::Result<()> {
+    WebviewWindowBuilder::new(
+        manager,
+        "startup-error",
+        WebviewUrl::App("desktop-startup-error.html".into()),
+    )
+    .title("Video Subber 启动失败")
+    .inner_size(720.0, 460.0)
+    .build()?;
+    Ok(())
 }
 
 fn main() {
@@ -78,15 +119,32 @@ fn main() {
     let state = BackendState {
         child: backend_child.clone(),
     };
+    let signal_child = backend_child.clone();
+    ctrlc::set_handler(move || {
+        let state = BackendState {
+            child: signal_child.clone(),
+        };
+        kill_backend(&state);
+        std::process::exit(130);
+    })
+    .expect("failed to install desktop shutdown signal handler");
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .manage(state)
         .setup(move |app| {
             let port = find_port(8766);
-            let child = spawn_backend(port)?;
-            *backend_child.lock().expect("backend mutex poisoned") = Some(child);
+            match spawn_backend(port) {
+                Ok(child) => {
+                    *backend_child.lock().expect("backend mutex poisoned") = Some(child);
+                }
+                Err(err) => {
+                    eprintln!("failed to start Python backend: {err}");
+                    show_startup_error(app)?;
+                    return Ok(());
+                }
+            }
 
-            if wait_for_health(port, Duration::from_secs(20)) {
+            if wait_for_health(port, Duration::from_secs(30)) {
                 let url = url::Url::parse(&format!("http://127.0.0.1:{port}"))?;
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                     .title("Video Subber")
@@ -94,14 +152,7 @@ fn main() {
                     .min_inner_size(800.0, 650.0)
                     .build()?;
             } else {
-                WebviewWindowBuilder::new(
-                    app,
-                    "startup-error",
-                    WebviewUrl::App("desktop-startup-error.html".into()),
-                )
-                .title("Video Subber 启动失败")
-                .inner_size(720.0, 460.0)
-                .build()?;
+                show_startup_error(app)?;
             }
             Ok(())
         })
@@ -111,6 +162,16 @@ fn main() {
                 kill_backend(&state);
             }
         })
-        .run(tauri::generate_context!())
-        .expect("failed to run Video Subber desktop shell");
+        .build(tauri::generate_context!())
+        .expect("failed to build Video Subber desktop shell");
+
+    app.run(|app_handle, event| {
+        if matches!(
+            event,
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+        ) {
+            let state = app_handle.state::<BackendState>();
+            kill_backend(&state);
+        }
+    });
 }

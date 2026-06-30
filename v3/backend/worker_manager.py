@@ -32,7 +32,10 @@ class WorkerManager:
         proc = self._processes.pop(job_id, None)
         self._job_dirs.pop(job_id, None)
         if proc:
-            proc.kill()
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                return
             try:
                 proc.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
@@ -76,7 +79,10 @@ class WorkerManager:
     def shutdown_all(self, timeout: float = 5):
         """Kill all tracked workers before the backend process exits."""
         for job_id in list(self._processes):
-            self._kill_if_alive(job_id, timeout=timeout)
+            try:
+                self._kill_if_alive(job_id, timeout=timeout)
+            except Exception as exc:
+                _log.warning("[worker:%s] shutdown cleanup failed: %s", job_id, exc)
 
     def _read_stdout(self, job_id: str, proc: subprocess.Popen):
         """Read JSON lines from worker stdout.

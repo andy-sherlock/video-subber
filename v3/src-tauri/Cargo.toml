@@ -9,3 +9,5 @@ tauri-build = { version = "2.5.1", features = [] }
 [dependencies]
 tauri = { version = "2.9.4", features = [] }
 url = "2.5.7"
+libc = "0.2.186"
+ctrlc = { version = "3.5.1", features = ["termination"] }
