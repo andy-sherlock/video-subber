@@ -35,7 +35,7 @@ class WorkerManager:
             try:
                 proc.kill()
             except ProcessLookupError:
-                return
+                pass
             try:
                 proc.wait(timeout=timeout)
             except subprocess.TimeoutExpired:

@@ -112,6 +112,31 @@ def test_worker_manager_shutdown_all_kills_every_live_worker():
     assert manager._job_dirs == {}
 
 
+def test_worker_manager_process_lookup_error_still_waits_to_reap_process():
+    from backend.worker_manager import WorkerManager
+
+    class AlreadyExitedProc:
+        def __init__(self):
+            self.waited = False
+
+        def kill(self):
+            raise ProcessLookupError("already exited")
+
+        def wait(self, timeout=None):
+            self.waited = True
+
+    manager = WorkerManager()
+    proc = AlreadyExitedProc()
+    manager._processes = {"done": proc}
+    manager._job_dirs = {"done": Path("/tmp/done")}
+
+    manager._kill_if_alive("done")
+
+    assert proc.waited is True
+    assert manager._processes == {}
+    assert manager._job_dirs == {}
+
+
 def test_worker_manager_shutdown_all_continues_after_single_worker_error():
     from backend.worker_manager import WorkerManager
 
@@ -196,7 +221,9 @@ def test_tauri_b1_shutdown_uses_unix_process_group_and_is_idempotent():
     assert "libc::SIGKILL" in source
     assert "libc::kill" in source
     assert "guard.take()" in source
-    assert "sleep(Duration::from_secs(5))" in source
+    assert "child.try_wait()" in source
+    assert "Duration::from_millis(100)" in source
+    assert "sleep(Duration::from_secs(5))" not in source
     assert "libc" in cargo_toml
 
 
