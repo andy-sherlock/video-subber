@@ -224,6 +224,11 @@ def test_tauri_b1_shutdown_uses_unix_process_group_and_is_idempotent():
     assert "child.try_wait()" in source
     assert "Duration::from_millis(100)" in source
     assert "sleep(Duration::from_secs(5))" not in source
+    try_wait_pos = source.index("child.try_wait()")
+    break_pos = source.index("break;", try_wait_pos)
+    sigkill_pos = source.index("libc::SIGKILL")
+    assert try_wait_pos < break_pos < sigkill_pos
+    assert "return;" not in source[try_wait_pos:sigkill_pos]
     assert "libc" in cargo_toml
 
 

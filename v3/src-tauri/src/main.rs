@@ -94,7 +94,7 @@ fn terminate_backend(child: &mut Child) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
         if child.try_wait().ok().flatten().is_some() {
-            return;
+            break;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
