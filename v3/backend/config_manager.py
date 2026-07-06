@@ -4,10 +4,24 @@ from pathlib import Path
 
 CONFIG_PATH = Path.home() / ".video-subber" / "config.json"
 
+# V3.09: Whisper 三模型方案的唯一权威来源。worker 校验白名单也引用这里。
+VALID_MODELS = ("large-v3-turbo", "large-v2", "large-v3")
+DEFAULT_MODEL = "large-v2"
+# 已删除的旧型号——老 config.json / 旧 localStorage 里若残留，加载时兜底为默认。
+LEGACY_MODELS = ("tiny", "base", "small", "medium")
+
+
+def coerce_model(model):
+    """已删除的旧型号兜底为默认 large-v2；其余原样放行，让校验拦截真正的非法值。"""
+    if model in LEGACY_MODELS:
+        return DEFAULT_MODEL
+    return model
+
+
 DEFAULT_CONFIG = {
     "translationMode": "speed",
     "translationPriority": ["google", "bing", "youdao"],
-    "model": "medium",
+    "model": DEFAULT_MODEL,
     "style": {
         "font": "Microsoft YaHei" if sys.platform == "win32" else "PingFang SC",
         "size": 42,
@@ -32,6 +46,8 @@ def load_config() -> dict:
     else:
         return dict(DEFAULT_CONFIG)
 
+    # 老配置里残留的已删型号（如 medium）兜底为 large-v2，避免下游校验报错。
+    data["model"] = coerce_model(data.get("model"))
     return data
 
 

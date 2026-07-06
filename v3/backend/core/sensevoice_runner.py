@@ -57,25 +57,9 @@ def _run_sensevoice_chunked(audio_path: str, device: str,
     _log.info("SenseVoice 分段处理: %d chunks (%d segments)",
               len(chunks), len(segments))
 
-    try:
-        from funasr import AutoModel
-    except ImportError:
-        _log.warning("SenseVoice 未安装 (funasr import failed)")
+    model = _load_sensevoice_model(device)
+    if model is None:
         return None
-
-    _log.info("加载 SenseVoice 模型 (device=%s) ...", device)
-    t0 = time.time()
-    try:
-        model = AutoModel(
-            model="iic/SenseVoiceSmall",
-            trust_remote_code=True,
-            device=device,
-            disable_pbar=True,     # P238: 关闭 tqdm 进度条，避免 stderr BrokenPipe
-        )
-    except Exception:
-        _log.warning("SenseVoice 模型加载失败", exc_info=True)
-        return None
-    _log.info("SenseVoice 模型加载完成 (%.1fs)", time.time() - t0)
 
     all_events = []
 
@@ -141,18 +125,29 @@ def _run_sensevoice_chunked(audio_path: str, device: str,
 # ═══════════════════════════════════════════════════════════════════
 
 def _load_sensevoice_model(device: str):
-    """加载 SenseVoice 模型；import 失败或加载失败返回 None。"""
+    """加载 SenseVoice 模型；import 失败、模型未就绪或加载失败返回 None。
+
+    C3.5 (㉖): 本地路径由模型注册表解析（自管目录 → 旧缓存只读回退），
+    两边都没有 → 返回 None 跳过，绝不在任务运行时静默联网下载。
+    """
     try:
         from funasr import AutoModel
     except ImportError:
         _log.warning("SenseVoice 未安装 (funasr import failed)")
         return None
 
+    try:
+        from backend.model_registry import resolve_model_path
+        model_path = resolve_model_path("sensevoice")
+    except Exception:
+        _log.warning("SenseVoice 模型未就绪，请先执行一键准备", exc_info=True)
+        return None
+
     _log.info("加载 SenseVoice 模型 (device=%s) ...", device)
     t0 = time.time()
     try:
         model = AutoModel(
-            model="iic/SenseVoiceSmall",
+            model=model_path,
             trust_remote_code=True,
             device=device,
             disable_pbar=True,     # P238: 关闭 tqdm 进度条，避免 stderr BrokenPipe

@@ -1424,7 +1424,7 @@ def _run_full_whisper(audio_path, model_size, lang, vad_threshold, detected_lang
     return info, detected_lang, n_total
 
 
-def transcribe(audio_path: str, model_size: str = "medium",
+def transcribe(audio_path: str, model_size: str = "large-v2",
                source_lang: str = "auto", skip_vad: bool = False,
                vad_threshold: float = 0.0,
                filter_keywords: bool = True,

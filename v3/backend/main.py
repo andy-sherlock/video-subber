@@ -1,4 +1,5 @@
 """V3 Web App — FastAPI backend."""
+from . import hf_mirror  # noqa: F401  # 设置 HF 镜像，必须在任何 huggingface 导入前
 import sys, json, uuid, asyncio, time, hashlib, threading, logging
 from pathlib import Path
 
@@ -356,31 +357,82 @@ def get_env(simulate: str = ""):
         _sim_path = r"C:\ffmpeg\bin\ffmpeg.exe" if __import__("sys").platform == "win32" else "/usr/local/bin/ffmpeg"
         data["ffmpeg"] = {"installed": True, "has_libass": False, "path": _sim_path}
     if "nowhisper" in sims:
-        data["whisper"] = {"installed": False, "models": []}
+        # 模拟"包在、模型没下载"这一现实缺失态：installed_pkg 为真、model_ready 为假，
+        # 前端 split() 据此显示"语音识别模型未下载"并给出一键修复入口。
+        data["whisper"] = {"installed": False, "installed_pkg": True,
+                           "model_ready": False, "models": []}
     return data
 
 
 # ── Model download ──
 
+def _has_running_jobs() -> bool:
+    """P316 防线：是否有排队/运行中的任务（与 /api/active-jobs 同源）。"""
+    return any(entry.get("status") in ("queued", "running")
+               for entry in GLOBAL_HASH_INDEX.values())
+
+
 @app.get("/api/models/status")
 def model_status():
-    """Return download status for all 5 models."""
+    """Whisper 各型号下载状态（旧消费方）+ 四模型准备/修复通道（C3.5）。"""
     from .model_manager import get_model_status
-    return get_model_status()
+    from .prepare_manager import get_prepare_status
+    result = get_model_status()
+    result["prepare"] = get_prepare_status()
+    return result
+
+
+@app.post("/api/prepare")
+def api_prepare(payload: dict = None):
+    """一键准备：检测四模型，缺哪个下哪个。幂等，重复调用只补缺失项。"""
+    from .prepare_manager import start_prepare
+    whisper_model_id = (payload or {}).get("model")
+    return start_prepare(whisper_model_id=whisper_model_id)
+
+
+@app.post("/api/prepare/stop")
+def api_prepare_stop():
+    """停止当前准备下载，保留已下载部分。"""
+    from .prepare_manager import stop_prepare
+    return stop_prepare()
+
+
+@app.post("/api/repair")
+def api_repair(payload: dict = None):
+    """一键修复：文件级优先 + 整模型兜底。运行中任务时拒绝（P316）。"""
+    if _has_running_jobs():
+        return {"error": "当前有任务正在进行，请等任务完成后再修复"}
+    from .prepare_manager import repair_model
+    payload = payload or {}
+    return repair_model(target=payload.get("target"),
+                        whisper_model_id=payload.get("model"))
 
 
 @app.post("/api/models/download/{model_id}")
 def model_download(model_id: str):
-    """Start downloading a model."""
+    """开始下载指定模型。"""
     from .model_manager import start_download
     return start_download(model_id)
 
 
 @app.delete("/api/models/download/{model_id}")
 def model_cancel(model_id: str):
-    """Cancel an in-progress model download."""
+    """停止正在下载的模型。"""
     from .model_manager import cancel_download
     return cancel_download(model_id)
+
+
+@app.delete("/api/models/{model_id}")
+def model_delete(model_id: str):
+    """删除本应用自管目录里已下载的模型。
+
+    运行中任务时拒绝（P316）；一键准备/修复进行中也拒绝（P2：避免与整模型
+    修复并发 rmtree/下载/写 manifest 同一目录）。
+    """
+    if _has_running_jobs():
+        return {"error": "当前有任务正在进行，请等任务完成后再删除模型"}
+    from .prepare_manager import delete_model_if_idle
+    return delete_model_if_idle(model_id)
 
 
 @app.get("/api/backends")
@@ -787,6 +839,21 @@ def _handle_existing_job(existing: dict, job_dir: Path, video_path, cfg: dict):
         try:
             video_path = next(job_dir.glob("input.*"))
         except StopIteration:
+            pass
+        try:
+            from . import model_manager
+            original_model = existing["config"].get("model") or "large-v2"
+            # B3: 用和 worker 加载同一把尺子（自管 ready 或旧缓存回退），
+            # is_model_ready 只认自管目录，会把旧缓存模型误判成缺失。
+            if not model_manager.is_model_loadable(original_model):
+                return {
+                    "found": True,
+                    "job_id": old_jid,
+                    "status": "model_missing",
+                    "original_model": original_model,
+                    "config": existing["config"],
+                }
+        except Exception:
             pass
 
         JOBS[old_jid] = {

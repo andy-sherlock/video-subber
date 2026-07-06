@@ -1,6 +1,8 @@
 """Qwen3-ForcedAligner — word-level timestamp alignment.
 
-Loads Qwen/Qwen3-ForcedAligner-0.6B via the official qwen-asr package.
+Loads the ForcedAligner model via the official qwen-asr package. The local
+model path is resolved through the model registry (C3.5 ㉖) — no hardcoded
+repo name, no silent network download at task time.
 Input: audio file + text → Output: per-word start/end timestamps.
 
 Model time-sharing: call close() to release model after use.
@@ -28,12 +30,13 @@ class QwenAligner:
         aligner.close()  # Release model memory
     """
 
-    def __init__(self, model_id: str = "Qwen/Qwen3-ForcedAligner-0.6B",
+    def __init__(self, model_id: str | None = None,
                  device: str | None = None):
         """Load the ForcedAligner model via the official API.
 
         Args:
-            model_id: HuggingFace model ID.
+            model_id: local model dir (tests may inject); None resolves
+                via the model registry (managed dir → legacy cache).
             device: "cuda", "mps", "cpu", or None (auto-detect).
         """
         self._model_id = model_id
@@ -44,6 +47,11 @@ class QwenAligner:
             from qwen_asr import Qwen3ForcedAligner
 
             import torch
+
+            if model_id is None:
+                from backend.model_registry import resolve_model_path
+                model_id = resolve_model_path("qwen_fa")
+                self._model_id = model_id
 
             if device is None:
                 if torch.cuda.is_available():
@@ -143,17 +151,18 @@ def _map_language(lang: str) -> str:
 
 
 def is_qwen_aligner_available() -> bool:
-    """Check if Qwen3-ForcedAligner can be loaded (packages + model cached)."""
+    """Check if Qwen3-ForcedAligner can be loaded (packages + local weights).
+
+    C3.5 (㉖): weight presence is judged by the model registry (managed dir
+    structural check, legacy cache fallback) instead of a hardcoded repo name.
+    """
     if not _has_qwen_asr_package:
         return False
     try:
         import torch  # noqa: F401
-        from transformers import AutoConfig
-        AutoConfig.from_pretrained(
-            "Qwen/Qwen3-ForcedAligner-0.6B", local_files_only=True
-        )
-        return True
-    except (ImportError, OSError):
+        from backend.model_registry import is_model_resolvable
+        return is_model_resolvable("qwen_fa")
+    except ImportError:
         return False
 
 

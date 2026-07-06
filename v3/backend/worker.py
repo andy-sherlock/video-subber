@@ -7,6 +7,7 @@ Protocol: prints JSON lines to stdout for progress events.
   {"type":"error","message":"...","failed_segments":[...]}
 """
 import sys, os, json, time, builtins, logging, shutil, re as _re
+from backend import hf_mirror  # noqa: F401  # 设置 HF 镜像，必须在任何 huggingface 导入前
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import SimpleNamespace
@@ -141,6 +142,7 @@ from backend.core.checkpoint import Checkpoint, find_versioned_cache, cleanup_ol
 from backend.core.sentence_splitter import word_align_segments, llm_split_segments
 from backend.transcriber_v2 import transcribe as transcribe_v2, Segment, _whisper_is_usable
 from backend.key_manager import scrub_logs
+from backend.config_manager import coerce_model, DEFAULT_MODEL, VALID_MODELS
 
 
 def emit(event_type: str, **kwargs):
@@ -405,11 +407,19 @@ def _log_crash_snapshot():
     logging.getLogger("worker").error("crash_snapshot: %s", _safe_crash_snapshot_json())
 
 
+# V3.09: 三模型的转录耗时预估（用于进度提示）。提到模块级以便单测。
+_MODEL_TIME_EST = {
+    "large-v3-turbo": "8-20 分钟",
+    "large-v2": "20-40 分钟",
+    "large-v3": "20-40 分钟",
+}
+
+
 def _validate_config(cfg: dict):
     """v2.05: Config schema 校验，防止静默降级。"""
     if "burn" in cfg and not isinstance(cfg.get("burn"), (bool, type(None))):
         raise ValueError(f"config.burn 应为 bool，实际为 {type(cfg['burn']).__name__}")
-    if "model" in cfg and cfg["model"] not in ("tiny", "base", "small", "medium", "large-v3", None):
+    if "model" in cfg and cfg["model"] not in (*VALID_MODELS, None):
         raise ValueError(f"config.model 无效: {cfg['model']}")
     if "translationMode" in cfg and cfg["translationMode"] not in ("speed", "quality", None):
         raise ValueError(f"config.translationMode 无效: {cfg['translationMode']}")
@@ -513,8 +523,7 @@ def _step_transcribe(stage, audio_path, transcript_path, model,
                      speaker_detect, transcription_tier, cache, config, ck):
     """Step 2 (5-35%): 转录音频或读已有缓存，返回 segments 列表。"""
     if stage in ("start", "extract_audio", "transcribe") and not transcript_path.exists():
-        _MODEL_TIME = {"tiny": "1-3 分钟", "base": "2-5 分钟", "small": "5-15 分钟", "medium": "10-25 分钟", "large-v3": "20-40 分钟"}
-        time_est = _MODEL_TIME.get(model, "10-30 分钟")
+        time_est = _MODEL_TIME_EST.get(model, "10-30 分钟")
         stderr_progress("transcribe", 10, f"正在识别语音…（{model} 约需 {time_est}）", f"模型: {model}")
         def _trans_progress(n):
             if n == -1:
@@ -588,11 +597,11 @@ def _llm_fallback_if_needed(segments, texts, failed, sub_splits, zh_list, total,
     _all_failed = len(failed) == total and total > 0
     if not (_has_llm_keys and _all_failed):
         return zh_list, failed, sub_splits
-    stderr_progress("translate", 40, "LLM 翻译全部失败，等待用户选择…")
+    stderr_progress("translate", 40, "智能翻译全部失败，等待用户选择…")
     try:
         msg = json.dumps({
             "type": "llm_failed",
-            "message": "LLM 翻译全部失败，是否改用免费引擎（Google/Bing/有道）继续？",
+            "message": "智能翻译全部失败，是否改用免费引擎（Google/Bing/有道）继续？",
             "total": total,
         }, ensure_ascii=False)
         _real_stdout.write(msg + "\n")
@@ -621,7 +630,7 @@ def _llm_fallback_if_needed(segments, texts, failed, sub_splits, zh_list, total,
             try:
                 _note = json.dumps({
                     "type": "notice",
-                    "message": "LLM 翻译未能完成，已自动切换免费引擎（Google/Bing/有道）。",
+                    "message": "智能翻译未能完成，已自动切换免费引擎（Google/Bing/有道）。",
                 }, ensure_ascii=False)
                 _real_stdout.write(_note + "\n")
                 _real_stdout.flush()
@@ -878,7 +887,9 @@ def main():
     burn_flag = (output_mode == "burn")
     mux_flag = (output_mode == "mux")
     subtitles = config.get("subtitles", "no")
-    model = config.get("model", "medium")
+    # V3.09: 老配置/旧 localStorage 残留的已删型号兜底为 large-v2，并回写以便后续校验通过。
+    model = coerce_model(config.get("model", DEFAULT_MODEL))
+    config["model"] = model
     translation_mode = config.get("translationMode", "speed")
     translation_priority = config.get("translationPriority", ["google", "bing", "youdao"])
     api_keys = config.get("apiKeys", [])
@@ -1035,10 +1046,10 @@ def _friendly_error(raw: str) -> str:
     if "未检测到任何语音内容" in raw:
         return "视频中没有检测到语音。可能原因：视频为纯音乐、静音、或音频格式损坏。请确认视频有声音后重试。"
     if "No such file" in raw or "FileNotFound" in raw:
-        return "缺少必要的模型文件。请检查网络连接，模型将在下次启动时自动下载。"
+        return "缺少必要的模型文件。请回到主界面执行一键准备，或点击一键修复后重试。"
     _raw_lower = raw.lower()
     if "memoryerror" in _raw_lower or "out of memory" in _raw_lower or "cannot allocate memory" in _raw_lower:
-        return "内存不足，无法处理该视频。请尝试使用更小的模型（如 tiny 或 base）。"
+        return "内存不足，无法处理该视频。请尝试切换到更省内存的模型（如 large-v3-turbo），或关闭其他占用内存的程序后重试。"
     if "ReadTimeout" in raw or "Timeout" in raw or "timeout" in raw.lower():
         return "连接翻译服务器超时。请检查网络，或切换到其他翻译引擎后重试。"
     if "429" in raw or "Too Many Requests" in raw:

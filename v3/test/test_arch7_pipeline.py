@@ -79,21 +79,23 @@ class TestP173LoadModel(unittest.TestCase):
     @patch("backend.core.qwen_asr_runner._USE_MLX", True)
     @patch("backend.core.qwen_asr_runner._USE_PYTORCH", False)
     def test_load_model_calls_mlx_when_mlx(self):
-        """当 _USE_MLX=True 时，应加载 MLX 模型（mlx-qwen3-asr）。"""
+        """当 _USE_MLX=True 时，应加载 MLX 模型（C3.5 ㉖：路径来自注册表）。"""
         mock_model = MagicMock()
         mock_config = MagicMock()
 
         from backend.core.qwen_asr_runner import _load_qwen_model
         with patch("backend.core.qwen_asr_runner._mlx_load_model",
-                   return_value=(mock_model, mock_config)) as mock_load:
+                   return_value=(mock_model, mock_config)) as mock_load, \
+             patch("backend.model_registry.resolve_model_path",
+                   return_value="/local/qwen_asr"):
             result = _load_qwen_model()
-        mock_load.assert_called_once_with("Qwen/Qwen3-ASR-1.7B")
+        mock_load.assert_called_once_with("/local/qwen_asr")
         self.assertIs(result, mock_model)
 
     @patch("backend.core.qwen_asr_runner._USE_MLX", False)
     @patch("backend.core.qwen_asr_runner._USE_PYTORCH", True)
     def test_load_model_calls_pytorch_when_not_mlx(self):
-        """当 _USE_MLX=False 时，应加载 PyTorch 模型。"""
+        """当 _USE_MLX=False 时，应加载 PyTorch 模型（C3.5 ㉖：路径来自注册表）。"""
         mock_cls = MagicMock()
         mock_model = MagicMock()
         mock_cls.from_pretrained.return_value = mock_model
@@ -101,9 +103,11 @@ class TestP173LoadModel(unittest.TestCase):
         mock_module.Qwen3ASRModel = mock_cls
 
         from backend.core.qwen_asr_runner import _load_qwen_model
-        with patch.dict("sys.modules", {"qwen_asr": mock_module}):
+        with patch.dict("sys.modules", {"qwen_asr": mock_module}), \
+             patch("backend.model_registry.resolve_model_path",
+                   return_value="/local/qwen_asr"):
             result = _load_qwen_model()
-        mock_cls.from_pretrained.assert_called_once_with("Qwen/Qwen3-ASR-1.7B")
+        mock_cls.from_pretrained.assert_called_once_with("/local/qwen_asr")
         self.assertIs(result, mock_model)
 
 

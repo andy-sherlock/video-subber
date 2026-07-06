@@ -15,10 +15,8 @@ from dataclasses import dataclass
 _log = logging.getLogger("whisper_runner")
 
 MLX_WHISPER_MODELS = {
-    "tiny": "mlx-community/whisper-tiny",
-    "base": "mlx-community/whisper-base",
-    "small": "mlx-community/whisper-small",
-    "medium": "mlx-community/whisper-medium",
+    "large-v3-turbo": "mlx-community/whisper-large-v3-turbo",
+    "large-v2": "mlx-community/whisper-large-v2-mlx",
     "large-v3": "mlx-community/whisper-large-v3-mlx",
 }
 
@@ -49,6 +47,16 @@ def choose_whisper_backend() -> str:
 def should_parallel_asr() -> bool:
     """Unified memory (Apple Silicon) cannot truly parallelise two large models."""
     return choose_whisper_backend() != "mlx"
+
+
+def resolve_whisper_model_path(model_size: str) -> str:
+    """Resolve a Whisper model name to a ready local directory.
+
+    Lazy import avoids a circular import: model_manager needs choose_whisper_backend()
+    to build platform-specific download metadata.
+    """
+    from backend.model_manager import resolve_whisper_model_path as _resolve
+    return _resolve(model_size, backend=choose_whisper_backend())
 
 
 def _normalize_words(words) -> list:
@@ -110,10 +118,10 @@ def transcribe_with_mlx_whisper(
     if vad_threshold > 0:
         _log.warning("mlx-whisper 不支持当前 faster-whisper VAD 参数，已忽略 vad_threshold=%.2f", vad_threshold)
 
-    repo = MLX_WHISPER_MODELS.get(model_size, model_size)
+    model_path = resolve_whisper_model_path(model_size)
     result = mlx_whisper.transcribe(
         audio_path,
-        path_or_hf_repo=repo,
+        path_or_hf_repo=model_path,
         language=language,
         word_timestamps=True,
     )
@@ -131,7 +139,7 @@ def transcribe_with_mlx_whisper(
             )
             from mlx_whisper.load_models import load_model
             dtype = mx.float16
-            model = load_model(repo, dtype=dtype)
+            model = load_model(model_path, dtype=dtype)
             audio_data = load_audio(audio_path)
             mel = log_mel_spectrogram(audio_data, n_mels=model.dims.n_mels, padding=N_SAMPLES)
             mel_seg = pad_or_trim(mel, N_FRAMES, axis=-2).astype(dtype)
@@ -162,7 +170,8 @@ def transcribe_with_faster_whisper(
     """Run faster-whisper. This is the unchanged Windows/Linux path."""
     from faster_whisper import WhisperModel
 
-    model = WhisperModel(model_size, device="auto", compute_type="auto")
+    model_path = resolve_whisper_model_path(model_size)
+    model = WhisperModel(model_path, device="auto", compute_type="auto")
     vad_kwargs = {}
     if vad_threshold > 0:
         vad_kwargs = {
@@ -243,11 +252,11 @@ def detect_language_with_mlx_whisper(
             "Mac 端需要安装 mlx-whisper 才能检测语言。请先安装依赖并下载模型。"
         ) from exc
 
-    repo = MLX_WHISPER_MODELS.get(model_size, model_size)
+    model_path = resolve_whisper_model_path(model_size)
     probe_path = _create_language_probe_clip(audio_path, probe_seconds)
     try:
         dtype = mx.float16
-        model = load_model(repo, dtype=dtype)
+        model = load_model(model_path, dtype=dtype)
         audio = load_audio(probe_path)
         mel = log_mel_spectrogram(audio, n_mels=model.dims.n_mels, padding=N_SAMPLES)
         mel_segment = pad_or_trim(mel, N_FRAMES, axis=-2).astype(dtype)
@@ -287,7 +296,8 @@ def detect_language_with_faster_whisper(
     """Detect language with faster-whisper without consuming all segments."""
     from faster_whisper import WhisperModel
 
-    model = WhisperModel(model_size, device="auto", compute_type="auto")
+    model_path = resolve_whisper_model_path(model_size)
+    model = WhisperModel(model_path, device="auto", compute_type="auto")
     try:
         segments_iter, info = model.transcribe(
             audio_path,

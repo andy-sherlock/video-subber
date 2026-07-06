@@ -1,6 +1,6 @@
 """Environment checks: ffmpeg, whisper, resemblyzer."""
 import importlib.util
-import subprocess, shutil, os, glob, sys
+import subprocess, shutil, os, sys
 from pathlib import Path
 
 
@@ -48,16 +48,25 @@ def check_ffmpeg() -> dict:
 
 
 def check_whisper() -> dict:
-    """Check if any Whisper model is cached locally.
-    Returns: {installed, models: [str]}
+    """Check the Whisper runtime package AND local models.
+
+    C3.5 收口：与其余三组件同口径拆分——installed_pkg（运行时包可用，只用
+    find_spec 探测、不 import）+ model_ready（本地有模型）。installed =
+    installed_pkg AND model_ready，保留给旧调用点（前端 blocking 门控、模型滑块）。
+    前端据 installed_pkg/model_ready 区分"包缺失不可修复"与"模型缺失可修复"。
+    Returns: {installed, installed_pkg, model_ready, models: [str], backend}
     """
     if sys.platform == "darwin" and platform_machine() == "arm64":
-        if importlib.util.find_spec("mlx_whisper") is None:
-            return {"installed": False, "models": [], "backend": "mlx"}
-        models = _cached_whisper_models()
-        return {"installed": len(models) > 0, "models": models, "backend": "mlx"}
-    models = _cached_whisper_models()
-    return {"installed": len(models) > 0, "models": models, "backend": "faster"}
+        installed_pkg = importlib.util.find_spec("mlx_whisper") is not None
+        backend = "mlx"
+    else:
+        installed_pkg = importlib.util.find_spec("faster_whisper") is not None
+        backend = "faster"
+    models = _cached_whisper_models() if installed_pkg else []
+    model_ready = len(models) > 0
+    return {"installed": installed_pkg and model_ready,
+            "installed_pkg": installed_pkg, "model_ready": model_ready,
+            "models": models, "backend": backend}
 
 
 def platform_machine() -> str:
@@ -69,22 +78,14 @@ def platform_machine() -> str:
 
 
 def _cached_whisper_models() -> list:
-    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    models = []
-    if os.path.exists(cache_dir):
-        whisper_dirs = glob.glob(
-            os.path.join(cache_dir, "models--*whisper*"), recursive=False
-        )
-        if not whisper_dirs:
-            whisper_dirs = glob.glob(
-                os.path.join(cache_dir, "**/*whisper*"), recursive=True
-            )
-        for d in whisper_dirs:
-            name = os.path.basename(d).replace("models--", "").replace("--", "/")
-            for m in ["tiny", "base", "small", "medium", "large"]:
-                if m in name and m not in models:
-                    models.append(m if m != "large" else "large-v3")
-    return list(set(models))
+    try:
+        from backend import model_manager
+        return [
+            mid for mid in model_manager.MODELS
+            if model_manager._find_ready_model_dir(mid) is not None
+        ]
+    except Exception:
+        return []
 
 
 def check_resemblyzer() -> dict:
@@ -105,41 +106,72 @@ def preload_resemblyzer():
         pass
 
 
+def _registry_model_ready(model_key: str) -> bool:
+    """C3.5 (㉕): 权重是否已在本地可离线加载——注册表统一判定。"""
+    try:
+        from backend import model_registry
+        return model_registry.is_model_resolvable(model_key)
+    except Exception:
+        return False
+
+
 def check_sensevoice() -> dict:
-    """Check if SenseVoice (funasr) is installed."""
+    """Check SenseVoice: funasr importable AND model weights present locally.
+
+    C3.5 (㉕): 包可导入 ≠ ready。ready = installed_pkg AND model_ready，
+    消灭"import 成功=就绪"的假绿灯。
+    """
     try:
         import funasr  # noqa: F401
-        return {"ready": True}
+        installed_pkg = True
     except ImportError:
-        return {"ready": False}
+        installed_pkg = False
+    model_ready = _registry_model_ready("sensevoice")
+    return {"ready": installed_pkg and model_ready,
+            "installed_pkg": installed_pkg, "model_ready": model_ready}
 
 
 def check_qwen_asr() -> dict:
-    """Check if Qwen3-ASR is installed (MLX on Apple Silicon, or PyTorch).
+    """Check Qwen3-ASR: backend package importable AND weights present locally.
 
     Imports can raise beyond ImportError (e.g. mlx raises RuntimeError when no
     Metal device is present), so treat any failure as "this backend unusable"
     and fall through rather than letting it escape and sink the health check.
     """
+    installed_pkg = False
+    backend = None
     try:
         from mlx_qwen3_asr import transcribe  # noqa: F401
-        return {"ready": True, "backend": "mlx"}
+        installed_pkg, backend = True, "mlx"
     except Exception:
         pass  # mlx unusable (not installed, or no Metal) → try pytorch
-    try:
-        from qwen_asr import Qwen3ASRModel  # noqa: F401
-        return {"ready": True, "backend": "pytorch"}
-    except Exception as e:
-        return {"ready": False, "error": type(e).__name__}
+    if not installed_pkg:
+        try:
+            from qwen_asr import Qwen3ASRModel  # noqa: F401
+            installed_pkg, backend = True, "pytorch"
+        except Exception:
+            pass
+    model_ready = _registry_model_ready("qwen_asr")
+    result = {"ready": installed_pkg and model_ready,
+              "installed_pkg": installed_pkg, "model_ready": model_ready}
+    if backend:
+        result["backend"] = backend
+    return result
 
 
 def check_qwen_aligner() -> dict:
-    """Check if Qwen3-ForcedAligner model is available locally."""
+    """Check Qwen3-ForcedAligner: qwen-asr importable AND weights present.
+
+    Frontend/API status key remains qwen_aligner; registry model key is qwen_fa.
+    """
     try:
-        from backend.core.qwen_aligner import is_qwen_aligner_available
-        return {"ready": is_qwen_aligner_available()}
+        from backend.core.qwen_aligner import (
+            _has_qwen_asr_package, is_qwen_aligner_available)
+        return {"ready": is_qwen_aligner_available(),
+                "installed_pkg": _has_qwen_asr_package,
+                "model_ready": _registry_model_ready("qwen_fa")}
     except ImportError:
-        return {"ready": False}
+        return {"ready": False, "installed_pkg": False, "model_ready": False}
 
 
 def check_ytdlp() -> dict:

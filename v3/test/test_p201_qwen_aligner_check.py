@@ -22,9 +22,11 @@ def _make_fake_modules():
 class TestQwenAlignerAvailability(unittest.TestCase):
 
     def test_returns_false_when_model_not_downloaded(self):
-        """Packages installed but model not cached locally → must return False."""
+        """Packages installed but model not present locally → must return False.
+
+        C3.5 (㉖): 权重是否在本地由模型注册表判定，不再 AutoConfig 硬编码仓库名。
+        """
         fake_torch, fake_transformers, mock_autoconfig, fake_qwen_asr = _make_fake_modules()
-        mock_autoconfig.from_pretrained.side_effect = OSError("not found locally")
 
         fake_modules = {
             "torch": fake_torch,
@@ -35,16 +37,16 @@ class TestQwenAlignerAvailability(unittest.TestCase):
             import importlib
             import backend.core.qwen_aligner as mod
             importlib.reload(mod)
-            result = mod.is_qwen_aligner_available()
+            with patch("backend.model_registry.is_model_resolvable",
+                       return_value=False):
+                result = mod.is_qwen_aligner_available()
 
         self.assertFalse(result,
                          "Must return False when model files are not downloaded locally")
 
     def test_returns_true_when_model_cached(self):
-        """Packages installed and model cached → must return True."""
+        """Packages installed and model present locally → must return True."""
         fake_torch, fake_transformers, mock_autoconfig, fake_qwen_asr = _make_fake_modules()
-        mock_autoconfig.from_pretrained.side_effect = None
-        mock_autoconfig.from_pretrained.return_value = MagicMock()
 
         fake_modules = {
             "torch": fake_torch,
@@ -55,7 +57,9 @@ class TestQwenAlignerAvailability(unittest.TestCase):
             import importlib
             import backend.core.qwen_aligner as mod
             importlib.reload(mod)
-            result = mod.is_qwen_aligner_available()
+            with patch("backend.model_registry.is_model_resolvable",
+                       return_value=True):
+                result = mod.is_qwen_aligner_available()
 
         self.assertTrue(result, "Must return True when model is cached locally")
 

@@ -55,13 +55,20 @@ def is_qwen_asr_available() -> bool:
 
 
 def _load_qwen_model():
-    """Load Qwen3-ASR model (MLX or PyTorch depending on platform)."""
+    """Load Qwen3-ASR model (MLX or PyTorch depending on platform).
+
+    C3.5 (㉖): the local path comes from the model registry — managed dir
+    first, legacy cache read-only fallback. Missing everywhere raises, so
+    the runner never silently downloads at task time.
+    """
+    from backend.model_registry import resolve_model_path
+    model_path = resolve_model_path("qwen_asr")
     if _USE_MLX:
-        model, _config = _mlx_load_model("Qwen/Qwen3-ASR-1.7B")
+        model, _config = _mlx_load_model(model_path)
         return model
     else:
         from qwen_asr import Qwen3ASRModel
-        return Qwen3ASRModel.from_pretrained("Qwen/Qwen3-ASR-1.7B")
+        return Qwen3ASRModel.from_pretrained(model_path)
 
 
 # Both backends (MLX mlx-qwen3-asr, PyTorch qwen-asr) require full language

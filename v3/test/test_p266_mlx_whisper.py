@@ -49,7 +49,9 @@ class P266MlxWhisperRoutingTests(unittest.TestCase):
 
         fake_mlx.transcribe = fake_transcribe
 
-        with patch.dict(sys.modules, {"mlx_whisper": fake_mlx}):
+        with patch.dict(sys.modules, {"mlx_whisper": fake_mlx}), \
+             patch("backend.core.whisper_runner.resolve_whisper_model_path",
+                   return_value="/models/mlx/large-v3", create=True):
             from backend.core.whisper_runner import transcribe_with_mlx_whisper
 
             segments, info = transcribe_with_mlx_whisper(
@@ -62,7 +64,7 @@ class P266MlxWhisperRoutingTests(unittest.TestCase):
         self.assertEqual(calls["audio_path"], "/tmp/audio.wav")
         self.assertEqual(
             calls["kwargs"]["path_or_hf_repo"],
-            "mlx-community/whisper-large-v3-mlx",
+            "/models/mlx/large-v3",
         )
         self.assertTrue(calls["kwargs"]["word_timestamps"])
         self.assertEqual(calls["kwargs"]["language"], "ja")
@@ -120,6 +122,8 @@ class P266MlxWhisperRoutingTests(unittest.TestCase):
                  "mlx_whisper.load_models": fake_load_models,
              }), \
              patch("backend.core.whisper_runner.choose_whisper_backend", return_value="mlx"), \
+             patch("backend.core.whisper_runner.resolve_whisper_model_path",
+                   return_value="/models/mlx/large-v3", create=True), \
              patch("backend.core.whisper_runner._create_language_probe_clip", return_value="/tmp/probe.wav") as make_clip, \
              patch("backend.core.whisper_runner.os.unlink") as unlink:
             from backend.core.whisper_runner import detect_language_with_whisper
@@ -133,11 +137,79 @@ class P266MlxWhisperRoutingTests(unittest.TestCase):
 
         make_clip.assert_called_once_with("/tmp/very-long-audio.wav", 30)
         self.assertEqual(calls["audio_path"], "/tmp/probe.wav")
-        self.assertEqual(calls["repo"], "mlx-community/whisper-large-v3-mlx")
+        self.assertEqual(calls["repo"], "/models/mlx/large-v3")
         unlink.assert_called_once_with("/tmp/probe.wav")
         self.assertEqual(info.language, "ja")
         self.assertEqual(info.language_probability, 0.93)
         self.assertEqual(info.backend, "mlx")
+
+    def test_faster_transcribe_uses_local_ready_path(self):
+        fake_fw = types.ModuleType("faster_whisper")
+        calls = {}
+
+        class FakeWhisperModel:
+            def __init__(self, model_path, **kwargs):
+                calls["model_path"] = model_path
+                calls["kwargs"] = kwargs
+
+            def transcribe(self, *_args, **_kwargs):
+                info = types.SimpleNamespace(
+                    language="ja",
+                    language_probability=0.9,
+                    duration=1.0,
+                )
+                return [], info
+
+        fake_fw.WhisperModel = FakeWhisperModel
+
+        with patch.dict(sys.modules, {"faster_whisper": fake_fw}), \
+             patch("backend.core.whisper_runner.resolve_whisper_model_path",
+                   return_value="/models/faster/large-v2", create=True):
+            from backend.core.whisper_runner import transcribe_with_faster_whisper
+
+            _segments, info = transcribe_with_faster_whisper(
+                "/tmp/audio.wav",
+                model_size="large-v2",
+                language="ja",
+            )
+
+        self.assertEqual(calls["model_path"], "/models/faster/large-v2")
+        self.assertEqual(calls["kwargs"]["device"], "auto")
+        self.assertEqual(info.backend, "faster")
+
+    def test_faster_language_probe_uses_local_ready_path(self):
+        fake_fw = types.ModuleType("faster_whisper")
+        calls = {}
+
+        class FakeWhisperModel:
+            def __init__(self, model_path, **kwargs):
+                calls["model_path"] = model_path
+                calls["kwargs"] = kwargs
+
+            def transcribe(self, *_args, **_kwargs):
+                info = types.SimpleNamespace(
+                    language="ja",
+                    language_probability=0.91,
+                    duration=1.0,
+                )
+                return [], info
+
+        fake_fw.WhisperModel = FakeWhisperModel
+
+        with patch.dict(sys.modules, {"faster_whisper": fake_fw}), \
+             patch("backend.core.whisper_runner.resolve_whisper_model_path",
+                   return_value="/models/faster/large-v2", create=True):
+            from backend.core.whisper_runner import detect_language_with_faster_whisper
+
+            info = detect_language_with_faster_whisper(
+                "/tmp/audio.wav",
+                model_size="large-v2",
+                language=None,
+            )
+
+        self.assertEqual(calls["model_path"], "/models/faster/large-v2")
+        self.assertEqual(calls["kwargs"]["compute_type"], "auto")
+        self.assertEqual(info.backend, "faster")
 
     def test_create_language_probe_clip_extracts_short_audio(self):
         with patch("backend.core.whisper_runner.tempfile.mkstemp", return_value=(123, "/tmp/probe.wav")), \
