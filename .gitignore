@@ -22,6 +22,13 @@ _trash/
 snapshots/
 _local_archive/
 
+# Local previews, screenshots, and promotional drafts.
+.claude/
+V3.09-C3-UI-preview-*.html
+V3.09-界面草图.html
+v3/final-*.png
+v3/promo/
+
 # Internal planning, reviews, and handoff records are local-only.
 *.md
 !README.md
