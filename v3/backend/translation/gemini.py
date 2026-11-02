@@ -26,20 +26,39 @@ class GeminiBackend(LLMBackend):
             "generationConfig": {"maxOutputTokens": max_tokens},
         }).encode()
 
-    def _call_api_raw(self, prompt: str, max_tokens: int = 8192) -> tuple:
-        url = (
+    @property
+    def _generate_url(self) -> str:
+        return (
             "https://generativelanguage.googleapis.com/v1beta/"
             f"models/{self._model}:generateContent"
         )
+
+    def _call_api_raw(self, prompt: str, max_tokens: int = 8192) -> tuple:
         body = self._build_body(prompt, max_tokens)
-        req = urllib.request.Request(url, data=body, headers=self._build_headers())
+        req = urllib.request.Request(self._generate_url, data=body, headers=self._build_headers())
         with urllib.request.urlopen(req, timeout=120) as resp:
             data = json.loads(resp.read().decode())
-            return self._call_api_parse(data), data
+            return self._parse_reply(data), data
 
     def _call_api(self, prompt: str, max_tokens: int = 8192) -> str:
         text, _ = self._call_api_raw(prompt, max_tokens)
         return text
+
+    def translate_raw_json(self, prompt: str, system_prompt: str = None) -> str:
+        """P519：断句/润色走 Gemini 自己的格式（原先套 OpenAI 格式、地址为空，必然失败）。
+        背景说明并进正文；Gemini 有 JSON 开关（responseMimeType），保留；随机程度同原断句 0.1。"""
+        text = "\n\n".join(part for part in (system_prompt, prompt) if part)
+        body = json.dumps({
+            "contents": [{"parts": [{"text": text}]}],
+            "generationConfig": {
+                "maxOutputTokens": 8192,
+                "temperature": 0.1,
+                "responseMimeType": "application/json",
+            },
+        }).encode()
+        req = urllib.request.Request(self._generate_url, data=body, headers=self._build_headers())
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            return self._parse_reply(json.loads(resp.read().decode()))
 
     def _extract_tokens(self, response_data: dict) -> dict | None:
         if response_data is None:

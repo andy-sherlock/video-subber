@@ -20,7 +20,10 @@ class TestSmartAssembleWhisperMode(unittest.TestCase):
 
     def test_word_spanning_boundary_is_included(self):
         """词从 t=1.8 到 t=2.3，窗口 [2.0, 3.0]——有重叠，应匹配到窗口."""
-        from backend.transcriber_v2 import _smart_assemble
+        from backend.transcriber_v2 import (
+            _assemble_qwen_words_on_whisper_boundaries,
+            _flatten_qwen_words,
+        )
 
         qwen_chunks = [{
             "text": "hello world",
@@ -34,7 +37,9 @@ class TestSmartAssembleWhisperMode(unittest.TestCase):
 
         whisper_segs = [FakeWhisperSeg(2.0, 3.0, "placeholder")]
 
-        result = _smart_assemble(qwen_chunks, whisper_segs, "en", "whisper")
+        result = _assemble_qwen_words_on_whisper_boundaries(
+            _flatten_qwen_words(qwen_chunks), whisper_segs, "en"
+        )
 
         # "world" has overlap with window → matched; "hello" has no overlap → orphan recovery
         window_texts = [s.text for s in result]
@@ -43,7 +48,10 @@ class TestSmartAssembleWhisperMode(unittest.TestCase):
 
     def test_word_entirely_before_window_does_not_pollute(self):
         """窗口 [2.0, 3.0]，词在 [1.0, 1.5]——无重叠，不应出现在窗口段的文本里."""
-        from backend.transcriber_v2 import _smart_assemble
+        from backend.transcriber_v2 import (
+            _assemble_qwen_words_on_whisper_boundaries,
+            _flatten_qwen_words,
+        )
 
         qwen_chunks = [{
             "text": "early",
@@ -55,7 +63,9 @@ class TestSmartAssembleWhisperMode(unittest.TestCase):
 
         whisper_segs = [FakeWhisperSeg(2.0, 3.0, "placeholder")]
 
-        result = _smart_assemble(qwen_chunks, whisper_segs, "en", "whisper")
+        result = _assemble_qwen_words_on_whisper_boundaries(
+            _flatten_qwen_words(qwen_chunks), whisper_segs, "en"
+        )
 
         # The window segment should fall back to Whisper text
         window_seg = [s for s in result if s.start >= 2.0]
@@ -69,7 +79,10 @@ class TestSmartAssembleWhisperMode(unittest.TestCase):
 
     def test_word_entirely_after_window_does_not_pollute(self):
         """窗口 [2.0, 3.0]，词在 [3.5, 4.0]——无重叠，不应出现在窗口段的文本里."""
-        from backend.transcriber_v2 import _smart_assemble
+        from backend.transcriber_v2 import (
+            _assemble_qwen_words_on_whisper_boundaries,
+            _flatten_qwen_words,
+        )
 
         qwen_chunks = [{
             "text": "late",
@@ -81,7 +94,9 @@ class TestSmartAssembleWhisperMode(unittest.TestCase):
 
         whisper_segs = [FakeWhisperSeg(2.0, 3.0, "placeholder")]
 
-        result = _smart_assemble(qwen_chunks, whisper_segs, "en", "whisper")
+        result = _assemble_qwen_words_on_whisper_boundaries(
+            _flatten_qwen_words(qwen_chunks), whisper_segs, "en"
+        )
 
         window_seg = [s for s in result if s.start >= 2.0 and s.start < 3.0]
         self.assertTrue(len(window_seg) >= 1)
@@ -126,7 +141,7 @@ class TestP284EnglishQwenUsesWhisperBoundaries(unittest.TestCase):
             FakeWhisperSeg(1.20, 3.40, "Oh gosh I don't know I wish I had clock"),
         ]
 
-        result = _smart_assemble(qwen_chunks, whisper_segs, "en", "qwen")
+        result = _smart_assemble(qwen_chunks, whisper_segs, "en")
 
         self.assertGreaterEqual(len(result), 2)
         self.assertEqual(result[0].text, "Hey Taylor what time is it")
@@ -152,7 +167,7 @@ class TestP284EnglishQwenUsesWhisperBoundaries(unittest.TestCase):
             FakeWhisperSeg(0.7, 1.3, "やめて"),
         ]
 
-        result = _smart_assemble(qwen_chunks, whisper_segs, "ja", "qwen")
+        result = _smart_assemble(qwen_chunks, whisper_segs, "ja")
 
         self.assertEqual([s.text for s in result], ["何するのやめて"])
 

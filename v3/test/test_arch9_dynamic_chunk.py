@@ -26,58 +26,55 @@ def _make_llm(model="test-model"):
 class TestMaxInputTokens(unittest.TestCase):
 
     def setUp(self):
-        from backend import main
-        self.cache = main._MODEL_CONTEXT_CACHE
+        from backend.model_cache import _MODEL_CONTEXT_CACHE, get_model_context
+        self.cache = _MODEL_CONTEXT_CACHE
+        self.get_context = get_model_context
+        self._file_patcher = patch(
+            'backend.model_cache.load_context_cache', return_value={},
+        )
+        self._file_patcher.start()
 
     def tearDown(self):
         self.cache.clear()
-
-    def _lookup(self, model: str) -> int:
-        """Replicate the lookup logic from LLMBackend.max_input_tokens."""
-        if not self.cache:
-            return 32768
-        if model in self.cache:
-            val = self.cache[model]
-            if val > 0:
-                return val
-        for key, val in self.cache.items():
-            if val > 0 and key.endswith("/" + model):
-                return val
-        return 32768
+        self._file_patcher.stop()
 
     def test_reads_from_context_cache(self):
         """When model name suffix-matches a cache entry, return its value."""
         self.cache["deepseek/deepseek-chat"] = 131072
-        self.assertEqual(self._lookup("deepseek-chat"), 131072)
+        self.assertEqual(self.get_context("deepseek-chat"), 131072)
 
     def test_suffix_match_across_providers(self):
         """gpt-4o should match openai/gpt-4o in cache."""
         self.cache["openai/gpt-4o"] = 128000
-        self.assertEqual(self._lookup("gpt-4o"), 128000)
+        self.assertEqual(self.get_context("gpt-4o"), 128000)
 
     def test_exact_match_preferred(self):
         """Exact key match takes priority over suffix match."""
         self.cache["gemini-2.0-flash"] = 1048576
         self.cache["google/gemini-2.0-flash"] = 999999
-        self.assertEqual(self._lookup("gemini-2.0-flash"), 1048576)
+        self.assertEqual(self.get_context("gemini-2.0-flash"), 1048576)
 
     def test_no_match_defaults_32k(self):
         """Model not in cache returns default 32768."""
-        self.assertEqual(self._lookup("totally-unknown-model-xyz"), 32768)
+        self.assertEqual(self.get_context("totally-unknown-model-xyz"), 32768)
 
     def test_cache_has_zero_value_falls_back(self):
         """0 in cache is treated as unknown — fall back to default."""
         self.cache["some/model"] = 0
-        self.assertEqual(self._lookup("model"), 32768)
+        self.assertEqual(self.get_context("model"), 32768)
 
-    def test_empty_cache_defaults_32k(self):
-        """Fresh empty cache — all models get 32K default."""
-        self.assertEqual(self._lookup("gpt-4o"), 32768)
+    def test_empty_cache_hits_local_fallback(self):
+        """Empty memory + empty file → local fallback table (P407)."""
+        self.assertEqual(self.get_context("gpt-4o"), 128000)
+
+    def test_empty_cache_unknown_model_defaults_32k(self):
+        """Model not in any tier → ultimate default 32768."""
+        self.assertEqual(self.get_context("nonexistent-model-xyz"), 32768)
 
     def test_empty_model_name_defaults_32k(self):
         """Empty model name."""
         self.cache["openai/gpt-4o"] = 128000
-        self.assertEqual(self._lookup(""), 32768)
+        self.assertEqual(self.get_context(""), 32768)
 
 
 # ═══════════════════════════════════════════════════════════

@@ -43,17 +43,29 @@ class TestQwenHealthCheck(unittest.TestCase):
         from backend.core.hallucination_filter import filter_hallucinations
 
         garbage = "1056234897 нет ты меня прости"
+        # G12 第二批段一：原来这十句是 `f"正常的第{i}句字幕内容"`，只差一个字符，
+        # 相似度恰好 0.9，会被收权后的 L5 整段标为疑似重复游程。
+        # 那是**合成数据的产物**——三个真实任务里 ≥3 条的游程数为 0，
+        # 完全相同与 ≥0.9 两种判据结果一致。
+        # 修数据、不改断言：这条测试守的是「Qwen 坍缩时 L2 不得乱标」，
+        # 断言强度一点不减，只是把不真实的输入换成真实形状的字幕。
+        distinct = [
+            "今天我们要去南岛自驾", "第一站是皇后镇", "路上风景特别好",
+            "中午在湖边吃了午饭", "下午开始下雨了", "晚上住在一家小旅馆",
+            "第二天去了米尔福德峡湾", "船上看到了海豹", "回程堵了两个小时",
+            "这趟旅行值得再来一次",
+        ]
         segs, qwen_chunks = [], []
         # 8/10: Whisper text is good & distinct, Qwen collapsed to garbage.
         for i in range(8):
-            segs.append(DummySeg(f"正常的第{i}句字幕内容", start=float(i),
+            segs.append(DummySeg(distinct[i], start=float(i),
                                  end=float(i) + 1.0, sensevoice_tag="Speech"))
             qwen_chunks.append(_chunk(garbage, float(i), float(i) + 1.0))
         # 2/10: Qwen agrees with Whisper.
         for i in range(8, 10):
-            segs.append(DummySeg(f"正常的第{i}句字幕内容", start=float(i),
+            segs.append(DummySeg(distinct[i], start=float(i),
                                  end=float(i) + 1.0, sensevoice_tag="Speech"))
-            qwen_chunks.append(_chunk(f"正常的第{i}句字幕内容", float(i), float(i) + 1.0))
+            qwen_chunks.append(_chunk(distinct[i], float(i), float(i) + 1.0))
 
         result = filter_hallucinations(segs, source_lang="zh", qwen_chunks=qwen_chunks)
 

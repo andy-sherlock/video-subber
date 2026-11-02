@@ -3,9 +3,14 @@ from .base import LLMBackend
 
 
 class DeepSeekBackend(LLMBackend):
-    def __init__(self, api_key: str, model: str = "deepseek-chat"):
+    def __init__(self, api_key: str, model: str = "deepseek-v4-flash"):
         self._key = api_key
-        self._model = model
+        requested_model = str(model or "").strip()
+        self._model = (
+            "deepseek-v4-flash"
+            if requested_model in {"", "deepseek-chat"}
+            else requested_model
+        )
 
     @property
     def name(self) -> str:
@@ -19,6 +24,12 @@ class DeepSeekBackend(LLMBackend):
         return {
             "Authorization": f"Bearer {self._key}",
             "Content-Type": "application/json",
+        }
+
+    def _request_body_options(self, max_tokens: int) -> dict:
+        return {
+            "thinking": {"type": "disabled"},
+            "max_tokens": max_tokens,
         }
 
     def _call_api_parse(self, data: dict) -> str:

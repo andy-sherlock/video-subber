@@ -179,14 +179,13 @@ class TestRunnersNoHardcode(unittest.TestCase):
 
     def test_qwen_asr_mlx_branch_uses_resolved_path(self):
         from backend.core import qwen_asr_runner as runner
-        fake_load = MagicMock(return_value=("model", "config"))
         with patch.object(runner, "_USE_MLX", True), \
-             patch.object(runner, "_mlx_load_model", fake_load), \
              patch("backend.model_registry.resolve_model_path",
                    return_value="/fake/qwen_asr") as res:
-            runner._load_qwen_model()
+            loaded = runner._load_qwen_model()
         res.assert_called_once_with("qwen_asr")
-        fake_load.assert_called_once_with("/fake/qwen_asr")
+        # P515/Z6：Mac 上把自管目录交给识别包（分词表随之读同一目录），不先加载成对象
+        assert loaded == "/fake/qwen_asr"
 
     def test_qwen_asr_pytorch_branch_uses_resolved_path(self):
         from backend.core import qwen_asr_runner as runner

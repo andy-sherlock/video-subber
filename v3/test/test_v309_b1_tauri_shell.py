@@ -6,6 +6,7 @@ pipeline intact while adding a desktop wrapper around it.
 
 import subprocess
 import time
+import os
 from pathlib import Path
 
 
@@ -191,6 +192,51 @@ def test_worker_manager_shutdown_all_kills_real_subprocess():
         if proc.poll() is None:
             proc.kill()
             proc.wait(timeout=2)
+
+
+def test_worker_manager_start_isolates_stdin_and_extends_path(monkeypatch, tmp_path):
+    import backend.worker_manager as wm
+    from backend.worker_manager import WorkerManager
+
+    captured = {}
+
+    class FakeProc:
+        stdout = []
+        stderr = []
+        returncode = 0
+
+        def wait(self, timeout=None):
+            return 0
+
+        def poll(self):
+            return None
+
+    def fake_popen(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return FakeProc()
+
+    monkeypatch.setattr(wm.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        wm,
+        "check_ffmpeg",
+        lambda: {
+            "installed": True,
+            "has_libass": True,
+            "path": "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg",
+        },
+        raising=False,
+    )
+    monkeypatch.setenv("PATH", "/usr/bin")
+
+    manager = WorkerManager()
+    manager.start("job1", tmp_path, "/tmp/input.mp4", {"model": "large-v3"})
+
+    kwargs = captured["kwargs"]
+    path_parts = kwargs["env"]["PATH"].split(os.pathsep)
+    assert kwargs["stdin"] == subprocess.DEVNULL
+    assert path_parts[0] == "/opt/homebrew/opt/ffmpeg-full/bin"
+    assert "/usr/bin" in path_parts
 
 
 def test_tauri_b1_skeleton_starts_existing_python_backend():

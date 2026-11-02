@@ -38,29 +38,33 @@ class TestP161_NoFallback(unittest.TestCase):
     filtering even without FA confirmation.
     """
 
-    def test_nonhuman_tag_no_aligner_filtered(self):
-        """music tag + no aligner → L1 filters (P183: trust SV alone)."""
+    def test_nonhuman_tag_no_aligner_marked_not_filtered(self):
+        """music tag + no aligner → 只标记可疑（G12 第二批推翻 P183 方案 A）。
+
+        真实日志：SenseVoice 判非人声被对齐器推翻 3492 次，真删 0 次。
+        「对齐器不可用时单独相信 SV」= 相信一个所有可核对场合都错了的信号。
+        """
         from backend.core.hallucination_filter import _layer1_dual_signal
 
         seg = DummySeg("some text", start=1.0, end=3.0,
                        sensevoice_tag="music")
         result = _layer1_dual_signal(seg, aligner_result=None)
 
-        self.assertTrue(seg.filtered,
-                        "P183: L1 should filter non-Speech via SV alone")
-        self.assertTrue(result)
+        self.assertFalse(seg.filtered, "单一声音标签不得拥有删除权")
+        self.assertTrue(seg.uncertain)
+        self.assertFalse(result)
 
-    def test_nonhuman_tag_empty_aligner_filtered(self):
-        """noise tag + empty aligner → L1 filters (P183: trust SV alone)."""
+    def test_nonhuman_tag_empty_aligner_marked_not_filtered(self):
+        """noise tag + empty aligner → 只标记可疑。空对齐器与 None 同一处理。"""
         from backend.core.hallucination_filter import _layer1_dual_signal
 
         seg = DummySeg("noise text", start=0.0, end=2.0,
                        sensevoice_tag="noise")
         result = _layer1_dual_signal(seg, aligner_result=[])
 
-        self.assertTrue(seg.filtered,
-                        "P183: L1 should filter with empty aligner via SV")
-        self.assertTrue(result)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
+        self.assertFalse(result)
 
     def test_speech_tag_no_aligner_still_passes(self):
         """Speech tag + no aligner → still passes (regression check)."""
@@ -83,8 +87,12 @@ class TestP161_NoFallback(unittest.TestCase):
         self.assertFalse(seg.filtered)
         self.assertFalse(result)
 
-    def test_dual_signal_still_works_with_data(self):
-        """Dual-signal path still works when aligner data exists."""
+    def test_dual_signal_still_marks_when_both_agree(self):
+        """双信号都说非人声 → 仍然只标记，不删除。
+
+        「两个信号一致」在这里是假象：第二个信号只是「这段没有对齐词」，
+        它不是独立证据，是第一个信号的缺席。**缺席不是证据。**
+        """
         from backend.core.hallucination_filter import _layer1_dual_signal
 
         seg = DummySeg("music noise", start=1.0, end=3.0,
@@ -94,8 +102,9 @@ class TestP161_NoFallback(unittest.TestCase):
         ]
         result = _layer1_dual_signal(seg, aligner_result=aligner_result)
 
-        self.assertTrue(seg.filtered,
-                        "Both signals agree non-human → should discard")
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
+        self.assertFalse(result)
 
     def test_dual_signal_sv_wrong_clears_tag(self):
         """SV says music but aligner found words → SV wrong, clear tag."""
@@ -134,8 +143,14 @@ class TestP161_Integration(unittest.TestCase):
                          "Segment should survive: aligner overrides SV")
         self.assertIsNone(result[0].sensevoice_tag)
 
-    def test_nonhuman_no_aligner_filtered_by_l1(self):
-        """Non-human + no aligner → L1 filters via SV alone (P183 fix)."""
+    def test_mistagged_real_speech_survives_l1(self):
+        """被 SenseVoice 误标的真实语音必须存活。
+
+        ⚠️ **注意这条测试自己的用例文字**：
+        `"this is actual speech that sensevoice mistagged"`
+        ——当初写测试的人已经写明这是被误标的真实语音，却断言它应该被删掉。
+        真实日志证实了这种误标发生了 3492 次，而真删 0 次。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
 
         seg = DummySeg("this is actual speech that sensevoice mistagged",
@@ -145,8 +160,8 @@ class TestP161_Integration(unittest.TestCase):
         result = filter_hallucinations([seg], source_lang="en",
                                        aligner_result=None)
 
-        self.assertEqual(len(result), 0,
-                         "P183: without aligner, L1 trusts SV alone → filtered")
+        self.assertEqual(len(result), 1, "被误标的真实语音不得被删")
+        self.assertTrue(seg.uncertain, "但要标可疑，噪音穿透由标记承接")
 
 
 if __name__ == '__main__':

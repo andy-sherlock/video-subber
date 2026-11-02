@@ -13,6 +13,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import unittest
 from unittest.mock import patch, MagicMock
 import json
+import socket
+import tempfile
+
+
+def _tree_manifest(root: Path):
+    """Capture names and metadata without reading large user media files."""
+    if not root.exists():
+        return ()
+    return tuple(
+        (
+            str(path.relative_to(root)),
+            path.lstat().st_mode,
+            path.lstat().st_size,
+            path.lstat().st_mtime_ns,
+            path.lstat().st_ctime_ns,
+        )
+        for path in sorted(root.rglob("*"))
+    )
 
 
 class TestUrlValidation(unittest.TestCase):
@@ -71,14 +89,98 @@ class TestUrlValidation(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def test_download_video_endpoint_unpacks_split_download_result(self):
+        """P371：接口收到 (video, audio) 后只把 video 字符串返回前端。"""
+        from fastapi.testclient import TestClient
+        from backend import main
+
+        with patch.object(main, "_verify_safe_url", return_value=True), \
+             patch("backend.core.video_downloader.is_ytdlp_available", return_value=True), \
+             patch("backend.core.video_downloader.download_video",
+                   return_value=("/tmp/movie_video.mp4", "/tmp/movie_audio.m4a")):
+            resp = TestClient(main.app, raise_server_exceptions=False).post(
+                "/api/download-video",
+                json={"url": "https://example.com/movie"},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["path"], "/tmp/movie_video.mp4")
+        self.assertEqual(resp.json()["filename"], "movie_video.mp4")
+
     def test_https_url_accepted(self):
-        """Valid https:// URL should proceed (returns 200 or 202)."""
-        resp = self._make_request("https://www.youtube.com/watch?v=abc")
-        # 200/202 = accepted; 400 = rejected; 422 = validation OK but other issue
-        self.assertNotEqual(
-            resp.status_code, 400,
-            "https:// URL should not be rejected as invalid protocol"
+        """HTTPS validation proceeds without touching real jobs, logs, or network."""
+        from backend import main
+        from fastapi.testclient import TestClient
+
+        user_jobs = Path.home() / ".video-subber" / "jobs"
+        user_logs = Path.home() / ".video-subber" / "logs"
+        jobs_before = _tree_manifest(user_jobs)
+        logs_before = _tree_manifest(user_logs)
+        original_state = (
+            main.JOBS_DIR,
+            main.LOG_DIR,
+            main.JOBS,
+            main.GLOBAL_HASH_INDEX,
+            main.JOB_ID_TO_HASH,
         )
+        worker_starts = []
+
+        def fake_worker_start(job_id, job_dir, video_path, config, **kwargs):
+            worker_starts.append((job_id, job_dir, video_path, config, kwargs))
+            return kwargs.get("run_id") or "test-run"
+
+        public_dns = [
+            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "",
+             ("93.184.216.34", 0)),
+        ]
+        with tempfile.TemporaryDirectory(prefix="p188-url-validation-") as tmp:
+            temp_root = Path(tmp)
+            temp_jobs = temp_root / "jobs"
+            temp_logs = temp_root / "logs"
+            temp_jobs.mkdir()
+            temp_logs.mkdir()
+            isolated_jobs = {}
+            isolated_hash_index = {}
+            isolated_job_to_hash = {}
+
+            with patch.object(main, "JOBS_DIR", temp_jobs), \
+                 patch.object(main, "LOG_DIR", temp_logs), \
+                 patch.object(main, "JOBS", isolated_jobs), \
+                 patch.object(main, "GLOBAL_HASH_INDEX", isolated_hash_index), \
+                 patch.object(main, "JOB_ID_TO_HASH", isolated_job_to_hash), \
+                 patch.object(main.worker_manager, "start", side_effect=fake_worker_start), \
+                 patch("socket.getaddrinfo", return_value=public_dns) as dns_lookup, \
+                 patch("subprocess.Popen", side_effect=AssertionError("测试不得启动子进程")) as popen, \
+                 patch("backend.core.video_downloader.download_video",
+                       side_effect=AssertionError("测试不得执行真实下载")) as download:
+                resp = TestClient(main.app).post(
+                    "/api/jobs",
+                    json={"url": "https://www.youtube.com/watch?v=abc", "config": {}},
+                )
+
+                self.assertNotEqual(
+                    resp.status_code, 400,
+                    "https:// URL should not be rejected as invalid protocol",
+                )
+                job_id = resp.json()["id"]
+                self.assertEqual(set(isolated_jobs), {job_id})
+                self.assertTrue((temp_jobs / job_id / "meta.json").is_file())
+                self.assertEqual(len(worker_starts), 1)
+                self.assertEqual(worker_starts[0][0], job_id)
+                self.assertEqual(worker_starts[0][1], temp_jobs / job_id)
+                self.assertEqual(worker_starts[0][2], "")
+                self.assertEqual(list(temp_logs.iterdir()), [])
+                self.assertEqual(dns_lookup.call_args.args[0], "www.youtube.com")
+                popen.assert_not_called()
+                download.assert_not_called()
+
+        self.assertIs(main.JOBS_DIR, original_state[0])
+        self.assertIs(main.LOG_DIR, original_state[1])
+        self.assertIs(main.JOBS, original_state[2])
+        self.assertIs(main.GLOBAL_HASH_INDEX, original_state[3])
+        self.assertIs(main.JOB_ID_TO_HASH, original_state[4])
+        self.assertEqual(_tree_manifest(user_jobs), jobs_before)
+        self.assertEqual(_tree_manifest(user_logs), logs_before)
 
     def test_empty_url_falls_through_to_local_path(self):
         """Empty URL should not trigger URL validation (goes to local path check)."""

@@ -203,6 +203,29 @@ class TestEnvCheckModelDetection(unittest.TestCase):
         self.assertFalse(r["model_ready"])
         self.assertFalse(r["installed"])
 
+    def test_check_whisper_marks_mlx_runtime_unusable(self):
+        """包和模型都在，但当前进程没有 Metal 时，不能继续报 installed=True。"""
+        import backend.env_check as ec
+
+        def fake_import_module(name):
+            if name == "mlx.core":
+                raise RuntimeError("No Metal device available")
+            raise AssertionError(f"unexpected import: {name}")
+
+        with patch("backend.env_check.sys.platform", "darwin"), \
+             patch("backend.env_check.platform_machine", return_value="arm64"), \
+             patch("backend.env_check.importlib.util.find_spec", return_value=object()), \
+             patch("backend.env_check._cached_whisper_models", return_value=["large-v3"]), \
+             patch("backend.env_check.importlib.import_module",
+                   side_effect=fake_import_module):
+            r = ec.check_whisper()
+
+        self.assertTrue(r["installed_pkg"])
+        self.assertTrue(r["model_ready"])
+        self.assertFalse(r["runtime_ready"])
+        self.assertIn("No Metal device available", r["runtime_error"])
+        self.assertFalse(r["installed"])
+
 
 class TestFrontendModelList(unittest.TestCase):
     """前端 index.html 的模型列表/默认值/文案同步到 3 个新型号。"""
@@ -221,7 +244,8 @@ class TestFrontendModelList(unittest.TestCase):
             self.assertNotIn(f'"{old}"', arr, f"前端 MODELS 仍含旧型号 {old}")
 
     def test_default_model_is_large_v2(self):
-        self.assertIn('model:"large-v2"', self.html)
+        self.assertIn("const DEFAULT_MODEL='large-v2'", self.html)
+        self.assertIn('model:DEFAULT_MODEL', self.html)
         self.assertNotIn('model:"medium"', self.html)
 
     def test_old_hint_text_gone(self):
@@ -429,8 +453,16 @@ class TestFrontendModelList(unittest.TestCase):
         self.assertIn("正在翻译字幕", self.html)
         self.assertIn("正在生成字幕文件", self.html)
         self.assertIn("正在封装视频", self.html)
-        self.assertIn("formatJobProgressText(j.stage,j.message)", self.html)
-        self.assertIn("formatJobProgressText(msg.stage,msg.message,msg.detail)", self.html)
+        self.assertIn("function setJobProgress(jid,percent,stage,message,detail)", self.html)
+        self.assertIn("formatJobProgressText(stage,message,detail)", self.html)
+        compact = self.html.replace(" ", "")
+        # **保护权交接（2026-08-20 · G9/P422 减法回炉）**：WebSocket 和查询接口
+        # 共用固定公开状态，并由唯一入口 applyTaskState 渲染。
+        self.assertIn("setJobProgress(jid,state.percent,state.phase,state.display_message", compact)
+        # **保护权交接（2026-08-19 · G9/P422）**：运行中的 WebSocket 推的是公开快照（type:'state'），
+        # 不再是 Worker 原始消息，因此与查询接口共用同一行渲染调用。
+        # 「两条通道都能渲染进度」这件事保护范围没变，实现合一了。
+        self.assertIn("if(msg&&msg.type==='state'&&msg.state)applyTaskState(jid,msg.state)", compact)
 
     def test_frontend_error_copy_gives_next_step(self):
         """C2: 错误提示要告诉用户下一步，不只显示“出错”。"""
@@ -438,7 +470,10 @@ class TestFrontendModelList(unittest.TestCase):
         self.assertIn("请检查网络", self.html)
         self.assertIn("请清理磁盘空间", self.html)
         self.assertIn("请先下载模型", self.html)
-        self.assertIn("formatJobErrorText(msg.message)", self.html)
+        self.assertIn(
+            "msg.failure_kind?errorMessage:formatJobErrorText(errorMessage)",
+            self.html,
+        )
 
     def test_error_copy_does_not_duplicate_existing_user_advice(self):
         """C2 review: 后端已经给出「请...」建议时，前端不能再重复追加一遍。"""
@@ -482,8 +517,12 @@ class TestFrontendModelList(unittest.TestCase):
         self.assertNotIn("${formatModelStatusText(currentMd)}</span>", self.html)
 
     def test_restored_error_card_uses_humanized_error_copy(self):
-        """C2 review: 刷新后恢复出来的 error 卡片也要走人话错误提示函数。"""
-        self.assertIn("err.textContent=formatJobErrorText(j.error||'未知错误')", self.html)
+        """刷新后的旧错误走人话提示，结构化错误保留后端给用户的原文。"""
+        self.assertIn("renderCardError(jid,view)", self.html)
+        self.assertIn(
+            "msg.failure_kind?errorMessage:formatJobErrorText(errorMessage)",
+            self.html,
+        )
 
 
 class TestTranscriberDefaultModel(unittest.TestCase):
@@ -576,6 +615,51 @@ class TestP308ModelScopeDownload(unittest.TestCase):
             self.assertFalse(list(model_dir.glob("*.tmp")),
                              "manifest 应先写临时文件再 rename，完成后不能残留 tmp")
             self.assertTrue(mm.is_model_ready("large-v2", backend="mlx"))
+
+    def test_whisper_ready_rejects_manifest_without_files(self):
+        """P329：顶层 ready 正确，也不能忽略 manifest v2 的 files 清单。"""
+        import backend.model_manager as mm
+        with tempfile.TemporaryDirectory() as d, \
+             patch.object(mm, "MODEL_ROOT", Path(d)):
+            model_dir = Path(d) / "mlx" / "large-v2"
+            model_dir.mkdir(parents=True)
+            (model_dir / "config.json").write_text("{}", encoding="utf-8")
+            (model_dir / "model.safetensors").write_bytes(b"complete")
+            (model_dir / "manifest.json").write_text(json.dumps({
+                "status": "ready",
+                "version": 2,
+                "model_id": "large-v2",
+                "backend": "mlx",
+                "repo": mm.MODELS["large-v2"]["repo"],
+            }), encoding="utf-8")
+
+            self.assertFalse(mm.is_model_ready("large-v2", backend="mlx"))
+
+    def test_whisper_ready_checks_listed_size_without_hashing(self):
+        """P329：日常检查核对文件大小，但不能为绿点计算整模型哈希。"""
+        import backend.model_manager as mm
+        with tempfile.TemporaryDirectory() as d, \
+             patch.object(mm, "MODEL_ROOT", Path(d)), \
+             patch("backend.model_manifest.sha256_file") as sha256_file:
+            model_dir = Path(d) / "mlx" / "large-v2"
+            model_dir.mkdir(parents=True)
+            (model_dir / "config.json").write_text("{}", encoding="utf-8")
+            (model_dir / "model.safetensors").write_bytes(b"complete")
+            (model_dir / "manifest.json").write_text(json.dumps({
+                "status": "ready",
+                "version": 2,
+                "model_id": "large-v2",
+                "backend": "mlx",
+                "repo": mm.MODELS["large-v2"]["repo"],
+                "files": [{
+                    "path": "model.safetensors",
+                    "size": 999,
+                    "sha256": "not-checked-here",
+                }],
+            }), encoding="utf-8")
+
+            self.assertFalse(mm.is_model_ready("large-v2", backend="mlx"))
+            sha256_file.assert_not_called()
 
     def test_resolve_model_path_requires_ready_model(self):
         import backend.model_manager as mm
@@ -709,8 +793,7 @@ class TestP324RecoverInterruptedMissingOriginalModel(unittest.TestCase):
                  patch.object(main, "JOBS", {}), \
                  patch("backend.model_manager.is_model_loadable", return_value=False), \
                  patch.object(main.worker_manager, "start") as start:
-                result = main._handle_existing_job(
-                    existing, new_job, old_job / "input.mp4", {"model": "large-v2"})
+                result = main._start_existing_job(existing, old_job / "input.mp4")
         self.assertEqual(result["status"], "model_missing")
         self.assertIn("original_model", result)
         start.assert_not_called()
@@ -737,8 +820,7 @@ class TestP324RecoverInterruptedMissingOriginalModel(unittest.TestCase):
                  patch("backend.model_manager.is_model_loadable", return_value=True), \
                  patch.object(main, "_persist_job_status"), \
                  patch.object(main.worker_manager, "start") as start:
-                result = main._handle_existing_job(
-                    existing, new_job, old_job / "input.mp4", {"model": "large-v3"})
+                result = main._start_existing_job(existing, old_job / "input.mp4")
         self.assertNotEqual(result.get("status"), "model_missing")
         start.assert_called_once()
 

@@ -242,7 +242,9 @@ class TestRunQwenASRChunking(unittest.TestCase):
 
         segs = [_make_seg(id=0, start=0.0, end=60.0, text="short")]
         result = run_qwen_asr("/fake/audio.wav", segs)
-        self.assertEqual(result, [])  # P251: unavailable → empty chunk list
+        # P464：返回 QwenAsrOutcome。Qwen 不可用 → 没有块，且**不是完整转录**。
+        self.assertEqual(result.chunks, [])
+        self.assertFalse(result.complete)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -321,7 +323,9 @@ class TestRunQwenASRChunkedIntegration(unittest.TestCase):
 
         segs = [_make_seg(id=0, start=0.0, end=1800.0)]
         result = run_qwen_asr("/fake/audio.wav", segs)
-        self.assertEqual(result, [])  # P251: unavailable → empty chunk list
+        # P464：返回 QwenAsrOutcome。Qwen 不可用 → 没有块，且**不是完整转录**。
+        self.assertEqual(result.chunks, [])
+        self.assertFalse(result.complete)
 
 
 # ═══════════════════════════════════════════════════════════════

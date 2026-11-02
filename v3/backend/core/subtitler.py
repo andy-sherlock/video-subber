@@ -3,18 +3,37 @@ Migrated from V1.3 in V2.08 with cross-platform fixes:
 - burn_subtitles: cross-platform ffmpeg path + Windows ASS path escaping
 - build_ass: platform-conditional default font
 """
-import re, subprocess, os, sys, shutil
+import subprocess, os, sys, shutil
 from pathlib import Path
 
-SENTENCE_END = re.compile(r'[。！？.!?]')
-COMMA = re.compile(r'[，,;；、]')
+from backend.core.display_timeline import assert_timeline_valid
 
 _DEFAULT_FONT = "Microsoft YaHei" if sys.platform == "win32" else "PingFang SC"
+_FFMPEG_MUX_TIMEOUT = 1800
+_FFMPEG_BURN_TIMEOUT = 7200
+
+
+class SubtitleOutputError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        stage: str,
+        failure_kind: str,
+        user_message: str,
+        technical_detail: str = "",
+    ):
+        super().__init__(user_message)
+        self.stage = stage
+        self.failure_kind = failure_kind
+        self.user_message = user_message
+        self.technical_detail = technical_detail
 
 
 def _to_srt_time(seconds: float) -> str:
-    h = int(seconds // 3600); m = int((seconds % 3600) // 60)
-    s = int(seconds % 60); ms = int((seconds % 1) * 1000)
+    total_ms = max(0, int(round(float(seconds) * 1000)))
+    h, remainder = divmod(total_ms, 3600 * 1000)
+    m, remainder = divmod(remainder, 60 * 1000)
+    s, ms = divmod(remainder, 1000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
@@ -24,97 +43,39 @@ def _to_ass_time(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def _split_zh_into_sentences(text: str, max_chars: int = 20) -> list[str]:
-    """Split text into readable subtitle chunks. Two-pass: sentence-end first, then comma."""
-    parts = []
-    last = 0
-    for m in SENTENCE_END.finditer(text):
-        end = m.end()
-        sent = text[last:end].strip()
-        if sent:
-            parts.append(sent)
-        last = end
-    remainder = text[last:].strip()
-    if remainder:
-        if parts:
-            parts[-1] += remainder
-        else:
-            parts.append(remainder)
+def build_srt(entries: list, output_path: str) -> None:
+    """把最终显示时间表序列化成 SRT。**只序列化，不改任何时间。**
 
-    result = []
-    for p in parts:
-        if len(p) <= max_chars:
-            result.append(p)
-        else:
-            sub = []
-            sub_last = 0
-            for m in COMMA.finditer(p):
-                end = m.end()
-                chunk = p[sub_last:end].strip()
-                if chunk:
-                    sub.append(chunk)
-                sub_last = end
-            sub_rem = p[sub_last:].strip()
-            if sub_rem:
-                sub.append(sub_rem)
-            result.extend([s for s in sub if s])
-    return [p for p in result if p]
-
-
-def _split_segment(seg, duration: float = None) -> list:
-    zh = getattr(seg, "zh", seg.text).strip()
-    if not zh:
-        return [(seg.start, min(seg.end, seg.start + 6.0), "[翻译失败]")]
-    if len(zh) <= 20:
-        return [(seg.start, seg.end, zh)]
-    parts = _split_zh_into_sentences(zh)
-    return [(seg.start, seg.end, "\n".join(parts))]
-
-
-def _annotate_speaker_changes(entries_with_flag: list) -> list:
-    result = []
-    for s, e, t, changed, unc in entries_with_flag:
-        if changed:
-            t = f"- {t}"
-        if unc:
-            t = f"{t} [?]"
-        result.append((s, e, t))
-    return result
-
-
-def _collect_entries(segments: list) -> list:
-    out = []
-    for seg in segments:
-        changed = getattr(seg, "speaker_change", False)
-        unc = getattr(seg, "uncertain", False)
-        for start, end, text in _split_segment(seg):
-            out.append((start, end, text, changed, unc))
-    return out
-
-
-def build_srt(segments: list, output_path: str) -> None:
-    """Generate SRT with per-sentence splitting and speaker change prefixes."""
-    entries = _annotate_speaker_changes(_collect_entries(segments))
+    G5-1：本函数不再自己收集条目。排版（拆屏、换行、说话人前缀）和时间修复
+    全部由 `display_timeline.build_display_timeline()` 一次性完成，三个写出器
+    读同一张表。以前 `start = max(start, previous_end)` 那一行会静默把后一条
+    往后推——那是在改数据，不是断言（R-14）。真正的修复只在时间表阶段发生；
+    走到这里还有结构问题说明上游漏了，必须报错。
+    """
+    assert_timeline_valid(entries, srt=True)
     lines = []
-    for i, (start, end, text) in enumerate(entries, 1):
+    for i, e in enumerate(entries, 1):
         lines.append(str(i))
-        lines.append(f"{_to_srt_time(start)} --> {_to_srt_time(end)}")
-        lines.append(text)
+        lines.append(f"{_to_srt_time(e.start)} --> {_to_srt_time(e.end)}")
+        lines.append(e.text)
         lines.append("")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
-def build_ass(segments: list, output_path: str, alignment: int = 8,
+def build_ass(entries: list, output_path: str, alignment: int = 8,
               font_name: str = None, video_width: int = 1920, video_height: int = 1080) -> None:
-    """Generate ASS with per-sentence splitting and speaker prefixes.
+    """把最终显示时间表序列化成内部 ASS（不作为成品交付）。
 
-    PlayRes fixed at 1920x1080 so font size stays consistent across resolutions.
-    video_width/video_height used only for aspect ratio detection (portrait vs landscape).
+    G12 第三批 B 收尾起**生产不再调用它**：所有烧录都走 `subtitle_style.build_ass_styled`。
+    只剩测试在用，留待后续清理（锁定方案第 9 节残留）。
+
+    与 build_srt 读同一张未取整的表，各自按自身精度取整（SRT 1ms / ASS 10ms）。
+    两者取整后时间不保证逐条相同，这是正确行为。
     """
+    assert_timeline_valid(entries, srt=True, ass=True)
     font = font_name or _DEFAULT_FONT
     play_res_x, play_res_y = 1920, 1080
-    entries = _annotate_speaker_changes(_collect_entries(segments))
     lines = [
         "[Script Info]", "ScriptType: v4.00+",
         f"PlayResX: {play_res_x}", f"PlayResY: {play_res_y}", "",
@@ -127,11 +88,11 @@ def build_ass(segments: list, output_path: str, alignment: int = 8,
         "", "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
-    for start, end, text in entries:
-        if not text:
+    for e in entries:
+        if not e.text:
             continue
-        ass_text = text.replace("\n", "\\N")
-        lines.append(f"Dialogue: 0,{_to_ass_time(start)},{_to_ass_time(end)},Default,,0,0,0,,{ass_text}")
+        ass_text = e.text.replace("\n", "\\N")
+        lines.append(f"Dialogue: 0,{_to_ass_time(e.start)},{_to_ass_time(e.end)},Default,,0,0,0,,{ass_text}")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -166,14 +127,22 @@ def mux_subtitles(video_path: str, srt_path: str, output_path: str,
     """
     ffmpeg = _find_ffmpeg()
     if not (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
-        raise RuntimeError("FFmpeg 未安装，无法封装字幕。请安装 ffmpeg 后重试。")
+        raise SubtitleOutputError(
+            stage="burn",
+            failure_kind="ffmpeg_not_installed",
+            user_message=(
+                "没有检测到 FFmpeg，无法生成带字幕的视频。"
+                "请先完成运行环境准备，然后重试。"
+            ),
+            technical_detail=f"ffmpeg={ffmpeg!r}",
+        )
 
     ext = os.path.splitext(output_path)[1].lower()
     codec = "mov_text" if ext in (".mp4", ".m4v", ".mov") else "srt"
 
     if audio_path:
         cmd = [
-            ffmpeg, "-y",
+            ffmpeg, "-nostdin", "-y",
             "-i", video_path,
             "-i", audio_path,
             "-i", srt_path,
@@ -184,7 +153,7 @@ def mux_subtitles(video_path: str, srt_path: str, output_path: str,
         ]
     else:
         cmd = [
-            ffmpeg, "-y",
+            ffmpeg, "-nostdin", "-y",
             "-i", video_path,
             "-i", srt_path,
             "-c", "copy",
@@ -192,10 +161,39 @@ def mux_subtitles(video_path: str, srt_path: str, output_path: str,
             "-map", "0:v", "-map", "0:a?", "-map", "1:s",
             output_path,
         ]
-    r = subprocess.run(cmd, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
-    if r.returncode != 0 or not Path(output_path).exists():
-        raise RuntimeError(f"字幕封装失败: {r.stderr[-800:]}")
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace",
+                           stdin=subprocess.DEVNULL, timeout=_FFMPEG_MUX_TIMEOUT)
+    except subprocess.TimeoutExpired as exc:
+        Path(output_path).unlink(missing_ok=True)
+        raise SubtitleOutputError(
+            stage="burn",
+            failure_kind="output_mux_timeout",
+            user_message=(
+                "字幕文件已生成，但视频封装超时。"
+                "你可以先下载 SRT 字幕文件，然后重新生成视频。"
+            ),
+            technical_detail=(
+                f"timeout={_FFMPEG_MUX_TIMEOUT}s "
+                f"output_path={output_path!r}"
+            ),
+        ) from exc
+    if r.returncode != 0 or not Path(output_path).is_file():
+        Path(output_path).unlink(missing_ok=True)
+        raise SubtitleOutputError(
+            stage="burn",
+            failure_kind="output_mux_failed",
+            user_message=(
+                "字幕文件已生成，但视频封装失败。"
+                "你可以先下载 SRT 字幕文件，然后重新生成视频。"
+            ),
+            technical_detail=(
+                f"returncode={r.returncode}; "
+                f"output_exists={Path(output_path).is_file()}; "
+                f"stderr={r.stderr[-800:]}"
+            ),
+        )
 
 
 def burn_subtitles(video_path: str, ass_path: str, output_path: str,
@@ -207,6 +205,16 @@ def burn_subtitles(video_path: str, ass_path: str, output_path: str,
     """
     import tempfile, shutil as _shutil
     ffmpeg = _find_ffmpeg()
+    if not (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
+        raise SubtitleOutputError(
+            stage="burn",
+            failure_kind="ffmpeg_not_installed",
+            user_message=(
+                "没有检测到 FFmpeg，无法生成带字幕的视频。"
+                "请先完成运行环境准备，然后重试。"
+            ),
+            technical_detail=f"ffmpeg={ffmpeg!r}",
+        )
 
     tmp_ass = None
     try:
@@ -219,17 +227,46 @@ def burn_subtitles(video_path: str, ass_path: str, output_path: str,
             filter_path = tmp_ass.replace("\\", "/").replace(":", "\\:")
 
         if audio_path:
-            cmd = [ffmpeg, "-i", video_path, "-i", audio_path,
+            cmd = [ffmpeg, "-nostdin", "-i", video_path, "-i", audio_path,
                    "-vf", f"ass={filter_path}",
                    "-map", "0:v", "-map", "1:a", "-c:a", "copy",
                    output_path, "-y"]
         else:
-            cmd = [ffmpeg, "-i", video_path, "-vf", f"ass={filter_path}",
+            cmd = [ffmpeg, "-nostdin", "-i", video_path, "-vf", f"ass={filter_path}",
                    "-c:a", "copy", output_path, "-y"]
-        r = subprocess.run(cmd, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace")
-        if r.returncode != 0 or not Path(output_path).exists():
-            raise RuntimeError(f"字幕烧录失败: {r.stderr[-800:]}")
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace",
+                               stdin=subprocess.DEVNULL, timeout=_FFMPEG_BURN_TIMEOUT)
+        except subprocess.TimeoutExpired as exc:
+            Path(output_path).unlink(missing_ok=True)
+            raise SubtitleOutputError(
+                stage="burn",
+                failure_kind="output_burn_timeout",
+                user_message=(
+                    "字幕文件已生成，但视频烧录超时。"
+                    "你可以先下载 SRT 字幕文件，然后重新生成视频。"
+                ),
+                technical_detail=(
+                    f"timeout={_FFMPEG_BURN_TIMEOUT}s "
+                    f"output_path={output_path!r}"
+                ),
+            ) from exc
+        if r.returncode != 0 or not Path(output_path).is_file():
+            Path(output_path).unlink(missing_ok=True)
+            raise SubtitleOutputError(
+                stage="burn",
+                failure_kind="output_burn_failed",
+                user_message=(
+                    "字幕文件已生成，但视频烧录失败。"
+                    "你可以先下载 SRT 字幕文件，然后重新生成视频。"
+                ),
+                technical_detail=(
+                    f"returncode={r.returncode}; "
+                    f"output_exists={Path(output_path).is_file()}; "
+                    f"stderr={r.stderr[-800:]}"
+                ),
+            )
     finally:
         if tmp_ass and Path(tmp_ass).exists():
             Path(tmp_ass).unlink(missing_ok=True)

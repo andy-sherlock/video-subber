@@ -1,7 +1,7 @@
 """P299（外部工程师审查 2026-06-22）：qwen_asr_runner 顶层 MLX 导入在无 Metal 环境
 （mlx import 抛 RuntimeError）必须满足两点：
   1. 模块顶层代码不崩——否则整套测试在收集阶段就被打断；
-  2. _mlx_load_model / _mlx_transcribe 仍作为名字存在（占位 None）——否则旧测试
+  2. _mlx_transcribe 仍作为名字存在（占位 None；_mlx_load_model 已随 P515/Z6 删除）——否则旧测试
      patch 它们时 AttributeError。
 
 本机有 Metal，用「在隔离命名空间里 exec 模块源码 + 塞一个 import 即抛 RuntimeError 的
@@ -37,9 +37,7 @@ class TestQwenRunnerImportResilience(unittest.TestCase):
             exec(compile(source, spec.origin, "exec"), ns)   # 1. 不崩
 
         self.assertFalse(ns["_USE_MLX"])                     # 2. MLX 标记不可用
-        self.assertIn("_mlx_load_model", ns)                 # 3. 占位仍在 → 旧测试可 patch
         self.assertIn("_mlx_transcribe", ns)
-        self.assertIsNone(ns["_mlx_load_model"])
         self.assertIsNone(ns["_mlx_transcribe"])
 
 

@@ -79,18 +79,12 @@ class TestP173LoadModel(unittest.TestCase):
     @patch("backend.core.qwen_asr_runner._USE_MLX", True)
     @patch("backend.core.qwen_asr_runner._USE_PYTORCH", False)
     def test_load_model_calls_mlx_when_mlx(self):
-        """当 _USE_MLX=True 时，应加载 MLX 模型（C3.5 ㉖：路径来自注册表）。"""
-        mock_model = MagicMock()
-        mock_config = MagicMock()
-
+        """当 _USE_MLX=True 时，交出注册表里的自管目录（C3.5 ㉖；P515/Z6：由识别包按目录加载）。"""
         from backend.core.qwen_asr_runner import _load_qwen_model
-        with patch("backend.core.qwen_asr_runner._mlx_load_model",
-                   return_value=(mock_model, mock_config)) as mock_load, \
-             patch("backend.model_registry.resolve_model_path",
+        with patch("backend.model_registry.resolve_model_path",
                    return_value="/local/qwen_asr"):
             result = _load_qwen_model()
-        mock_load.assert_called_once_with("/local/qwen_asr")
-        self.assertIs(result, mock_model)
+        self.assertEqual(result, "/local/qwen_asr")
 
     @patch("backend.core.qwen_asr_runner._USE_MLX", False)
     @patch("backend.core.qwen_asr_runner._USE_PYTORCH", True)
@@ -145,9 +139,10 @@ class TestIndependentQwenASR(unittest.TestCase):
                            return_value=60.0):
                     result = run_qwen_asr("/fake.wav", language="en")
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["text"], "hello world")
-        self.assertEqual(len(result[0]["segments"]), 2)
+        # P464：返回 QwenAsrOutcome（块 + 完整性状态），块列表在 .chunks 上。
+        self.assertEqual(len(result.chunks), 1)
+        self.assertEqual(result.chunks[0]["text"], "hello world")
+        self.assertEqual(len(result.chunks[0]["segments"]), 2)
 
     @patch("backend.core.qwen_asr_runner._USE_MLX", True)
     @patch("backend.core.qwen_asr_runner._USE_PYTORCH", False)
@@ -170,7 +165,7 @@ class TestIndependentQwenASR(unittest.TestCase):
                    side_effect=Exception("ffprobe failed")):
             result = run_qwen_asr("/fake.wav", language="en")
 
-        self.assertEqual(result, [])
+        self.assertEqual(result.chunks, [])
 
 
 # ═══════════════════════════════════════════════════════════

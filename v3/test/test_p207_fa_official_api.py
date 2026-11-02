@@ -220,10 +220,18 @@ class TestP207Availability(unittest.TestCase):
 
     def test_available_when_package_and_model_present(self):
         """Returns True when qwen-asr is installed and model is cached."""
-        from backend.core.qwen_aligner import is_qwen_aligner_available
+        import backend.core.qwen_aligner as qwen_aligner
 
-        # qwen-asr 0.0.6 IS installed, model IS cached
-        result = is_qwen_aligner_available()
+        with (
+            unittest.mock.patch.object(
+                qwen_aligner, "_has_qwen_asr_package", True
+            ),
+            unittest.mock.patch(
+                "backend.model_registry.is_model_resolvable",
+                return_value=True,
+            ),
+        ):
+            result = qwen_aligner.is_qwen_aligner_available()
         self.assertTrue(result,
                         "is_qwen_aligner_available() should return True: "
                         "qwen-asr installed, model cached")

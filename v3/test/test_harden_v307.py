@@ -41,7 +41,9 @@ class TestP170EmptyListGuard(unittest.TestCase):
         with patch.object(qwen_asr_runner, "is_qwen_asr_available",
                           return_value=True):
             result = qwen_asr_runner.run_qwen_asr("dummy.wav", segments=[])
-        self.assertEqual(result, [])
+        # P464：无 segments → 无法确定时长 → 没有块，且**不是完整转录**。
+        self.assertEqual(result.chunks, [])
+        self.assertFalse(result.complete)
 
 
 # ═══════════════════════════════════════════════════════════

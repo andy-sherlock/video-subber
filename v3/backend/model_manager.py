@@ -165,13 +165,20 @@ def _read_manifest(model_dir: Path) -> dict | None:
 
 def _manifest_matches(model_dir: Path, model_id: str, backend: str) -> bool:
     manifest = _read_manifest(model_dir)
-    if not manifest:
+    if not isinstance(manifest, dict):
         return False
-    return (
+    metadata_matches = (
         manifest.get("status") == "ready"
         and manifest.get("model_id") == model_id
         and manifest.get("backend") == backend
         and manifest.get("repo") == MODELS[model_id]["repo"]
+    )
+    if not metadata_matches:
+        return False
+    from backend import model_manifest
+    return (
+        model_manifest.manifest_well_formed(manifest)
+        and model_manifest.structure_ok(model_dir, manifest)
     )
 
 

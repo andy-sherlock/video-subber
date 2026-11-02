@@ -43,25 +43,32 @@ class TestLayer1SenseVoice(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertFalse(seg.filtered)
 
-    def test_bgm_tag_discards(self):
+    def test_bgm_tag_marks_not_discards(self):
+        """断言翻转。
+        G12 第二批收尾：L1 交出删除权，改为只标记。真实日志里
+        SenseVoice 判非人声被对齐器推翻 3492 次、真删 0 次。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="some music text", sensevoice_tag="BGM")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
-    def test_laughter_tag_discards(self):
+    def test_laughter_tag_marks_not_discards(self):
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="haha", sensevoice_tag="Laughter")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
-    def test_applause_tag_discards(self):
+    def test_applause_tag_marks_not_discards(self):
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="clapping", sensevoice_tag="Applause")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
+        self.assertEqual(len(result), 1)
+        self.assertTrue(seg.uncertain)
 
     def test_none_tag_skips_layer(self):
         """When sensevoice_tag is None, layer 1 does NOT filter."""
@@ -146,21 +153,37 @@ class TestLayer3SpeechRate(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertTrue(seg.uncertain)
 
-    def test_impossible_duration_discards(self):
-        """Duration < 0.1s with text > 5 chars is physically impossible."""
+    def test_impossible_duration_marks_only(self):
+        """断言翻转（2026-09-04）：时长异常只标记，不删除。
+
+        本条原名 `test_impossible_duration_discards`，注释写着
+        「physically impossible」。**那个判断建立在没看过内容的基础上**：
+        这条分支 26 次开火从没记过删了什么。补 `text=` 日志重跑真实素材，
+        它删掉的是 `'We apologize for that.'`（dur=0.080，真实空乘广播）。
+
+        注意这条测试自己的用例文字——`"Hello world impossible"`
+        是一句**读得通的英语**，却被断言必须删掉。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="Hello world impossible", start=0.0, end=0.05)
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
-        self.assertEqual(seg.filter_reason, "layer3_impossible_duration")
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
+        self.assertEqual(seg.filter_reason, "layer3_impossible_duration_uncertain")
 
-    def test_zero_duration_discards(self):
+    def test_zero_duration_marks_only(self):
+        """断言翻转（2026-09-04）：零时长段只标记，不删除。
+
+        与段三一致：零时长 = 模型不知道它什么时候说的，**不等于它没说**。
+        段三据此保下 449 个零时长词；这里不能把由这些词组成的段整条删掉。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="This should not exist", start=5.0, end=5.0)
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
 
 class TestLayer4RegexPatterns(unittest.TestCase):
@@ -173,42 +196,73 @@ class TestLayer4RegexPatterns(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertFalse(seg.filtered)
         self.assertTrue(seg.uncertain)
-        self.assertEqual(seg.filter_reason, "layer4_cjk_repetition_uncertain")
+        # 闸门 2 补漏后三条重复分支对**所有语言**都只标记，
+        # CJK 专用豁免函数随之删除（成了那次改动制造的孤儿），原因串统一。
+        self.assertEqual(seg.filter_reason, "layer4_repetition_uncertain")
 
-    def test_repeated_pattern_na(self):
+    def test_repeated_pattern_na_marks_not_discards(self):
+        """闸门 2 真跑补漏：断言翻转。`na na na na` 是真人在唱歌。"""
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="na na na na na na")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
-    def test_bracket_description_discards(self):
+    def test_bracket_description_marks_not_discards(self):
+        """断言翻转：与产品裁决「无障碍字幕保留」（2026-09-02）对齐。"""
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="[Music]")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
-    def test_parenthesis_description_discards(self):
+    def test_parenthesis_description_marks_not_discards(self):
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="(Applause)")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
-    def test_cyclic_sentence_discards(self):
+    def test_cyclic_sentence_marks_not_discards(self):
+        """闸门 2 真跑补漏：断言翻转。**这一条是真的有取舍，写清楚。**
+
+        `Thank you for watching ×2` 确实是经典的片尾幻觉，删掉它是对的。
+        但同一条分支在真实素材上的**全部**战果是：
+
+            'Canada. Canada.'     真人连说两次（闸门 2 真跑三次全部命中）
+            'Oh yeah. Oh yeah.'   真话
+            'hey hey hey'         真话
+            'Meow Meow'           真话（学猫叫）
+
+        **删真话已观测到 3 次；删片尾幻觉观测到 0 次。**
+        按「这件事在真实用户身上发生过吗」的判据，删除权收回，改为只标记。
+
+        **接管者**：段三的词级游程判据（同词连续 ≥3 次 + 零时长占比），
+        以及 L5 的段级游程标记。片尾幻觉通常成串出现，会被它们抓到；
+        单条成对的这种形状是本批**明确接受的残留**。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="Thank you for watching Thank you for watching")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
-    def test_hallucination_keyword_discards(self):
+    def test_hallucination_keyword_no_longer_discards(self):
+        """G12 第二批段一：关键词删除权已收回，本条断言随之翻转。
+
+        原断言锁的是「含 music 就整句删」。全库 12 次开火 0 次正确：
+        5 次删掉真人说的整句日语，7 次删掉歌词与 `Music` 标记
+        （产品已裁决无障碍字幕保留）。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="♪ Some music playing ♪")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
 
     def test_normal_text_passes(self):
         from backend.core.hallucination_filter import filter_hallucinations
@@ -228,7 +282,13 @@ class TestLayer4RegexPatterns(unittest.TestCase):
 class TestLayer5Dedup(unittest.TestCase):
     """Layer 5 (HARD): Hallucination chain dedup."""
 
-    def test_consecutive_duplicates_keep_first(self):
+    def test_consecutive_duplicates_marked_not_deleted(self):
+        """G12 第二批段一：L5 只标记，不删除，本条断言随之翻转。
+
+        原断言锁的是「相邻同文即删后一条」，**没有任何数量或时间约束**。
+        真实任务 `80703166ff`（30 分钟正常英语对话）全片只开火一次，
+        删的就是真人连说的第二句 `Canada.`——正常素材上准确率 0/1。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
         segs = [
             _make_seg(id=0, text="Thank you", start=0.0, end=1.0),
@@ -236,11 +296,21 @@ class TestLayer5Dedup(unittest.TestCase):
             _make_seg(id=2, text="Thank you", start=2.0, end=3.0),
         ]
         result = filter_hallucinations(segs)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].text, "Thank you")
-        self.assertFalse(result[0].filtered)
-        self.assertTrue(segs[1].filtered)
-        self.assertTrue(segs[2].filtered)
+        self.assertEqual(len(result), 3, "L5 收权后一条都不许删")
+        self.assertFalse(any(s.filtered for s in segs))
+        self.assertTrue(all(s.uncertain for s in segs),
+                        "连续 3 条相同应整段标为可疑")
+
+    def test_two_consecutive_duplicates_not_even_marked(self):
+        """两条不成游程——这正是真人连说两次 `Canada.` 的形状。"""
+        from backend.core.hallucination_filter import filter_hallucinations
+        segs = [
+            _make_seg(id=0, text="Thank you", start=0.0, end=1.0),
+            _make_seg(id=1, text="Thank you", start=1.0, end=2.0),
+        ]
+        result = filter_hallucinations(segs)
+        self.assertEqual(len(result), 2)
+        self.assertFalse(any(s.uncertain for s in segs))
 
     def test_non_consecutive_duplicates_kept(self):
         from backend.core.hallucination_filter import filter_hallucinations
@@ -272,22 +342,30 @@ class TestProcessingOrder(unittest.TestCase):
         )
         aligner = [{"word": "far away", "start": 99.0, "end": 99.5}]
         result = filter_hallucinations([seg], aligner_result=aligner)
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
-        self.assertFalse(seg.uncertain)
+        # G12 第二批收尾：L1 只标记，段落存活。原意图（L1 判定之后 L2 不再叠加
+        # 标记）已无对象——两层现在都只标记，标了就是标了。
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
+        self.assertTrue(seg.uncertain)
 
-    def test_layer4_before_layer5(self):
-        """Layer 4 regex should catch before dedup runs."""
+    def test_layer4_marks_before_layer5(self):
+        """L4 仍然先于 L5 认领——只是两层现在都只标记。
+
+        本条守的是**顺序**（L4 的原因先落上去），顺序一点没变。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
         segs = [
             _make_seg(id=0, text="[Music]", start=0.0, end=1.0),
             _make_seg(id=1, text="[Music]", start=1.0, end=2.0),
         ]
         result = filter_hallucinations(segs)
-        self.assertEqual(len(result), 0)
-        # Both should be caught by layer 4 regex, not layer 5 dedup
-        self.assertEqual(segs[0].filter_reason, "layer4_regex")
-        self.assertEqual(segs[1].filter_reason, "layer4_regex")
+        self.assertEqual(len(result), 2)
+        # G12 第二批收尾 ②：reason 由 `layer4_bracket_uncertain` 改名为
+        # `layer4_accessibility_uncertain`——括号描述和音乐符号合并成同一条规则
+        # （`is_accessibility_marker`）。**本条守的顺序一点没变。**
+        # 该字符串只在过滤器内部使用，不存盘、不回读、后端无人比对（已 grep 验证）。
+        self.assertEqual(segs[0].filter_reason, "layer4_accessibility_uncertain")
+        self.assertEqual(segs[1].filter_reason, "layer4_accessibility_uncertain")
 
 
 class TestBackwardCompatibility(unittest.TestCase):
@@ -299,15 +377,23 @@ class TestBackwardCompatibility(unittest.TestCase):
         result = filter_hallucinations([seg])
         self.assertEqual(len(result), 0)
 
-    def test_keyword_music_discarded(self):
+    def test_keyword_music_no_longer_discarded(self):
+        """G12 第二批段一：断言翻转。这句话本身是正常内容，不该整句删。"""
         from backend.core.hallucination_filter import filter_hallucinations
         seg = _make_seg(text="音乐 playing in background")
         result = filter_hallucinations([seg])
-        self.assertEqual(len(result), 0)
+        self.assertEqual(len(result), 1)
 
     def test_only_symbols_discarded(self):
+        """纯符号仍然删除。**例子从 `♪♪♪♪` 换成 `...`。**
+
+        G12 第二批收尾 ②：音符是无障碍标记，产品裁决「无障碍字幕保留」，
+        真实素材开火 **22 次**（♪♪♪ 11、🎵 6、♪♪ 5），全部是音乐标记。
+        本条守的是「纯符号该删」这个规则，规则没变——变的是音符不再算纯符号。
+        音符的新行为由 `test_g12b_accessibility_markers.py` 守。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
-        seg = _make_seg(text="♪♪♪♪")
+        seg = _make_seg(text="......")
         result = filter_hallucinations([seg])
         self.assertEqual(len(result), 0)
 
@@ -343,18 +429,20 @@ class TestMultipleSegments(unittest.TestCase):
             _make_seg(id=3, text="哈哈哈哈哈哈哈", start=6.0, end=7.0),
         ]
         result = filter_hallucinations(segs)
-        self.assertEqual(len(result), 3)
-        self.assertEqual(result[0].text, "Normal speech here")
-        self.assertEqual(result[1].text, "Another normal segment")
-        self.assertEqual(result[2].text, "哈哈哈哈哈哈哈")
-        self.assertTrue(result[2].uncertain)
+        # G12 第二批收尾：[Music] 不再被删，改为标可疑 → 四段全部存活
+        self.assertEqual(len(result), 4)
+        self.assertEqual([s.text for s in result], [
+            "Normal speech here", "[Music]",
+            "Another normal segment", "哈哈哈哈哈哈哈"])
+        self.assertTrue(result[1].uncertain)
+        self.assertTrue(result[3].uncertain)
 
     def test_ids_renumbered(self):
         """After filtering, segment IDs should be renumbered 0, 1, 2..."""
         from backend.core.hallucination_filter import filter_hallucinations
         segs = [
             _make_seg(id=0, text="Keep this", start=0.0, end=2.0),
-            _make_seg(id=1, text="[Music]", start=2.0, end=3.0),
+            _make_seg(id=1, text="   ", start=2.0, end=3.0),   # 空文字，白名单内
             _make_seg(id=2, text="Also keep this", start=3.0, end=5.0),
         ]
         result = filter_hallucinations(segs)

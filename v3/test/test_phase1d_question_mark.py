@@ -72,30 +72,14 @@ class TestQuestionMarkThreshold(unittest.TestCase):
         self.assertEqual(result["level"], "red")
 
 
-class TestQuestionMarkAppending(unittest.TestCase):
-    """[?] is appended to uncertain segment text."""
-
-    def test_uncertain_segment_gets_question_mark(self):
-        """seg.uncertain=True → text gets ' [?]' appended."""
-        text = "这是正常的字幕文本"
-        uncertain = True
-        if uncertain:
-            text = text + " [?]"
-        self.assertEqual(text, "这是正常的字幕文本 [?]")
-
-    def test_clean_segment_no_question_mark(self):
-        """seg.uncertain=False → no [?]."""
-        text = "正常字幕"
-        self.assertEqual(text, "正常字幕")
-
-    def test_already_has_question_mark_no_double(self):
-        """Don't append twice if [?] already present."""
-        text = "某段文本 [?]"
-        uncertain = True
-        if uncertain and not text.endswith("[?]"):
-            text = text + " [?]"
-        self.assertEqual(text, "某段文本 [?]")
-        # Not doubled
+# G6 删除 TestQuestionMarkAppending（原 3 个测试）。
+#
+# **它们从未调用过产品代码**：函数体内自己写 `text = text + " [?]"`，
+# 再断言自己的局部变量。删掉产品代码它们也照样全绿——零覆盖。
+#
+# 施工前的盘点表把这 3 处算成「会真的变红」，实际一处都不会红。
+# 真正覆盖 [?] 输出形态的断言只在 test_phase1d_integration.py，
+# 本批已反转；行为等价的守门断言在 test_g6_question_mark_removal.py。
 
 
 class TestQuestionMarkCountWS(unittest.TestCase):

@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os
+import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -29,8 +30,8 @@ class TestMuxSubtitlesCommand(unittest.TestCase):
         self.mock_run = self.run_patcher.start()
         self.mock_run.return_value.returncode = 0
 
-        # Ensure Path.exists returns True for output path check
-        self.exists_patcher = patch("backend.core.subtitler.Path.exists")
+        # Ensure Path.is_file returns True for output path check
+        self.exists_patcher = patch("backend.core.subtitler.Path.is_file")
         self.mock_exists = self.exists_patcher.start()
         self.mock_exists.return_value = True
 
@@ -138,13 +139,15 @@ class TestMuxSubtitlesErrors(unittest.TestCase):
     """Verify error handling in mux_subtitles."""
 
     def test_ffmpeg_not_found_raises_runtime_error(self):
-        """When ffmpeg binary is not found, RuntimeError should be raised."""
+        """When ffmpeg binary is not found, a structured output error is raised."""
         with patch("backend.core.subtitler.shutil.which", return_value=None):
             with patch("backend.core.subtitler.os.path.isfile", return_value=False):
-                from backend.core.subtitler import mux_subtitles
-                with self.assertRaises(RuntimeError) as ctx:
+                from backend.core.subtitler import mux_subtitles, SubtitleOutputError
+                with self.assertRaises(SubtitleOutputError) as ctx:
                     mux_subtitles("input.mp4", "subs.srt", "output.mp4")
-                self.assertIn("FFmpeg", str(ctx.exception))
+                self.assertEqual(ctx.exception.stage, "burn")
+                self.assertEqual(ctx.exception.failure_kind, "ffmpeg_not_installed")
+                self.assertIn("FFmpeg", ctx.exception.user_message)
 
     def test_ffmpeg_nonzero_exit_raises_runtime_error(self):
         """When ffmpeg returns non-zero, RuntimeError should be raised."""
@@ -152,22 +155,37 @@ class TestMuxSubtitlesErrors(unittest.TestCase):
             with patch("backend.core.subtitler.subprocess.run") as mock_run:
                 mock_run.return_value.returncode = 1
                 mock_run.return_value.stderr = "ffmpeg error output"
-                with patch("backend.core.subtitler.Path.exists", return_value=False):
-                    from backend.core.subtitler import mux_subtitles
-                    with self.assertRaises(RuntimeError) as ctx:
+                with patch("backend.core.subtitler.Path.is_file", return_value=False):
+                    from backend.core.subtitler import mux_subtitles, SubtitleOutputError
+                    with self.assertRaises(SubtitleOutputError) as ctx:
                         mux_subtitles("input.mp4", "subs.srt", "output.mp4")
-                    self.assertIn("字幕封装失败", str(ctx.exception))
+                    self.assertEqual(ctx.exception.failure_kind, "output_mux_failed")
+                    self.assertIn("ffmpeg error output", ctx.exception.technical_detail)
+                    self.assertNotIn("ffmpeg error output", ctx.exception.user_message)
 
     def test_ffmpeg_zero_exit_but_no_output_file(self):
         """When ffmpeg exits 0 but output file missing, RuntimeError should be raised."""
         with patch("backend.core.subtitler.shutil.which", return_value="/usr/bin/ffmpeg"):
             with patch("backend.core.subtitler.subprocess.run") as mock_run:
                 mock_run.return_value.returncode = 0
-                with patch("backend.core.subtitler.Path.exists", return_value=False):
-                    from backend.core.subtitler import mux_subtitles
-                    with self.assertRaises(RuntimeError) as ctx:
+                with patch("backend.core.subtitler.Path.is_file", return_value=False):
+                    from backend.core.subtitler import mux_subtitles, SubtitleOutputError
+                    with self.assertRaises(SubtitleOutputError) as ctx:
                         mux_subtitles("input.mp4", "subs.srt", "output.mp4")
-                    self.assertIn("字幕封装失败", str(ctx.exception))
+                    self.assertEqual(ctx.exception.failure_kind, "output_mux_failed")
+                    self.assertIn("output_exists=False", ctx.exception.technical_detail)
+
+    def test_ffmpeg_timeout_raises_structured_error(self):
+        with patch("backend.core.subtitler.shutil.which", return_value="/usr/bin/ffmpeg"):
+            with patch(
+                "backend.core.subtitler.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(cmd="ffmpeg", timeout=1800),
+            ):
+                from backend.core.subtitler import mux_subtitles, SubtitleOutputError
+                with self.assertRaises(SubtitleOutputError) as ctx:
+                    mux_subtitles("input.mp4", "subs.srt", "output.mp4")
+                self.assertEqual(ctx.exception.stage, "burn")
+                self.assertEqual(ctx.exception.failure_kind, "output_mux_timeout")
 
 
 class TestWorkerOutputModeConfig(unittest.TestCase):

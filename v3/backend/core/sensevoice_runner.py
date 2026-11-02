@@ -44,7 +44,8 @@ def extract_tags(text: str) -> dict:
 # ═══════════════════════════════════════════════════════════════════
 
 def _run_sensevoice_chunked(audio_path: str, device: str,
-                            segments: list) -> list[dict] | None:
+                            segments: list,
+                            run_stats: dict | None = None) -> list[dict] | None:
     """Chunked SenseVoice for long audio.
 
     Uses the same chunking strategy as Qwen3-ASR: batches Whisper segments
@@ -57,8 +58,21 @@ def _run_sensevoice_chunked(audio_path: str, device: str,
     _log.info("SenseVoice 分段处理: %d chunks (%d segments)",
               len(chunks), len(segments))
 
+    # G11-B：先记「原本打算跑几块」——跑到一半崩了也要留下这个事实。
+    if run_stats is not None:
+        run_stats.update({"mode": "chunked", "planned": len(chunks),
+                          "ok": 0, "failed": 0, "failed_ranges": []})
+
     model = _load_sensevoice_model(device)
     if model is None:
+        # G11-B 第二轮：模型都没加载起来，计划的块**一块都没跑**。
+        # 留下 planned=7/ok=0/failed=0 这笔账是不成立的——那读起来像
+        # 「跑了但既没成功也没失败」。计划过的块必须有着落。
+        if run_stats is not None:
+            run_stats["failed"] = len(chunks)
+            run_stats["failed_ranges"] = [
+                [round(float(t_start), 3), round(float(t_end), 3)]
+                for _s, _e, t_start, t_end in chunks]
         return None
 
     all_events = []
@@ -97,9 +111,20 @@ def _run_sensevoice_chunked(audio_path: str, device: str,
                         "event": parsed["event"],
                     })
 
+            # G11-B：**处理完成即算成功，与返回几个事件无关。**
+            # 模型可能完整处理了一块音频却只返回很少（甚至零个）事件——
+            # 只看事件数量分不清「处理失败」和「这一段本来就没有声音事件」。
+            if run_stats is not None:
+                run_stats["ok"] += 1
             _log.info("SenseVoice chunk %d/%d 完成 (%.1fs–%.1fs)",
                       idx + 1, len(chunks), t_start, t_end)
         except Exception:
+            # 失败只记安全的事实：第几块、哪个时间范围。
+            # 完整异常与本地路径留在 debug.log，不进正式收据。
+            if run_stats is not None:
+                run_stats["failed"] += 1
+                run_stats["failed_ranges"].append(
+                    [round(float(t_start), 3), round(float(t_end), 3)])
             _log.warning("SenseVoice chunk %d/%d 失败",
                          idx + 1, len(chunks), exc_info=True)
         finally:
@@ -210,7 +235,8 @@ def _parse_sensevoice_results(res) -> list[dict]:
 
 
 def run_sensevoice(audio_path: str, device: str = "cpu",
-                   segments: list = None) -> list[dict] | None:
+                   segments: list = None,
+                   run_stats: dict | None = None) -> list[dict] | None:
     """Run SenseVoice on audio and return raw sound-event segments.
 
     Each returned dict: {text, tags: {language, emotion, event, clean_text},
@@ -231,11 +257,24 @@ def run_sensevoice(audio_path: str, device: str = "cpu",
         if total_duration > _LONG_AUDIO_THRESHOLD_S:
             _log.info("SenseVoice 音频 %.0fs > 20min，启用分段处理",
                       total_duration)
-            return _run_sensevoice_chunked(audio_path, device, segments)
+            return _run_sensevoice_chunked(
+                audio_path, device, segments, run_stats=run_stats)
 
     # ── Direct path ──
+    # 短音频不分块，整段一次处理——同样记下事实，免得「没有 run 字段」
+    # 被误读成「没跑过」。
+    if run_stats is not None:
+        run_stats.update({"mode": "whole", "planned": 1,
+                          "ok": 0, "failed": 0, "failed_ranges": []})
+    def _whole_failed():
+        # 整段这一「块」没跑成。记成 failed=1，范围留空——
+        # 整段模式没有可指认的子区间，写死一个假区间会骗人。
+        if run_stats is not None:
+            run_stats["failed"] = 1
+
     model = _load_sensevoice_model(device)
     if model is None:
+        _whole_failed()
         return None
 
     res = _sensevoice_generate(model, audio_path)
@@ -244,8 +283,14 @@ def run_sensevoice(audio_path: str, device: str = "cpu",
     gc.collect()
     # 注：generate 失败（res is None）保持原行为——不打印"已释放"日志，直接返回 None。
     if res is None:
+        _whole_failed()
         return None
     _log.info("SenseVoice 模型已释放")
+
+    # G11-B：**处理完成即算成功，与返回几个事件无关。**
+    # `res` 为空表示这段音频没有声音事件，不表示处理失败。
+    if run_stats is not None:
+        run_stats["ok"] = 1
 
     if not res:
         return []

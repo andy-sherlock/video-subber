@@ -276,8 +276,16 @@ class TestQwenSegmentsAsAlignment(unittest.TestCase):
         self.assertEqual(len(results), 1, "L1 should keep segment (SV overridden by Qwen alignment)")
         self.assertFalse(results[0].filtered)
 
-    def test_l1_dual_confirm_discard_with_qwen_segments(self):
-        """L1 discards when SV=non-human AND Qwen has no speech at that time."""
+    def test_l1_dual_confirm_marks_with_qwen_segments(self):
+        """断言翻转：SV 判非人声 + 该时段无 Qwen 词 → **只标记**。
+
+        本条守的是 P251 的接线——Qwen 的词级时间戳能当 L1 的对齐证据用。
+        接线没变，变的只是处置：G12 第二批收尾后 L1 交出删除权。
+
+        真实日志：SenseVoice 判非人声被对齐器推翻 3492 次、真删 0 次。
+        「两个信号一致」在这里是假象——第二个信号只是「这段没有对齐词」，
+        它不是独立证据，是第一个信号的缺席。**缺席不是证据。**
+        """
         seg = FakeSeg("subscribe", 100, 105)
         seg.sensevoice_tag = "Music"
         qwen_chunks = [{
@@ -285,10 +293,10 @@ class TestQwenSegmentsAsAlignment(unittest.TestCase):
             "segments": [{"text": "hello", "start": 0.5, "end": 1.0}],
             "t_start": 0, "t_end": 30,
         }]
-        # SV=Music, Qwen has no segment at 100-105s → dual confirm discard
         results = filter_hallucinations(
             [seg], "en", aligner_result=None, qwen_chunks=qwen_chunks)
-        self.assertEqual(len(results), 0, "L1 should discard (both signals confirm non-human)")
+        self.assertEqual(len(results), 1, "L1 不得再拥有删除权")
+        self.assertTrue(seg.uncertain)
 
 
 if __name__ == "__main__":

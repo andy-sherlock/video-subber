@@ -104,35 +104,42 @@ class TestSubNumberParsing(unittest.TestCase):
 class TestBuildSplitSegments(unittest.TestCase):
     """Tests for _build_split_segments helper."""
 
-    def test_two_way_split(self):
+    # ── G5-1 类型 C：被测对象已按合同删除 ──────────────────────────
+    # 原断言（已作废，留档）：
+    #   test_two_way_split   —— 断言 ["前半","后半"] 各得 1.0 秒
+    #                           （"Duration proportional to char count"）
+    #   test_three_way_split —— 断言拆出 3 条、id 为 seg.id*100+j
+    # 这两条断言的正是 R-11 禁止的行为：按译文字数比例凭空分配词级时间。
+    # 那个时间跟视频里谁在哪一秒说话没有任何关系，是 P401/P402/P414/P415
+    # 的来源之一。拆分现已交给 display_timeline，用真实原词边界切。
+
+    def test_no_char_ratio_time_allocation(self):
+        """译文分片合回一条，绝不按字数比例造时间。"""
         from backend.core.sentence_splitter import _build_split_segments
         seg = FakeSegment(id=5, start=0.0, end=2.0, text="hello")
-        parts = ["前半", "后半"]
-        results = _build_split_segments(seg, parts)
-        self.assertEqual(len(results), 2)
-        self.assertEqual(results[0].zh, "前半")
-        self.assertEqual(results[1].zh, "后半")
+        # G12-B 收尾补充（P475）：正文一律取片段自己的译文，分片只提供断开位置。
+        # 生产里只有译文够长的片段才会走到这里，假片段要带上分片来自的那条译文。
+        seg.zh = "前半后半"
+        results = _build_split_segments(seg, ["前半", "后半"])
+        self.assertEqual(len(results), 1, "不得产生按字数分时间的伪造分屏")
         self.assertEqual(results[0].start, 0.0)
-        self.assertEqual(results[1].end, 2.0)
-        # Duration proportional to char count (2+2=4, each gets 1.0s)
-        self.assertAlmostEqual(results[0].end, 1.0, places=2)
-        self.assertAlmostEqual(results[1].start, 1.0, places=2)
+        self.assertEqual(results[0].end, 2.0)
+        self.assertIn("前半", results[0].zh)
+        self.assertIn("后半", results[0].zh)
 
-    def test_three_way_split(self):
+    def test_original_words_preserved_for_downstream_mapping(self):
+        """原词表必须留给 display_timeline 做真实边界映射（合同 §10.1）。"""
         from backend.core.sentence_splitter import _build_split_segments
         seg = FakeSegment(id=1, start=0.0, end=3.0, text="test")
-        parts = ["短", "中等长度", "更长的部分"]
-        results = _build_split_segments(seg, parts)
-        self.assertEqual(len(results), 3)
-        self.assertEqual(results[2].end, 3.0)
-        # IDs: seg.id * 100 + j
-        self.assertEqual(results[0].id, 100)
-        self.assertEqual(results[1].id, 101)
-        self.assertEqual(results[2].id, 102)
+        seg.words = [{"word": "test", "start": 0.0, "end": 3.0}]
+        results = _build_split_segments(seg, ["短", "中等长度", "更长的部分"])
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].words, seg.words, "原词表被清空了")
 
     def test_single_part_no_split(self):
         from backend.core.sentence_splitter import _build_split_segments
         seg = FakeSegment(id=0, start=0.0, end=1.0, text="hi")
+        seg.zh = "单一段"   # P475：正文取片段自己的译文（见上一条测试的说明）
         parts = ["单一段"]
         results = _build_split_segments(seg, parts)
         self.assertEqual(len(results), 1)
@@ -140,21 +147,29 @@ class TestBuildSplitSegments(unittest.TestCase):
         self.assertEqual(results[0].start, 0.0)
         self.assertEqual(results[0].end, 1.0)
 
-    def test_speaker_change_preserved_on_first(self):
+    def test_speaker_change_preserved(self):
+        """原断言：拆出的第一条保留 speaker_change、第二条为 False。
+        合回一条之后，该标记必须留在这唯一一条上。"""
         from backend.core.sentence_splitter import _build_split_segments
         seg = FakeSegment(id=0, start=0.0, end=2.0, text="hi")
         seg.speaker_change = True
-        parts = ["A", "B"]
-        results = _build_split_segments(seg, parts)
+        results = _build_split_segments(seg, ["A", "B"])
+        self.assertEqual(len(results), 1)
         self.assertTrue(results[0].speaker_change)
-        self.assertFalse(results[1].speaker_change)
 
 
 class TestApplyPrecomputedSplits(unittest.TestCase):
     """Tests for llm_split_segments with pre_splits arg."""
 
     def test_pre_splits_applied(self):
-        """When pre_splits is provided, those segments get split without LLM call."""
+        """G5-1 类型 C：pre_splits 不再在这一层产生分屏。
+
+        原断言（已作废，留档）：seg0→2 条、seg1→1 条、seg2→2 条 = 5 条，
+        且逐条断言 result[i].zh 等于各分片。它依赖的是「按字数比例给每个
+        分片算 start/end」——R-11 禁止的伪造时间。
+
+        新合同：这一层只保证译文内容不丢、原时间不改；真正的分屏由
+        display_timeline 用真实原词边界完成。"""
         from backend.core.sentence_splitter import llm_split_segments
         seg0 = FakeSegment(id=0, start=0.0, end=2.0, text="line one")
         seg0.zh = "一条很长的中文翻译超过二十字需要拆分"  # >20 chars
@@ -169,21 +184,21 @@ class TestApplyPrecomputedSplits(unittest.TestCase):
             2: ["另一条很长的中文翻译", "也需要拆分一下"],
         }
 
-        result = llm_split_segments(segments, pre_splits=pre_splits)
-        # seg0 -> 2 parts, seg1 -> 1 part, seg2 -> 2 parts = 5 total
-        self.assertEqual(len(result), 5)
-        self.assertEqual(result[0].zh, "一条很长的中文翻译")
-        self.assertEqual(result[1].zh, "超过二十字需要拆分")
-        self.assertEqual(result[2].zh, "正常长度")  # seg1 unchanged
-        self.assertEqual(result[3].zh, "另一条很长的中文翻译")
-        self.assertEqual(result[4].zh, "也需要拆分一下")
+        result = llm_split_segments(segments, pre_splits=pre_splits, on_wait=lambda *a: None)
+        self.assertEqual(len(result), 3, "不得在这一层产生按字数分时间的分屏")
+        joined = "".join(r.zh.replace(" ", "") for r in result)
+        for piece in ("一条很长的中文翻译", "超过二十字需要拆分", "正常长度",
+                      "另一条很长的中文翻译", "也需要拆分一下"):
+            self.assertIn(piece, joined, f"译文丢了「{piece}」")
+        self.assertEqual([r.start for r in result], [0.0, 2.0, 3.0])
+        self.assertEqual([r.end for r in result], [2.0, 3.0, 5.0])
 
     def test_pre_splits_empty_dict_noop(self):
         """Empty pre_splits should fall through to normal behavior."""
         from backend.core.sentence_splitter import llm_split_segments
         seg = FakeSegment(id=0, start=0.0, end=1.0, text="ok")
         seg.zh = "短文本"
-        result = llm_split_segments([seg], pre_splits={})
+        result = llm_split_segments([seg], pre_splits={}, on_wait=lambda *a: None)
         # With empty pre_splits and no LLM, falls to rule-based.
         # Short text -> no split.
         self.assertEqual(len(result), 1)
@@ -194,7 +209,7 @@ class TestApplyPrecomputedSplits(unittest.TestCase):
         from backend.core.sentence_splitter import llm_split_segments
         seg = FakeSegment(id=0, start=0.0, end=1.0, text="ok")
         seg.zh = "短文本"
-        result = llm_split_segments([seg], pre_splits=None)
+        result = llm_split_segments([seg], pre_splits=None, on_wait=lambda *a: None)
         self.assertEqual(len(result), 1)
 
     def test_pre_splits_with_rule_fallback_for_unsplit(self):
@@ -207,11 +222,46 @@ class TestApplyPrecomputedSplits(unittest.TestCase):
         seg2 = FakeSegment(id=1, start=2.0, end=3.0, text="ok")
         seg2.zh = "短"
         pre_splits = {1: ["a", "b"]}  # id=1 has pre-splits but id=0 doesn't
-        result = llm_split_segments([seg, seg2], pre_splits=pre_splits)
-        # seg (id=0) is long, not in pre_splits -> rule-based: should get split
-        # seg2 (id=1) in pre_splits -> gets pre_splits
-        # Total should be > 2
-        self.assertGreater(len(result), 2)
+        result = llm_split_segments([seg, seg2], pre_splits=pre_splits, on_wait=lambda *a: None)
+        # G5-1 类型 C。原断言：len(result) > 2 —— 长句在这一层被规则断句拆开。
+        # 现在规则断句返回原条不拆（它只会字符中点硬切 + 按字数造时间，
+        # 两件事都被 R-11 禁止），拆分交给 display_timeline 的真实原词边界。
+        self.assertEqual(len(result), 2, "这一层不得再产生伪造分屏")
+        self.assertIn("规则断句", result[0].zh, "长句译文不得丢失")
+
+    def test_collapsed_pre_split_uses_same_rule_fallback_at_any_index(self):
+        """P354：异常预切折叠成一条后，不能因为原字幕位置不同而结果不同。"""
+        from backend.core.sentence_splitter import llm_split_segments
+
+        long_zh = "这是第一句需要保留。这里是第二句也需要保留。最后一句仍然需要保留。"
+        noisy_parts = ["这是第一句需要保留", "这里是第二句", "也需要保留", "最后一句仍然需要保留"]
+
+        at_zero = FakeSegment(id=0, start=0.0, end=0.6, text="same")
+        at_zero.zh = long_zh
+        zero_result = llm_split_segments([at_zero], pre_splits={0: noisy_parts}, on_wait=lambda *a: None)
+
+        prefix = FakeSegment(id=0, start=0.0, end=0.2, text="prefix")
+        prefix.zh = "短"
+        at_one = FakeSegment(id=1, start=0.2, end=0.8, text="same")
+        at_one.zh = long_zh
+        one_result = llm_split_segments([prefix, at_one], pre_splits={1: noisy_parts}, on_wait=lambda *a: None)[1:]
+
+        # G5-1 类型 C：原断言 `assertGreater(len(zero_result), 1, "折叠回长句后
+        # 仍应走安全规则断句")` 已作废——规则断句不再自行拆分（它只会字符中点
+        # 硬切 + 按字数造时间）。P354 真正要保的是**位置无关性**，那一条不变。
+        self.assertEqual(len(zero_result), 1, "这一层不得再产生伪造分屏")
+        self.assertEqual(
+            [seg.zh for seg in zero_result],
+            [seg.zh for seg in one_result],
+            "相同字幕不能因为位于第 0 条或第 1 条而得到不同结果",
+        )
+        for seg in zero_result:
+            for piece in noisy_parts:
+                pass
+        self.assertTrue(
+            all(p in "".join(x.zh for x in zero_result) for p in noisy_parts),
+            "折叠回长句时译文不得丢失",
+        )
 
 
 class TestSubSplitReturnValue(unittest.TestCase):
@@ -326,12 +376,12 @@ class TestRuleBasedSplit(unittest.TestCase):
         seg = FakeSegment(id=3, start=0.0, end=2.0, text="hi")
         seg.zh = "这是一条非常长的中文字幕文本需要被规则断句来分割成两半"
         result = _rule_based_split(seg)
-        # Expect split into 2 parts
-        self.assertEqual(len(result), 2)
-        combined = result[0].zh + result[1].zh
-        self.assertEqual(combined, seg.zh)
-        # First segment gets seg.id * 100 + 0
-        self.assertEqual(result[0].id, 300)
+        # G5-1 类型 C。原断言：拆成 2 条、拼回等于原文、首条 id 为 seg.id*100+0。
+        # 旧实现在没有逗号时用 `split_points = [len(zh) // 2]` 从字符中点硬切
+        # （「商店」→「商 / 店」），再按字数比例算切点时间。两件事都被 R-11 禁止。
+        self.assertEqual(len(result), 1, "规则断句不得再自行拆分")
+        self.assertEqual(result[0].zh, seg.zh, "译文必须原样保留")
+        self.assertEqual((result[0].start, result[0].end), (seg.start, seg.end))
 
     def test_exactly_20_chars_not_split(self):
         from backend.core.sentence_splitter import _rule_based_split

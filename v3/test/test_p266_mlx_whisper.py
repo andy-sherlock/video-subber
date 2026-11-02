@@ -1,5 +1,21 @@
+# P464：`run_qwen_asr` 返回 QwenAsrOutcome（块 + 完整性状态），不再是裸列表。
+# stub 必须跟上真模块的契约，否则测试就在撒谎。
+def _Outcome(**kw):
+    """惰性构造真的 QwenAsrOutcome。
+
+    **不能在顶层 `from backend.core.qwen_asr_runner import ...`**：
+    多个测试用 `sys.modules` 把该模块换成假模块；本文件若在那期间被导入
+    （例如被别的测试 `from test.xxx import _stub_environment` 拉进来），
+    顶层 import 会拿到假模块并炸在 `(unknown location)`。
+    `transcriber_v2` 顶层持有真类的引用，不受 sys.modules 替换影响。
+    """
+    from backend.transcriber_v2 import QwenAsrOutcome
+    return QwenAsrOutcome(**kw)
 import inspect
 import sys
+from backend.core.qwen_asr_runner import (
+    count_chunks_missing_punctuation as _real_count_chunks_missing_punctuation,
+)
 import types
 import unittest
 from unittest.mock import patch
@@ -241,6 +257,8 @@ class P266MlxWhisperRoutingTests(unittest.TestCase):
         with patch("backend.env_check.sys.platform", "darwin"), \
              patch("backend.env_check.platform_machine", return_value="arm64"), \
              patch("backend.env_check.importlib.util.find_spec", return_value=object()), \
+             patch("backend.env_check._cached_whisper_models", return_value=["large-v2"]), \
+             patch("backend.env_check._check_mlx_runtime", return_value=(True, None)), \
              patch("builtins.__import__", side_effect=fail_if_imports_mlx):
             result = env_check.check_whisper()
 
@@ -251,19 +269,23 @@ class P266MlxWhisperRoutingTests(unittest.TestCase):
 def test_standard_router_detects_language_before_full_whisper():
     import backend.transcriber_v2 as transcriber_v2
 
-    # V3.08 复杂度拆分：标准模式语言探测移入 _run_standard_language_router，
-    # 全量转录移入 _run_full_whisper；仍需保证 transcribe() 中探测先于全量转录。
+    # CI-09 #6：本测试原是两条断言焊在一起，G11 后必须拆开——
+    #   ① 「先弄清语言再开始转录」→ **保留，并按 CI-06 加强**：语言决定还必须
+    #      先于 Qwen 并行线程启动，不只是先于全量转录。
+    #   ② 「查语言发生在 _run_standard_language_router 内部」→ **删除**：
+    #      G11 把多点采样挪到路由函数外面、更前面了，该断言已成假。
+    #      半真半假的断言最危险——它会通过，然后骗你说全都对。
     source = inspect.getsource(transcriber_v2.transcribe)
-    probe_at = source.index("_run_standard_language_router")
+    decide_at = source.index("sample_language_multipoint")
+    qwen_thread_at = source.index("qwen_thread = threading.Thread")
     full_whisper_at = source.index("_run_full_whisper")
 
-    assert probe_at < full_whisper_at
+    assert decide_at < qwen_thread_at, "CI-06：语言决定必须先于 Qwen 线程启动"
+    assert decide_at < full_whisper_at, "语言决定必须先于全量转录"
     assert "use_standard_router" in source
     assert "_standard_primary == \"whisper\"" in source
 
-    # 探测在辅助函数内调用 Whisper 语言检测；全量转录在 _run_full_whisper 内调用 Whisper
-    router_src = inspect.getsource(transcriber_v2._run_standard_language_router)
-    assert "detect_language_with_whisper" in router_src
+    # 全量转录仍在 _run_full_whisper 内调用 Whisper
     full_src = inspect.getsource(transcriber_v2._run_full_whisper)
     assert "transcribe_whisper" in full_src
 
@@ -277,18 +299,25 @@ def test_standard_qwen_path_skips_full_whisper(monkeypatch):
 
     qwen_calls = {}
     fake_qwen = types.ModuleType("backend.core.qwen_asr_runner")
+    # 假模块必须带上真模块被用到的符号，否则 transcriber_v2 的
+    # 局部 import 会炸。直接挂真实现，避免假货与真货漂移。
+    fake_qwen.count_chunks_missing_punctuation = (
+        _real_count_chunks_missing_punctuation)
     fake_qwen.is_qwen_asr_available = lambda: True
+    # P463：主引擎路由新增「后端能不能给词级时间」的判据。
+    # 本测试测的是标准模式走 Qwen 时跳过完整 Whisper，前提就是 Qwen 有主引擎资格。
+    fake_qwen.qwen_provides_word_timings = lambda: True
 
     def fake_run_qwen_asr(audio_path, language=None, cache_dir=None, **_kwargs):
         qwen_calls["audio_path"] = audio_path
         qwen_calls["language"] = language
         qwen_calls["cache_dir"] = cache_dir
-        return [{
+        return _Outcome(complete=True, chunks=[{
             "text": "こんにちは",
             "t_start": 0.0,
             "t_end": 1.0,
             "segments": [{"text": "こんにちは", "start": 0.0, "end": 1.0}],
-        }]
+        }])
 
     fake_qwen.run_qwen_asr = fake_run_qwen_asr
     monkeypatch.setitem(sys.modules, "backend.core.qwen_asr_runner", fake_qwen)
@@ -298,15 +327,14 @@ def test_standard_qwen_path_skips_full_whisper(monkeypatch):
     fake_sv.run_sensevoice = lambda *_args, **_kwargs: []
     monkeypatch.setitem(sys.modules, "backend.core.sensevoice_runner", fake_sv)
 
-    info = types.SimpleNamespace(
-        language="ja",
-        language_probability=0.95,
-        duration=30.0,
-    )
+    # G11：语言不再由单点探测产生，改由多点采样一次性决定。
+    from backend.core.whisper_runner import LanguageDecision
     monkeypatch.setattr(
         transcriber_v2,
-        "detect_language_with_whisper",
-        lambda *_args, **_kwargs: info,
+        "sample_language_multipoint",
+        lambda *_args, **_kwargs: LanguageDecision(
+            language="ja", locked=True, split=False,
+            expected_count=3, valid_count=3),
     )
 
     def fail_full_whisper(*_args, **_kwargs):
@@ -314,15 +342,16 @@ def test_standard_qwen_path_skips_full_whisper(monkeypatch):
 
     monkeypatch.setattr(transcriber_v2, "transcribe_whisper", fail_full_whisper)
     monkeypatch.setattr(transcriber_v2, "release_whisper_model", lambda: None)
+    # 段必须带词级时间，理由同 test_g11_transcribe_orchestration._assembled_segment
+    from test.test_g11_transcribe_orchestration import _assembled_segment
+    _ja = lambda: _assembled_segment(transcriber_v2, text="こんにちは", end=1.0)
     monkeypatch.setattr(
-        transcriber_v2,
-        "_qwen_chunks_to_segments",
-        lambda _chunks, _lang: [transcriber_v2.Segment(0, 0.0, 1.0, "こんにちは")],
+        transcriber_v2, "_qwen_chunks_to_segments",
+        lambda _chunks, _lang: [_ja()],
     )
     monkeypatch.setattr(
-        transcriber_v2,
-        "_smart_assemble",
-        lambda _raw, **_kwargs: [transcriber_v2.Segment(0, 0.0, 1.0, "こんにちは")],
+        transcriber_v2, "_smart_assemble",
+        lambda _raw, **_kwargs: [_ja()],
     )
     monkeypatch.setattr(
         transcriber_v2,
@@ -338,7 +367,6 @@ def test_standard_qwen_path_skips_full_whisper(monkeypatch):
     segments = transcriber_v2.transcribe(
         "/tmp/very-long-audio.wav",
         model_size="large-v3",
-        source_lang="auto",
         skip_vad=True,
         filter_keywords=True,
         speaker_detect=False,

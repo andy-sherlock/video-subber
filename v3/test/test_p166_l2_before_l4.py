@@ -80,27 +80,40 @@ class TestP166_KeywordSkipOnGreen(unittest.TestCase):
                          "Keyword segment should survive when L2 is GREEN")
         self.assertFalse(result[0].filtered)
 
-    def test_keyword_filtered_without_qwen(self):
-        """Segment with keyword and no Qwen data → still filtered by L4."""
+    def test_keyword_no_longer_filtered_without_qwen(self):
+        """G12 第二批段一：关键词删除权已收回，本条断言随之翻转。
+
+        P166 原本的关注点是「L2 的 GREEN 状态能不能豁免 L4」。关键词分支整个删掉后，
+        这个关注点由同类 `test_structural_rules_still_apply_on_green`（括号描述）
+        继续守着——**结构性规则仍然不受 GREEN 豁免**，那条测试未改动。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
 
         seg = DummySeg("music", start=0.0, end=1.0)
         result = filter_hallucinations([seg], source_lang="en")
 
-        self.assertEqual(len(result), 0)
-        self.assertTrue(seg.filtered)
+        self.assertEqual(len(result), 1)
+        self.assertFalse(seg.filtered)
 
     def test_structural_rules_still_apply_on_green(self):
-        """Bracket descriptions filtered even when window is GREEN."""
+        """本条守的是「GREEN 不豁免结构性规则」，用例改成真正的结构性内容。
+
+        G12 第二批收尾：括号描述已交出删除权（与产品裁决「无障碍字幕保留」
+        对齐），不再是结构性删除项。**纯符号才是。** 本条的意图——
+        L2 判 GREEN 不能让结构性规则失效——一点没变。
+
+        2026-09-04 再次修正用例：`♪♪♪♪` 也交出了删除权（音符同样是无障碍标记，
+        真实素材开火 22 次）。**改用纯标点。** 两次改的都是用例，不是意图。
+        """
         from backend.core.hallucination_filter import filter_hallucinations
 
-        seg = DummySeg("[Music]", start=0.0, end=1.0)
+        seg = DummySeg("......", start=0.0, end=1.0)
         result = filter_hallucinations(
             [seg], source_lang="en",
             qwen_chunks=_qc(("music was playing clearly in window", 0.0, 1.0)))
 
         self.assertEqual(len(result), 0,
-                         "Bracket patterns should be caught regardless of l2_status")
+                         "纯符号是结构性不可能，GREEN 也不得豁免")
 
 
 class TestP166_OrderChange(unittest.TestCase):

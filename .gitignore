@@ -47,3 +47,16 @@ v1.1/
 v1.2/
 v1.3/
 vs/
+
+# Local backups and competitor research material (2026-10-04).
+_backup*/
+research_*/
+
+# 目录整理（2026-10-04）：备份、测试视频、本机记录仓库与其脚本都不进公开仓库。
+/备份/
+/测试素材/
+/记录存档.sh
+
+# 公开仓库只放软件代码（2026-11-02）：QA 截图与真实视频测试数据不进仓库。
+/evidence/
+v3/test/display_data/

@@ -33,19 +33,12 @@ class DummySeg:
 class TestUncertainEndToEnd(unittest.TestCase):
     """uncertain flag survives hallucination filter → subtitler output."""
 
-    def test_uncertain_survives_word_align(self):
-        """word_align_segments preserves uncertain from parent segment."""
-        from backend.core.sentence_splitter import word_align_segments
-        from backend.transcriber_v2 import Segment
-
-        seg = Segment(id=1, start=0.0, end=2.0, text="hello world")
-        seg.uncertain = True
-
-        result = word_align_segments([seg])
-        # Should have at least one output segment with uncertain preserved
-        has_uncertain = any(getattr(s, 'uncertain', False) for s in result)
-        self.assertTrue(has_uncertain,
-                        "uncertain=True must survive word_align_segments")
+    # G6 删除 test_uncertain_survives_display_timeline：
+    # 它表面断言 [?]，实际是拿 [?] 当**探针**测「uncertain 有没有活到显示层」。
+    # [?] 删掉后 DisplayEntry 只剩 start/end/text，uncertain 在显示层再无消费者
+    # ——被测的行为**前提已经消失**，不是断言过时。
+    # 真正要守的东西搬到 test_g6_question_mark_removal.py，锚在 segments 层：
+    # question_mark_count 就是从那里算的（worker.py:2986），与显示层无关。
 
     def test_uncertain_survives_llm_split(self):
         """llm_split_segments preserves uncertain from parent segment."""
@@ -59,57 +52,42 @@ class TestUncertainEndToEnd(unittest.TestCase):
         seg.uncertain = True
 
         # llm_split_segments with empty pre_splits (no splitting needed)
-        result = llm_split_segments([seg], pre_splits={})
+        result = llm_split_segments([seg], pre_splits={}, on_wait=lambda *a: None)
         has_uncertain = any(getattr(s, 'uncertain', False) for s in result)
         self.assertTrue(has_uncertain,
                         "uncertain=True must survive llm_split_segments")
 
-    def test_uncertain_shows_in_subtitle_text(self):
-        """[?] appears in subtitle output when uncertain=True."""
-        from backend.core.subtitler import _collect_entries, _annotate_speaker_changes
+    def test_uncertain_does_not_show_in_subtitle_text(self):
+        """G6 反转：uncertain=True 时输出里**不得**出现 [?]。
+
+        原断言（施工前）是「[?] 必须出现」。存疑信息不再混在字幕正文里，
+        改由界面统一告知——用户下载的 SRT 和烧录成品里不再有内部标注。
+        真实证据（施工前）：jobs/9db7d51138 的成品 SRT 有 9 个 [?]。"""
+        from backend.core.display_timeline import build_display_timeline
 
         seg = DummySeg("hello world", start=0.0, end=2.0, uncertain=True)
 
-        entries = _collect_entries([seg])
-        annotated = _annotate_speaker_changes(entries)
+        entries = build_display_timeline([seg])
 
-        found_qm = any("[?]" in text for _, _, text in annotated)
-        self.assertTrue(found_qm,
-                        "[?] must appear in annotated subtitle text when uncertain=True")
+        found_qm = any("[?]" in e.text for e in entries)
+        self.assertFalse(found_qm,
+                         "[?] must NOT appear in subtitle output any more (G6)")
 
     def test_no_question_mark_when_clean(self):
         """No [?] when uncertain=False."""
-        from backend.core.subtitler import _collect_entries, _annotate_speaker_changes
+        from backend.core.display_timeline import build_display_timeline
 
         seg = DummySeg("clean text", start=0.0, end=1.0, uncertain=False)
 
-        entries = _collect_entries([seg])
-        annotated = _annotate_speaker_changes(entries)
+        entries = build_display_timeline([seg])
 
-        found_qm = any("[?]" in text for _, _, text in annotated)
+        found_qm = any("[?]" in e.text for e in entries)
         self.assertFalse(found_qm,
                          "[?] must NOT appear when uncertain=False")
 
-    def test_split_segment_preserves_uncertain(self):
-        """When a segment gets split, all sub-segments inherit uncertain."""
-        from backend.core.sentence_splitter import word_align_segments
-        from backend.transcriber_v2 import Segment
-
-        # A long English segment that word_align_segments might split
-        seg = Segment(id=1, start=0.0, end=6.0,
-                      text="This is a very long sentence that might get split into multiple parts by the word align function")
-        seg.words = [
-            {"word": "This", "start": 0.0, "end": 0.3, "probability": 0.9},
-            {"word": "is", "start": 0.3, "end": 0.5, "probability": 0.9},
-            {"word": "a", "start": 0.5, "end": 0.6, "probability": 0.9},
-        ]
-        seg.uncertain = True
-
-        result = word_align_segments([seg])
-        # All resulting segments should have uncertain=True
-        for s in result:
-            self.assertTrue(getattr(s, 'uncertain', False),
-                            f"Split segment at {s.start} must inherit uncertain=True")
+    # G6 删除 test_split_preserves_uncertain：同上，[?] 是探针不是被测对象。
+    # 「显示层拆屏时每一屏继承 uncertain」这个行为在 [?] 删除后**没有任何消费者**
+    # ——DisplayEntry 不带 uncertain 字段，本批也明确不给它加（YAGNI，红线）。
 
 
 class TestAlignerTimestampsReal(unittest.TestCase):

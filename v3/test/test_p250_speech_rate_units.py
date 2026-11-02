@@ -90,12 +90,20 @@ class TestImpossibleDuration(unittest.TestCase):
         _layer3_speech_rate(seg, "en")
         self.assertFalse(seg.filtered, "single short word must not be killed")
 
-    def test_impossible_multiword_killed(self):
-        # 4 words in 0.05s is physically impossible → filtered.
+    def test_impossible_multiword_marks_only(self):
+        """断言翻转（2026-09-04）：多词零时长只标记，不删除。
+
+        P250 关心的是**计数口径**（`count_speech_units` 按词还是按字），
+        那部分一个字没改。变的只是「数出来之后怎么处置」——从删除改成标记。
+
+        这条分支 26 次开火从没记过删了什么；补日志重跑真实素材后，
+        五次开火五次删真话，其中就有 `'We apologize for that.'`（dur=0.080）。
+        """
         seg = FakeSegment("this is totally impossible", 0.0, 0.05)
         _layer3_speech_rate(seg, "en")
-        self.assertTrue(seg.filtered)
-        self.assertEqual(seg.filter_reason, "layer3_impossible_duration")
+        self.assertFalse(seg.filtered, "时长异常已交出删除权")
+        self.assertTrue(seg.uncertain, "但要标存疑")
+        self.assertEqual(seg.filter_reason, "layer3_impossible_duration_uncertain")
 
 
 if __name__ == "__main__":

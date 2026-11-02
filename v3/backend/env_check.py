@@ -52,9 +52,11 @@ def check_whisper() -> dict:
 
     C3.5 收口：与其余三组件同口径拆分——installed_pkg（运行时包可用，只用
     find_spec 探测、不 import）+ model_ready（本地有模型）。installed =
-    installed_pkg AND model_ready，保留给旧调用点（前端 blocking 门控、模型滑块）。
+    installed_pkg AND model_ready AND runtime_ready，保留给旧调用点（前端 blocking 门控、模型滑块）。
     前端据 installed_pkg/model_ready 区分"包缺失不可修复"与"模型缺失可修复"。
-    Returns: {installed, installed_pkg, model_ready, models: [str], backend}
+    runtime_ready 代表当前启动环境真能运行该后端；macOS MLX 会轻量触发 Metal。
+    Returns: {installed, installed_pkg, model_ready, runtime_ready, runtime_error,
+              models: [str], backend}
     """
     if sys.platform == "darwin" and platform_machine() == "arm64":
         installed_pkg = importlib.util.find_spec("mlx_whisper") is not None
@@ -64,9 +66,27 @@ def check_whisper() -> dict:
         backend = "faster"
     models = _cached_whisper_models() if installed_pkg else []
     model_ready = len(models) > 0
-    return {"installed": installed_pkg and model_ready,
+    runtime_ready = False
+    runtime_error = None
+    if installed_pkg and model_ready:
+        if backend == "mlx":
+            runtime_ready, runtime_error = _check_mlx_runtime()
+        else:
+            runtime_ready = True
+    return {"installed": installed_pkg and model_ready and runtime_ready,
             "installed_pkg": installed_pkg, "model_ready": model_ready,
+            "runtime_ready": runtime_ready, "runtime_error": runtime_error,
             "models": models, "backend": backend}
+
+
+def _check_mlx_runtime() -> tuple[bool, str | None]:
+    try:
+        mx = importlib.import_module("mlx.core")
+        probe = mx.array([1.0])
+        mx.eval(probe)
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
 
 
 def platform_machine() -> str:

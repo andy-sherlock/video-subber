@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import unittest
+from types import SimpleNamespace
 
 
 class DummySeg:
@@ -49,7 +50,9 @@ class RecordingLLM:
         idx = len(self.calls)
         self.calls.append((prompt, system_prompt))
         if idx in self._raise_on:
-            raise ConnectionError("simulated window failure")
+            # D-1（合同变更）：断网由付费请求函数原地等，不再算窗口失败；
+            # 窗口失败只剩回复格式不对（解析失败）这一种。
+            return "not json: simulated window failure"
         if self._response_fn:
             return self._response_fn(idx, prompt, system_prompt)
         return '{"corrections": []}'
@@ -62,16 +65,23 @@ def _jp_segs(n, start_id=0):
 
 
 def _dual_segs(n):
-    """n segments with whisper_text set so _choose_refiner_mode -> 'dual'.
+    """n segments；配合 `_dual_receipt()` 走 dual 模式。
 
-    Distinct texts, small total_end -> _whisper_is_usable returns True.
+    G2/B1+B10：模式原来靠给每段挂 `whisper_text`（按时间重叠拼出来的参照）
+    来触发，那套拼接已删。现在模式只看转录阶段填好的收据，与段上的字段无关。
     """
-    segs = []
-    for i in range(n):
-        s = DummySeg(f"テキスト{i}", start=float(i) * 0.5, end=float(i) * 0.5 + 0.4, id=i)
-        s.whisper_text = f"てきすと{i}"
-        segs.append(s)
-    return segs
+    return [
+        DummySeg(f"テキスト{i}", start=float(i) * 0.5, end=float(i) * 0.5 + 0.4, id=i)
+        for i in range(n)
+    ]
+
+
+def _dual_receipt():
+    """一份「副引擎可用」的收据——dual 模式的唯一开关。"""
+    return SimpleNamespace(
+        reference_text=" ".join(f"てきすと{i}" for i in range(10)),
+        reference_usable=True,
+    )
 
 
 # ── RC1: chunking ──────────────────────────────────────────────────────────
@@ -182,15 +192,19 @@ class TestPassStructure(unittest.TestCase):
     def test_dual_mode_runs_conflict_then_smoothing(self):
         from backend.worker import _run_refiner
 
-        segs = _dual_segs(3)  # whisper_text set -> dual
+        segs = _dual_segs(3)
         llm = RecordingLLM()
 
-        result = _run_refiner(segs, llm, window_size=120, context_pad=20)
+        result = _run_refiner(segs, llm, receipt=_dual_receipt(),
+                              window_size=120, context_pad=20)
 
         self.assertEqual(result["mode"], "dual")
         self.assertEqual(len(llm.calls), 2)
-        # Pass 1 conflict resolution (终审裁判), then Pass 2 smoothing (校对)
-        self.assertIn("裁判", llm.calls[0][1])
+        # Pass 1 带副引擎参照（B 块），Pass 2 只有 A 块。
+        # G2/B3+B5：旧断言认的是「终审裁判 / 校对」两套系统提示词，
+        # 那两套已经并成一套（`_REFINER_COMMON_RULES`），改认 B 块在不在。
+        self.assertIn("B 块", llm.calls[0][0])
+        self.assertNotIn("B 块", llm.calls[1][0])
         self.assertIn("校对", llm.calls[1][1])
 
 
@@ -208,7 +222,8 @@ class TestFailedWindowKeepsUncertain(unittest.TestCase):
         # raise on the 2nd Pass-1 call (index 1) -> window [2,3] not judged.
         llm = RecordingLLM(raise_on={1})
 
-        _run_refiner(segs, llm, window_size=2, context_pad=1)
+        _run_refiner(segs, llm, receipt=_dual_receipt(),
+                     window_size=2, context_pad=1)
 
         by_id = {s.id: s for s in segs}
         # failed window: uncertain preserved (never judged)

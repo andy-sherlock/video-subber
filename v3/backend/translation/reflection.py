@@ -2,6 +2,8 @@
 import re
 import logging
 
+from .base import is_clean_translation_text
+
 _log = logging.getLogger(__name__)
 
 _REFLECTION_RE = re.compile(r"^\[(\d+)\]\s*(.+)$")
@@ -24,16 +26,35 @@ def build_reflection_prompt(
     )
 
 
-def parse_reflection_result(raw: str) -> dict[int, str]:
+def parse_reflection_result(
+    raw: str, source_texts: list[str] | None = None
+) -> dict[int, str]:
     """Parse reflection output into {index: corrected_text}."""
     if not raw or not raw.strip():
         return {}
+    from .orchestrator import _is_valid_translation_for_source
+
     corrections = {}
+    seen: set[int] = set()
     for line in raw.strip().split("\n"):
         m = _REFLECTION_RE.match(line.strip())
         if m:
             idx = int(m.group(1))
             text = m.group(2).strip()
+            if idx in seen:
+                _log.debug("反思建议拒绝: idx=%d kind=duplicate_number", idx)
+                return {}
+            seen.add(idx)
+            if source_texts is not None and not 0 <= idx < len(source_texts):
+                _log.debug("反思建议拒绝: idx=%d kind=outside_range", idx)
+                continue
+            if not is_clean_translation_text(text):
+                _log.debug("反思建议拒绝: idx=%d kind=quality_rejected", idx)
+                continue
+            source = source_texts[idx] if source_texts is not None else ""
+            if not _is_valid_translation_for_source(source, text):
+                _log.debug("反思建议拒绝: idx=%d kind=target_language", idx)
+                continue
             corrections[idx] = text
     return corrections
 

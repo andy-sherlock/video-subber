@@ -1,6 +1,12 @@
 """Claude backend — Anthropic API."""
 import json
+import re
 from .base import LLMBackend
+
+# P519：断句/润色要 JSON。Claude 没有通用的 JSON 开关（预填在新模型上被禁用、
+# 结构化输出不支持 Sonnet 4.6），只能在正文里要求；它偶尔仍会包一层代码块。
+_JSON_INSTRUCTION = "只输出一个 JSON 对象，不要输出任何其他文字。"
+_CODE_FENCE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```$", re.S)
 
 
 class ClaudeBackend(LLMBackend):
@@ -31,7 +37,25 @@ class ClaudeBackend(LLMBackend):
         }).encode()
 
     def _call_api_parse(self, data: dict) -> str:
-        return data["content"][0]["text"]
+        # 新模型思考默认开启，第一块是思考内容；取第一块正文（P519）
+        # 没有正文块 → IndexError，由 _parse_reply 当作空回答（⑦.5 R2）
+        return [block["text"] for block in data["content"] if block.get("type") == "text"][0]
+
+    def translate_raw_json(self, prompt: str, system_prompt: str = None) -> str:
+        """P519：断句/润色走 Claude 自己的格式。背景说明并进正文；不带 temperature
+        （Opus 4.7 以后、Sonnet 5 / 5.5 收到会拒绝请求）。"""
+        import urllib.request
+        text = "\n\n".join(part for part in (system_prompt, prompt, _JSON_INSTRUCTION) if part)
+        body = json.dumps({
+            "model": self._model,
+            "max_tokens": 8192,
+            "messages": [{"role": "user", "content": text}],
+        }).encode()
+        req = urllib.request.Request(self._api_url, data=body, headers=self._build_headers())
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            raw = self._parse_reply(json.loads(resp.read().decode())).strip()
+        fenced = _CODE_FENCE.match(raw)
+        return fenced.group(1).strip() if fenced else raw
 
     def understand_context(self, full_text: str) -> str:
         prompt = (

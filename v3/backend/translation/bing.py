@@ -1,6 +1,6 @@
 """Bing Translate backend — reverse-engineered Edge browser translation API."""
 import json, time, logging, urllib.request
-from .base import TranslationBackend, TranslationResult
+from .base import TranslationBackend, TranslationResult, classify_translation_failure
 
 _log = logging.getLogger("bing")
 
@@ -42,6 +42,7 @@ class BingBackend(TranslationBackend):
         t0 = time.time()
         non_empty = [(i, t.strip()) for i, t in enumerate(texts) if t.strip()]
         results = ["" if not t.strip() else "[翻译失败]" for t in texts]
+        failure_kind = None
 
         if not non_empty:
             return TranslationResult(translated=results, backend_name=self.name, duration_ms=0)
@@ -64,10 +65,14 @@ class BingBackend(TranslationBackend):
                     translated_text = item["translations"][0]["text"].strip()
                     original_idx = non_empty[idx][0]
                     results[original_idx] = translated_text if translated_text else "[翻译失败]"
-        except Exception as e:
-            _log.warning("Bing 翻译失败: %s", e)
+            if any(results[i] == "[翻译失败]" for i, _ in non_empty):
+                failure_kind = classify_translation_failure(empty_translation=True)
+        except Exception as error:
+            _log.warning("Bing 翻译失败: %s", error)
+            failure_kind = classify_translation_failure(error)
 
         return TranslationResult(
             translated=results, backend_name=self.name,
             duration_ms=int((time.time() - t0) * 1000),
+            failure_kind=failure_kind,
         )

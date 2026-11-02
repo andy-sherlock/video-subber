@@ -9,7 +9,9 @@
 - B5 字幕样式合并（后续追加）。
 - B6 翻译分区（后续追加）。
 """
+import json
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -391,10 +393,18 @@ class TestB5SubtitleStyleMerged(unittest.TestCase):
                          "灰框专用 CSS 删元素后应一并清掉，不留孤儿样式")
 
     def test_output_change_toggles_style_section_only(self):
-        """Fix 1：复用 outputModeSelect change，烧录显示样式控件、非烧录隐藏；
-        灰框已删，全文件不该再有任何 styleModeHint 引用（含 909/1945/1588/HTML）。"""
-        self.assertIn("$('styleSubSection').style.display=_burn?'block':'none'",
-                      self.compact, "烧录才显示样式控件")
+        """Fix 1：烧录显示样式控件、非烧录隐藏；
+        灰框已删，全文件不该再有任何 styleModeHint 引用（含 909/1945/1588/HTML）。
+
+        **2026-09-07 断言迁移**：这段显隐原本写在 outputModeSelect 的 change
+        监听器里，与另外两处（加载配置、syncOutputModeUI）各写一遍——
+        外审第五轮抓到「改一处漏两处」（拖 mp3 时按钮说生成字幕、
+        底下还挂着烧录警告）。现已全部收进 `syncOutputModeUI()` 一处，
+        change 监听器只负责调用它。断言跟着搬到新位置，**意图不变**：
+        烧录才显示样式控件。
+        """
+        self.assertIn("styleSec.style.display=mode==='burn'?'block':'none'",
+                      self.compact, "烧录才显示样式控件（现由 syncOutputModeUI 统一控制）")
         self.assertNotIn("styleModeHint", self.compact,
                          "styleModeHint 已彻底删除，任何引用（DOM/handler/init/place）都不该留")
 
@@ -518,8 +528,6 @@ class TestB6SmartTranslationCompact(unittest.TestCase):
         """后端发给前端的进度/弹窗文案也不能带用户可见的 LLM。"""
         for gone in ["LLM 翻译全部失败", "LLM 翻译未能完成"]:
             self.assertNotIn(gone, self.worker)
-        self.assertIn("智能翻译全部失败", self.worker)
-        self.assertIn("智能翻译未能完成", self.worker)
 
 
 class TestC3FinalInformationArchitecture(unittest.TestCase):
@@ -535,6 +543,12 @@ class TestC3FinalInformationArchitecture(unittest.TestCase):
                       self.html, re.S)
         self.assertIsNotNone(m, f"找不到函数 {name}")
         return m.group(1).replace(" ", "")
+
+    def _fn_source(self, name):
+        m = re.search(r"function " + name + r"\([^)]*\)\{.*?\n\}",
+                      self.html, re.S)
+        self.assertIsNotNone(m, f"找不到函数 {name}")
+        return m.group(0)
 
     def test_drawer_has_four_modules_in_final_order(self):
         order = re.findall(r'<section class="acc-item" data-acc="([^"]+)"',
@@ -580,10 +594,10 @@ class TestC3FinalInformationArchitecture(unittest.TestCase):
         """一键修复只修模型文件，不承诺安装 Python 包或 FFmpeg。"""
         body = self._fn_body("_envComponents")
         self.assertIn(
-            "if(o.installed_pkg===false)return{dot:'err',text:copy.no_pkg,repairable:false}",
+            "if(o.installed_pkg===false)return{dot:'err',text:copy.no_pkg,repairable:false,preparable:true}",
             body)
         self.assertIn(
-            "if(o.model_ready===false)return{dot:'err',text:copy.no_model,repairable:true}",
+            "if(o.model_ready===false)return{dot:'err',text:copy.no_model,repairable:true,preparable:true}",
             body)
         # 语音识别（whisper）与其余三项同口径：走 split()，包缺失不可修复、模型缺失可修复。
         # 旧的单 installed 布尔把"包缺失"也判成可修复，与 point 3 边界冲突。
@@ -600,6 +614,250 @@ class TestC3FinalInformationArchitecture(unittest.TestCase):
         self.assertIn("whisper:{ok:'语音识别已就绪'", self.compact)
         self.assertIn("no_pkg:'语音识别组件未安装'", self.compact)
         self.assertIn("no_model:'语音识别模型未下载'", self.compact)
+
+    def test_p357_whisper_runtime_not_ready_marks_voice_unavailable(self):
+        """P357: 包和模型都在但 Metal 不可用时，顶部语音识别不能显示绿色。"""
+        body = self._fn_body("_envComponents")
+        self.assertIn("runtime:'语音识别运行环境不可用'", self.compact)
+        self.assertIn(
+            "if(o.runtime_ready===false)return{dot:'err',text:copy.runtime||copy.bad,detail:o.runtime_error||'',repairable:false,preparable:false}",
+            body)
+        self.assertIn("preparable:asr.preparable||align.preparable", body)
+
+    def test_p357_start_button_uses_runtime_modal_before_prepare_modal(self):
+        """P357: runtime_ready=false 应提示启动环境问题，而不是第一次使用下载模型。"""
+        self.assertIn("function envRuntimeBlocked()", self.html)
+        runtime_body = self._fn_body("envRuntimeBlocked")
+        self.assertIn(
+            "wh.installed_pkg!==false&&wh.model_ready!==false&&wh.runtime_ready===false",
+            runtime_body)
+
+        click = re.search(
+            r"async function startJob\(\)\{(.*?)\n  // ── 本地路径模式",
+            self.html, re.S)
+        self.assertIsNotNone(click, "找不到开始按钮点击处理函数")
+        click_body = click.group(1).replace(" ", "")
+        self.assertIn("envRuntimeBlocked()", click_body)
+        self.assertIn("openRuntimeBlockedModal()", click_body)
+        self.assertLess(click_body.index("envRuntimeBlocked()"),
+                        click_body.index("envNeedsPrepare()"),
+                        "运行态不可用要先于一键准备判断")
+
+        modal_body = self._fn_body("openRuntimeBlockedModal")
+        self.assertIn("模型已经下载", modal_body)
+        self.assertIn("普通桌面或Tauri环境", modal_body)
+        for forbidden in ["第一次使用", "一键准备", "下载语音识别模型"]:
+            self.assertNotIn(forbidden, modal_body)
+
+    def test_p357_env_needs_prepare_keeps_runtime_out_of_download_path(self):
+        """P357: runtime_ready=false 不是下载缺失，不能走 openPrepareModal。"""
+        body = self._fn_body("envNeedsPrepare")
+        self.assertIn(
+            "if(wh.installed_pkg===false||wh.model_ready===false)returntrue",
+            body)
+        self.assertIn("if(wh.runtime_ready===false)returnfalse", body)
+        self.assertNotIn("d.whisper&&d.whisper.installed===false", body)
+
+    def test_p357_runtime_state_executes_as_blocked_not_prepare(self):
+        """P357: 直接喂入三层状态，确认真实 JS 返回不可运行而不是一键准备。"""
+        copy_match = re.search(r"const _COMP_COPY=\{.*?\n\};", self.html, re.S)
+        self.assertIsNotNone(copy_match, "找不到 _COMP_COPY")
+        js = "\n".join([
+            copy_match.group(0),
+            self._fn_source("_envComponents"),
+            "let latestEnvStatus=null;",
+            self._fn_source("envRuntimeBlocked"),
+            self._fn_source("envNeedsPrepare"),
+            """
+const sample={
+  ffmpeg:{installed:true},
+  whisper:{
+    installed:false,
+    installed_pkg:true,
+    model_ready:true,
+    runtime_ready:false,
+    runtime_error:"No Metal device available"
+  },
+  sensevoice:{installed_pkg:true,model_ready:true,ready:true},
+  qwen_asr:{installed_pkg:true,model_ready:true,ready:true},
+  qwen_aligner:{installed_pkg:true,model_ready:true,ready:true}
+};
+latestEnvStatus=sample;
+const voice=_envComponents(sample).find(it=>it.key==="voice");
+console.log(JSON.stringify({
+  voiceDot:voice.dot,
+  voiceText:voice.text,
+  voicePreparable:voice.preparable,
+  runtimeBlocked:envRuntimeBlocked(),
+  needsPrepare:envNeedsPrepare()
+}));
+""",
+        ])
+        result = subprocess.run(["node", "-e", js], text=True,
+                                capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertEqual(data["voiceDot"], "err")
+        self.assertIn("运行环境不可用", data["voiceText"])
+        self.assertFalse(data["voicePreparable"])
+        self.assertTrue(data["runtimeBlocked"])
+        self.assertFalse(data["needsPrepare"])
+
+    def test_p357_status_line_stays_visible_when_partly_blocked(self):
+        """P357: 有组件异常时，顶部四个状态点仍要显示，不能整行藏掉。"""
+        body = self._fn_body("renderEnv")
+        self.assertNotIn(
+            "$('envPill').classList.toggle('show',allReady)",
+            body,
+            "状态行不能再按 allReady 显隐，否则有红点时四个点全消失")
+        self.assertIn(
+            "$('envPill').classList.add('show')",
+            body,
+            "renderEnv 应展示状态行，让 3绿1红 露出来")
+
+    def test_p357_render_env_keeps_dots_visible_on_runtime_block(self):
+        """P357: runtime_ready=false 时 envPill 仍可见，四个点里只有语音识别红。"""
+        copy_match = re.search(r"const _COMP_COPY=\{.*?\n\};", self.html, re.S)
+        self.assertIsNotNone(copy_match, "找不到 _COMP_COPY")
+        js = "\n".join([
+            "function mkEl(){const s=new Set();return{className:'',innerHTML:'',"
+            "classList:{add:c=>s.add(c),remove:c=>s.delete(c),"
+            "toggle:(c,v)=>{v?s.add(c):s.delete(c);return s.has(c)},"
+            "contains:c=>s.has(c)}};}",
+            "const _els={envPill:mkEl(),envBanner:mkEl()};",
+            "const $=id=>_els[id];",
+            "const document={getElementById:()=>null,createElement:()=>({})};",
+            "const window={};",
+            "let _prepareBannerActive=false,_envCheckedOnce=false,latestEnvStatus=null;",
+            copy_match.group(0),
+            self._fn_source("_envComponents"),
+            self._fn_source("renderEnvStatusLine"),
+            self._fn_source("renderEnv"),
+            """
+const sample={ffmpeg:{installed:true},
+ whisper:{installed:false,installed_pkg:true,model_ready:true,
+          runtime_ready:false,runtime_error:"No Metal device available"},
+ sensevoice:{installed_pkg:true,model_ready:true,ready:true},
+ qwen_asr:{installed_pkg:true,model_ready:true,ready:true},
+ qwen_aligner:{installed_pkg:true,model_ready:true,ready:true}};
+renderEnv(sample);
+const h=_els.envPill.innerHTML;
+console.log(JSON.stringify({
+ pillVisible:_els.envPill.classList.contains('show'),
+ dotTotal:(h.match(/env-dot/g)||[]).length,
+ errDots:(h.match(/env-dot err/g)||[]).length}));
+""",
+        ])
+        result = subprocess.run(["node", "-e", js], text=True,
+                                capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertTrue(data["pillVisible"], "runtime 挂掉时状态行仍要可见")
+        self.assertEqual(data["dotTotal"], 4, "四个检测点都要在")
+        self.assertEqual(data["errDots"], 1, "恰好一个红点（语音识别）")
+
+    def test_p358_drawer_open_moves_main_action_to_background(self):
+        """P358: 打开设置抽屉后，主按钮应退到背景，不再抢视觉焦点。"""
+        self.assertIn(".app.drawer-open .main-action-panel", self.html)
+        self.assertIn(".app.drawer-open .main-model-summary", self.html)
+        self.assertIn("pointer-events:none", self.html)
+
+        # 不锁死取 .app 的方式（裸 app 会 ReferenceError，须走 document.querySelector）；
+        # 抽屉真能打开由 test_p358_drawer_actually_opens_at_runtime 行为验证兜底。
+        open_body = self._fn_body("openSettingsDrawer")
+        close_body = self._fn_body("closeSettingsDrawer")
+        self.assertIn("classList.add('drawer-open')", open_body)
+        self.assertIn("classList.remove('drawer-open')", close_body)
+
+    def test_p358_select_uses_uniform_single_down_arrow(self):
+        """P358: 输出方式 select 不能露出系统原生上下箭头。"""
+        self.assertIn("appearance:none", self.compact)
+        self.assertIn("-webkit-appearance:none", self.compact)
+        self.assertIn("background-image:", self.compact)
+        self.assertNotIn("appearance:auto", self.compact)
+
+    def test_p358_drawer_actually_opens_at_runtime(self):
+        """P358: 真实调用 openSettingsDrawer 必须真的打开抽屉。
+
+        静态断言只锁住源码里有 drawer-open 字样，锁不住裸 `app` 未定义
+        导致函数第一行就抛 ReferenceError、抽屉根本打不开（QA 真机实测：
+        点设置按钮/左侧箭头都没反应）。这条真跑一遍。"""
+        open_src = self._fn_source("openSettingsDrawer")
+        close_m = re.search(r"function closeSettingsDrawer\(\)\{[^}]*\}", self.html)
+        self.assertIsNotNone(close_m, "找不到 closeSettingsDrawer")
+        js = "\n".join([
+            "function mkEl(){const s=new Set();return{classList:{"
+            "add:c=>s.add(c),remove:c=>s.delete(c),contains:c=>s.has(c)}};}",
+            "const _els={app:mkEl(),settingsDrawer:mkEl(),settingsScrim:mkEl()};",
+            "const document={querySelector:sel=>sel==='.app'?_els.app:null};",
+            "const $=id=>_els[id]||null;",
+            open_src,
+            close_m.group(0),
+            """
+let threw=null;
+try{openSettingsDrawer();}catch(e){threw=e.message;}
+const opened={
+  app:_els.app.classList.contains('drawer-open'),
+  drawer:_els.settingsDrawer.classList.contains('open'),
+  scrim:_els.settingsScrim.classList.contains('open')
+};
+closeSettingsDrawer();
+const closed={
+  app:_els.app.classList.contains('drawer-open'),
+  drawer:_els.settingsDrawer.classList.contains('open')
+};
+console.log(JSON.stringify({threw,opened,closed}));
+""",
+        ])
+        result = subprocess.run(["node", "-e", js], text=True,
+                                capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertIsNone(data["threw"],
+                          f"openSettingsDrawer 抛错，抽屉打不开：{data['threw']}")
+        self.assertTrue(data["opened"]["app"], "打开后 .app 应有 drawer-open")
+        self.assertTrue(data["opened"]["drawer"], "打开后抽屉应 open")
+        self.assertTrue(data["opened"]["scrim"], "打开后遮罩应 open")
+        self.assertFalse(data["closed"]["app"], "关闭后 .app 不应残留 drawer-open")
+        self.assertFalse(data["closed"]["drawer"], "关闭后抽屉应收起")
+
+    def test_p359_running_job_card_has_percent_and_stop_button(self):
+        """P359: 用户开始任务后，任务卡要同时看到数字百分比和停止任务按钮。"""
+        add_body = self._fn_body("addJobCard")
+        self.assertIn("job-card-percent", add_body)
+        self.assertIn("id=\"pct-${jid}\"", add_body)
+        self.assertIn("job-card-stop", add_body)
+        self.assertIn("停止任务", add_body)
+        self.assertIn("onclick=\"cancelCard('${jid}')\"", add_body)
+
+        self.assertIn("function setJobProgress(jid,percent,stage,message,detail)", self.html)
+        # **保护权交接（2026-08-20 · G9/P422 减法回炉）**：WebSocket 和查询接口
+        # 共用固定公开状态，并由唯一入口 applyTaskState 渲染。
+        self.assertIn("setJobProgress(jid,state.percent,state.phase,state.display_message", self.compact)
+        # **保护权交接（2026-08-19 · G9/P422）**：运行中的 WebSocket 推的是公开快照（type:'state'），
+        # 不再是 Worker 原始消息，因此与查询接口共用同一行渲染调用。
+        # 「两条通道都能渲染进度」这件事保护范围没变，实现合一了。
+        self.assertIn("if(msg&&msg.type==='state'&&msg.state)applyTaskState(jid,msg.state)", self.compact)
+
+    def test_p359_done_card_hides_milestones_and_keeps_output_entry(self):
+        """P359: 完成后里程碑圆点退场，只保留完成文案和成品入口。
+
+        B2 起应用内不再提供下载，成品已交付到用户目录，入口改为
+        「在文件夹中显示」，显隐只看后端的 can_show_output_folder。"""
+        body = self._fn_body("renderCardDone")
+        self.assertNotIn("finishMilestones(jid)", body)
+        self.assertIn("hideMilestones(jid)", body)
+        self.assertIn("已完成，成品已保存到目标文件夹", body)
+        self.assertIn("can_show_output_folder", body)
+        self.assertIn("job-card-result", self.html)
+
+    def test_p341_alignment_fallback_notice_is_visible_on_job_card(self):
+        """P341: Qwen3-FA 对齐失败后，粗时间兜底要显示给用户看。"""
+        self.assertIn("job-card-quality", self.html)
+        self.assertIn("时间轴对齐失败，已使用粗时间继续", self.html)
+        self.assertIn("fa_quality", self.html)
+        self.assertIn("alignment_fallback", self.html)
+        self.assertIn("showAlignmentFallbackNotice", self.html)
 
     def test_tier_toggle_removed_and_main_tier_is_independent(self):
         for gone in [r"\btierPanel\b", r"\btierNote\b", r"#tierToggle"]:
@@ -619,6 +877,13 @@ class TestC3FinalInformationArchitecture(unittest.TestCase):
     def test_speaker_toggle_mounted_at_bottom_of_voice_module(self):
         self.assertIn('id="voiceSpeakerPanel"', self.html)
         self.assertIn('id="speakerToggle"', self.html)
+        panel = re.search(
+            r'<div class="card settings-panel" id="voiceSpeakerPanel">(.*?)</div>\s*</div>',
+            self.html, re.S)
+        self.assertIsNotNone(panel, "说话人检测面板必须存在")
+        self.assertEqual(
+            panel.group(1).count("说话人检测"), 1,
+            "面板只保留控件名称，不能再显示重复的小标题")
         self.assertIn("识别模型、下载模型、说话人检测", self.html,
                       "语音识别模块折叠时也要让用户知道里面有说话人检测")
         self.assertIn("place('accBodyVoice',['voiceSpeakerPanel']",

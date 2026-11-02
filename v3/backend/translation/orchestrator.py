@@ -6,7 +6,16 @@ T5: Terminology auto-extraction before translation.
 """
 import threading, time, re, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .base import TranslationBackend, TranslationResult
+from .base import (
+    TranslationBackend,
+    TranslationResult,
+    FAILED_TRANSLATION,
+    SHARED_TRANSLATION_RULES,
+    _is_unchanged_pure_proper_name,
+    classify_translation_failure,
+    is_clean_translation_text,
+)
+from .paid_request import call_paid, wait_message
 from .google import GoogleBackend
 from .bing import BingBackend
 from .youdao import YoudaoBackend
@@ -21,6 +30,27 @@ _ALL_FREE = {
 FREE_BACKENDS: dict[str, TranslationBackend] = {
     k: v for k, v in _ALL_FREE.items() if v.enabled
 }
+
+_IMMEDIATE_LLM_FUSE_FAILURES = {
+    "auth",
+    "connection",
+    "timeout",
+    "rate_limit",
+    "service_error",
+    # D-1 增 1 / 增 3：这两类以前都归 service_error。上下文感知路线（:1650 免费补洞）
+    # 还在用这张名单，加进来让它的行为一点不变。
+    "insufficient_balance",
+    "request_rejected",
+}
+
+# P404：编号协议失败后，在同一付费后端上做整批 → 两半 → 逐条的分级恢复。
+# 只有 numbering_format 会触发；连接/鉴权/限流等在上面的熔断名单里先被拦掉，
+# 不能让恢复链对着一条已经断掉的连接连打几十次。
+_PAID_BATCH_RETRY_CORRECTION = (
+    "上一次返回条数与输入不符，很可能合并了相邻两条。"
+    "这一次必须严格一条对一条，即使两条原文本是一句话。"
+)
+_MAX_PROTOCOL_SINGLE_RETRIES = 40
 
 
 def _split_into_batches(texts: list[str], limit: int = 2000) -> list[list[str]]:
@@ -72,7 +102,12 @@ def _build_llm_backends(api_keys: list[dict]) -> list[TranslationBackend]:
                 backends.append(GeminiBackend(api_key=key))
             elif platform == "deepseek":
                 from .deepseek import DeepSeekBackend
-                backends.append(DeepSeekBackend(api_key=key))
+                # 用户在界面上选了哪个 DeepSeek 型号就用哪个；传空字符串或已停用的
+                # deepseek-chat 时，DeepSeekBackend 内部会迁移到 deepseek-v4-flash。
+                backends.append(DeepSeekBackend(
+                    api_key=key,
+                    model=entry.get("model", ""),
+                ))
             elif platform == "doubao" or platform == "豆包":
                 from .doubao import DoubaoBackend
                 backends.append(DoubaoBackend(api_key=key))
@@ -98,7 +133,7 @@ def _run_speed_mode_batch(
     batch: list[str],
     backends: list[TranslationBackend],
     context: str = "",
-) -> tuple[list[str], TranslationBackend | None, dict | None]:
+) -> tuple[list[str], TranslationBackend | None, dict | None, dict[int, str]]:
     best_container = [None]
     best_lock = threading.Lock()
     done_event = threading.Event()
@@ -110,12 +145,25 @@ def _run_speed_mode_batch(
             r = backend.translate_batch(batch, context=context)
             if done_event.is_set() or len(r.translated) != len(batch):
                 return
-            valid_count = sum(
-                1 for x in r.translated if x not in (None, "", "[翻译失败]")
-            )
+            cleaned = [
+                x.strip() if is_clean_translation_text(x) else FAILED_TRANSLATION
+                for x in r.translated
+            ]
+            failure_by_index = {
+                i: r.failure_kind or "quality_rejected"
+                for i, value in enumerate(cleaned)
+                if value == FAILED_TRANSLATION
+            }
+            valid_count = sum(1 for x in cleaned if x != FAILED_TRANSLATION)
             with best_lock:
                 if best_container[0] is None or valid_count > best_container[0][3]:
-                    best_container[0] = (r.translated, backend, r.tokens_used, valid_count)
+                    best_container[0] = (
+                        cleaned,
+                        backend,
+                        r.tokens_used,
+                        valid_count,
+                        failure_by_index,
+                    )
             if valid_count == len(batch):
                 done_event.set()
         except Exception:
@@ -137,40 +185,54 @@ def _run_speed_mode_batch(
             break
 
     if best_container[0] is not None:
-        translated, backend, tokens, _ = best_container[0]
+        translated, backend, tokens, _, failure_by_index = best_container[0]
         while len(translated) < len(batch):
             translated.append("[翻译失败]")
-        return translated[:len(batch)], backend, tokens
-    return ["[翻译失败]"] * len(batch), None, None
+        for i, value in enumerate(translated[:len(batch)]):
+            if value == FAILED_TRANSLATION:
+                failure_by_index.setdefault(i, "unknown")
+        return translated[:len(batch)], backend, tokens, failure_by_index
+    return ["[翻译失败]"] * len(batch), None, None, {
+        i: "unknown" for i in range(len(batch))
+    }
 
 
 def _run_quality_mode_batch(
     batch: list[str],
     backends: list[TranslationBackend],
     context: str = "",
-) -> tuple[list[str], TranslationBackend | None, list[int], dict | None]:
+) -> tuple[list[str], TranslationBackend | None, list[int], dict | None, dict[int, str]]:
     n = len(batch)
     results = ["[翻译失败]"] * n
     used_backend = None
     failed_indices = set(range(n))
     batch_tokens = None
+    failure_by_index: dict[int, str] = {}
 
     for backend in backends:
         if not failed_indices:
             break
         try:
             r = backend.translate_batch(batch, context=context)
+            accepted_any = False
             for i in list(failed_indices):
-                if i < len(r.translated) and r.translated[i] not in ("", "[翻译失败]", None):
-                    results[i] = r.translated[i]
+                if i < len(r.translated) and is_clean_translation_text(r.translated[i]):
+                    results[i] = r.translated[i].strip()
                     failed_indices.discard(i)
-            if used_backend is None:
+                    failure_by_index.pop(i, None)
+                    accepted_any = True
+                else:
+                    failure_by_index[i] = r.failure_kind or "quality_rejected"
+            if accepted_any and used_backend is None:
                 used_backend = backend
             batch_tokens = _merge_tokens(batch_tokens, r.tokens_used)
-        except Exception:
+        except Exception as error:
+            kind = classify_translation_failure(error)
+            for i in failed_indices:
+                failure_by_index[i] = kind
             continue
 
-    return results, used_backend, list(failed_indices), batch_tokens
+    return results, used_backend, list(failed_indices), batch_tokens, failure_by_index
 
 
 # ── T5: Terminology extraction ──
@@ -331,20 +393,12 @@ _OVERLAP_RATIO = 0.2
 def _compute_chunk_size(llm) -> int:
     """Return chunk size (line count) based on the model's fatigue limit (P253).
 
-    LLMs suffer from "Lost in the Middle": attention degrades once input
-    crosses ~30% of the context window. Instead of (ctx - 18000)//8 which
-    fills all remaining space up to the ceiling, use a fatigue-aware cap:
-    ctx * 30% → subtract prompt overhead (2000 tokens) → convert to lines.
-
-    Old formula: (32768 - 18000)//8 = 1750 lines/batch ≈ 14000 tokens (44%).
-    New formula: (32768*0.30 - 2000)//8 ≈ 950 lines/batch (30%). 64K+ models
-    capped at 1200 (was 3000).
+    P408: delegates to shared compute_fatigue_chunk in model_cache.py.
+    Translation parameters: overhead=2000, per_unit=8, floor=200, ceiling=1200.
     """
+    from backend.model_cache import compute_fatigue_chunk
     ctx = getattr(llm, 'max_input_tokens', 32768) or 32768
-    fatigue = int(ctx * 0.30)
-    available = fatigue - 2000  # prompt overhead
-    raw = available // 8
-    return max(200, min(raw, 1200))
+    return compute_fatigue_chunk(ctx, overhead=2000, per_unit=8, floor=200, ceiling=1200)
 
 _SEAM_CONTEXT = 50
 _INDEXED_LINE_RE = re.compile(r"\[(\d+)\]\s*(.+)")
@@ -411,6 +465,7 @@ def _review_seam(
     version_b: dict[int, str],
     terminology: dict[str, str],
     llm: TranslationBackend,
+    source_texts: list[str] | None = None,
 ) -> dict | None:
     """Review the overlap zone between two chunks and pick the best version.
 
@@ -463,15 +518,34 @@ def _review_seam(
         return None
 
     reviewed = {}
+    seen: set[int] = set()
     for line in raw.split("\n"):
         m = _INDEXED_LINE_RE.match(line.strip())
         if m:
             idx = int(m.group(1))
             zh = m.group(2).strip()
-            if overlap_start <= idx < overlap_end and zh:
-                if _looks_like_seam_review_comment(zh):
-                    continue
-                reviewed[idx] = zh
+            if idx in seen:
+                _log.debug("接缝建议拒绝: idx=%d kind=duplicate_number", idx)
+                return None
+            seen.add(idx)
+            if not overlap_start <= idx < overlap_end:
+                _log.debug("接缝建议拒绝: idx=%d kind=outside_overlap", idx)
+                continue
+            if not zh or not is_clean_translation_text(zh):
+                _log.debug("接缝建议拒绝: idx=%d kind=quality_rejected", idx)
+                continue
+            if _looks_like_seam_review_comment(zh):
+                _log.debug("接缝建议拒绝: idx=%d kind=review_comment", idx)
+                continue
+            source = (
+                source_texts[idx]
+                if source_texts is not None and 0 <= idx < len(source_texts)
+                else ""
+            )
+            if not _is_valid_translation_for_source(source, zh):
+                _log.debug("接缝建议拒绝: idx=%d kind=target_language", idx)
+                continue
+            reviewed[idx] = zh
 
     return reviewed if reviewed else None
 
@@ -506,6 +580,20 @@ def _is_valid_translation(zh: str) -> bool:
     return ratio >= _TRANSLATION_CJK_MIN_RATIO
 
 
+def _is_valid_translation_for_source(source: str, translated: str) -> bool:
+    """Apply the Chinese gate, with the approved unchanged-name exception.
+
+    P404 第五轮试过在这里加一条「译文整段包含源文本 = 回抄原文」的检测，
+    用来抓「原文：second source」那种脏内容。**已撤回**——它会误伤真实场景：
+    译文合理保留源文本是常态（`Lizard Village` → `利泽德村（Lizard Village）`），
+    实测直接打红 7 条既有测试。为挡一个构造案例引入一个真实误伤，不划算。
+    该形状的漏拦已在 P404 记录中明确接受，见管道文件「明确接受的残留」。
+    """
+    return _is_valid_translation(translated) or _is_unchanged_pure_proper_name(
+        source, translated
+    )
+
+
 def _translate_one_chunk(
     chunk: list[tuple[int, str]],
     prompt_prefix: str,
@@ -530,6 +618,9 @@ def _translate_one_chunk(
         _log.warning("LLM 返回为空 (chunk %d/%d)", ci + 1, total)
 
     chunk_result: dict[int, str] = {}
+    source_by_idx = dict(chunk)
+    expected_ids = set(source_by_idx)
+    seen_ids: set[int] = set()
     for line in raw.split("\n"):
         line = line.strip()
         if not line:
@@ -544,7 +635,18 @@ def _translate_one_chunk(
                 zh = m.group(2).strip()
                 break
         if idx is not None and zh:
-            if not _is_valid_translation(zh):
+            if idx in seen_ids:
+                _log.debug("R9 块结果拒绝: idx=%d kind=duplicate_number", idx)
+                return ci, {}, result.tokens_used
+            seen_ids.add(idx)
+            if idx not in expected_ids:
+                _log.debug("R9 块结果拒绝: idx=%d kind=outside_chunk", idx)
+                continue
+            source = source_by_idx.get(idx, "")
+            if (
+                not is_clean_translation_text(zh)
+                or not _is_valid_translation_for_source(source, zh)
+            ):
                 _log.warning("翻译内容校验失败 (CJK): idx=%d text=%r",
                              idx, zh[:60])
                 continue
@@ -620,9 +722,10 @@ def _translate_chunks_with_prompt(
         for future in as_completed(futures):
             ci, chunk_result, chunk_tokens = future.result()
             chunk_results[ci] = chunk_result
+            expected_ids = {idx for idx, _ in chunks[ci]}
             with translated_lock:
                 for idx, zh in chunk_result.items():
-                    if 0 <= idx < len(texts) and zh:
+                    if idx in expected_ids and 0 <= idx < len(texts) and zh:
                         translated[idx] = zh
             token_usage_total = _merge_tokens(token_usage_total, chunk_tokens)
             completed += 1
@@ -641,6 +744,7 @@ def _review_translation_seams(
     llm: TranslationBackend,
     token_usage_total: dict | None,
     progress_callback=None,
+    source_texts: list[str] | None = None,
 ) -> dict | None:
     if progress_callback:
         progress_callback(82, "接缝审查中…")
@@ -665,10 +769,16 @@ def _review_translation_seams(
         reviewed = _review_seam(
             translated, overlap_start, overlap_end,
             version_a, version_b, terminology, llm,
+            source_texts=source_texts,
         )
         if reviewed:
             for idx, zh in reviewed.items():
-                translated[idx] = zh
+                if idx in overlap_indices:
+                    translated[idx] = zh
+                else:
+                    _log.debug(
+                        "接缝写回拒绝: idx=%d kind=outside_overlap", idx
+                    )
             token_usage_total = _merge_tokens(
                 token_usage_total, {"seam_reviews": 1}
             )
@@ -747,7 +857,14 @@ def _translate_whole_with_markers(
     # Seam review for overlap zones (only when multiple chunks exist)
     if total_chunks > 1 and terminology is not None:
         token_usage_total = _review_translation_seams(
-            chunks, chunk_results, translated, terminology, llm, token_usage_total, progress_callback
+            chunks,
+            chunk_results,
+            translated,
+            terminology,
+            llm,
+            token_usage_total,
+            progress_callback,
+            source_texts=texts,
         )
 
     # Phase 1C: finalize sub_splits — join parts into translated list,
@@ -763,33 +880,339 @@ def _translate_whole_with_markers(
     return translated, token_usage_total, final_sub_splits
 
 
+def _accept_recovered_batch(
+    batch, results, failed_local, failure_local, translated, *, offset=0
+):
+    """把一次恢复调用的结果按原始位置回填。
+
+    每条都必须过与主路径完全相同的两道强检查（P352）：恢复旁路绝不允许降低标准，
+    否则 `---`、编号残留、点评文字、英文原文会从这条路漏进字幕。
+    """
+    for local_index, text in enumerate(translated):
+        index = offset + local_index
+        if index not in failed_local:
+            continue
+        candidate = (text or "").strip()
+        if (
+            is_clean_translation_text(candidate)
+            and _is_valid_translation_for_source(batch[index], candidate)
+        ):
+            results[index] = candidate
+            failed_local.discard(index)
+            failure_local.pop(index, None)
+        elif candidate:
+            failure_local[index] = "quality_rejected"
+
+
+def _recover_paid_batch_protocol_failure(
+    batch, backend, results, failed_local, failure_local, *, paid
+):
+    """P404：编号协议失败后，在同一付费后端上做整批纠正与半批纠正。
+
+        整批纠正 ──仍有失败──> 前半批 / 后半批 ──仍有失败──> (交回调用方逐条恢复)
+             │                      │
+           全好                    全好 ──按 offset 回填原位置
+             │
+          直接返回
+
+    半批只在「该范围内还有失败位置」时才发：已经补齐的那一半再调一次不只是
+    白花钱，万一那次无关调用断连，`fused` 会把真正待恢复的另一半也带走。
+
+    只处理批量层级；仍失败的位置交回调用方走逐条恢复（上限
+    `_MAX_PROTOCOL_SINGLE_RETRIES`）。就地修改 results / failed_local / failure_local。
+
+    返回本轮用掉的 tokens。D-1：每一次重发都经过付费请求函数——连不上 / 余额不足
+    在那里原地等、换 Key，不会走到这里；不会自己好的错直接抛出，任务停在出错。
+    这里只剩 AI 回复格式类的失败。本批不得切换到第二个付费厂商。
+    """
+    tokens = None
+
+    def _call(sub_batch, *, offset=0):
+        """发一次纠正重发。返回可用结果或 None。
+
+        失败原因**只记本次覆盖的位置**，否则后半批的失败会盖掉前半批已经
+        查明的原因，用户看到的失败提示就会指向错的病因。
+        """
+        nonlocal tokens
+        scope = {
+            index for index in failed_local
+            if offset <= index < offset + len(sub_batch)
+        }
+        _used, result = paid(
+            lambda b: b.translate_batch(sub_batch, context=_PAID_BATCH_RETRY_CORRECTION)
+        )
+        tokens = _merge_tokens(tokens, result.tokens_used)
+        kind = getattr(result, "failure_kind", None)
+        if kind:
+            for index in scope:
+                failure_local[index] = kind
+        return result if kind is None else None
+
+    whole = _call(batch)
+    if whole is not None:
+        _accept_recovered_batch(
+            batch, results, failed_local, failure_local, whole.translated
+        )
+    if not failed_local:
+        return tokens
+
+    midpoint = (len(batch) + 1) // 2
+    for start, end in ((0, midpoint), (midpoint, len(batch))):
+        if start >= end or not failed_local:
+            continue
+        # 这半批已经全部恢复了：再调一次是白花钱。
+        if not any(start <= index < end for index in failed_local):
+            continue
+        half = _call(batch[start:end], offset=start)
+        if half is not None:
+            _accept_recovered_batch(
+                batch,
+                results,
+                failed_local,
+                failure_local,
+                half.translated,
+                offset=start,
+            )
+    return tokens
+
+
+def _paid_requester(llm_backends, first, progress_callback, pct, resume_message=None):
+    """D-1 C3：从 `first` 开始、按用户排序换 Key 的付费请求；等待时更新进度文字，
+    恢复后换回 `resume_message`（⑦.5 R3）。"""
+    if progress_callback is None:
+        # P514：没有汇报函数，原地等时就没法发现主程序没了——宁可调用时就报错。
+        raise ValueError("付费请求必须带进度汇报函数")
+    order = [first, *[b for b in llm_backends if b is not first]]
+
+    def on_wait(kind, name, _seconds):
+        progress_callback(pct, wait_message(kind, name))
+
+    def on_resume():
+        if resume_message:
+            progress_callback(pct, resume_message)
+
+    def run(request):
+        return call_paid(order, request, on_wait=on_wait, on_resume=on_resume)
+
+    return run
+
+
 def _translate_llm_per_batch(
     texts: list[str],
     llm_backends: list,
+    ordered_backends: list | None = None,
     progress_callback=None,
-) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
+    batch_progress_callback=None,
+    engine_status_callback=None,
+    item_result_callback=None,
+    translation_stats_callback=None,
+) -> tuple[
+    list[str],
+    list[int],
+    dict | None,
+    dict[int, list[str]],
+    dict[int, str],
+]:
     """Per-batch LLM translation (no full context)."""
     batches = _split_into_batches(texts)
     all_results = []
     token_usage_total = None
+    failure_by_index: dict[int, str] = {}
+    api_total_count = 0
+    api_success_count = 0
+    # D-1 A5：格式修复后仍失败、保留原文的句子数（跨批累计）。
+    kept_original_count = 0
 
     for bi, batch in enumerate(batches):
+        batch_offset = len(all_results)
+        if engine_status_callback:
+            engine_status_callback({"engine_category": "api", "phase": "trying_api", "failure_kind": None})
+        pct = int((bi + 1) / len(batches) * 95)
+        batch_message = f"LLM 逐段翻译… (批 {bi+1}/{len(batches)})"
         if progress_callback:
-            pct = int((bi + 1) / len(batches) * 95)
-            progress_callback(pct, f"LLM 逐段翻译… (批 {bi+1}/{len(batches)})")
+            progress_callback(pct, batch_message)
+        # ⑦.5 R7：这一批已经整批发过的 Key 不再整批重发（换 Key 后不重复花钱）。
+        tried_backends = []
 
-        batch_results, _, _, batch_tokens = _run_quality_mode_batch(batch, llm_backends)
+        batch_results = [FAILED_TRANSLATION] * len(batch)
+        failed_local = set(range(len(batch)))
+        failure_local = {idx: "unknown" for idx in failed_local}
+        batch_tokens = None
+
+        for backend in llm_backends:
+            if not failed_local:
+                break
+            if backend in tried_backends:
+                continue
+            empty_streak = 0
+            # D-1 C3：连不上 / 余额不足由付费请求函数换 Key、原地等；回来的只剩
+            # 成功或 AI 回复格式类失败。不会自己好的错直接抛出。
+            untried = [b for b in llm_backends if b not in tried_backends]
+            paid = _paid_requester(untried, backend, progress_callback, pct, batch_message)
+            backend, initial = paid(lambda b: b.translate_batch(batch))
+            tried_backends.append(backend)
+            # 合同增量 5：之后的格式修复与逐句重试只用这一家——断网也只原地等它，
+            # 不换 Key（P404：同一批不得混进第二个付费厂商的译文）。
+            paid = _paid_requester([backend], backend, progress_callback, pct, batch_message)
+
+            batch_tokens = _merge_tokens(batch_tokens, initial.tokens_used)
+            failure_kind = getattr(initial, "failure_kind", None)
+            if failure_kind:
+                for local_idx in failed_local:
+                    failure_local[local_idx] = failure_kind
+            if failure_kind == "empty_translation":
+                empty_streak = 1
+
+            # P404：只有编号协议失败才进分级恢复。进来之后这一批就锁定在当前
+            # 付费后端上（下面用 break 而不是 continue），不再试第二个厂商。
+            protocol_recovery = False
+            if failure_kind == "numbering_format":
+                protocol_recovery = True
+                # G12 第三批 B（T-3）：验收要数「因条数不对重发」的次数
+                _log.info("逐段翻译：这一批 %d 条条数不对，整批重发", len(batch))
+                recover_tokens = _recover_paid_batch_protocol_failure(
+                    batch, backend, batch_results, failed_local, failure_local,
+                    paid=paid,
+                )
+                batch_tokens = _merge_tokens(batch_tokens, recover_tokens)
+
+            if failure_kind is None:
+                for local_idx in list(failed_local):
+                    if local_idx >= len(initial.translated):
+                        continue
+                    candidate = (initial.translated[local_idx] or "").strip()
+                    if (
+                        is_clean_translation_text(candidate)
+                        and _is_valid_translation_for_source(batch[local_idx], candidate)
+                    ):
+                        batch_results[local_idx] = candidate
+                        failed_local.discard(local_idx)
+                        failure_local.pop(local_idx, None)
+                    elif candidate:
+                        failure_local[local_idx] = "quality_rejected"
+
+            if not failed_local:
+                break
+
+            context_lines = "\n".join(
+                f"[{idx}] {source}" for idx, source in enumerate(batch)
+            )
+            fused = False
+            # P404：走过分级恢复的批次，逐条阶段有硬上限，超出的交给免费引擎。
+            # 没走恢复链的失败（quality_rejected、empty_translation 等）仍然逐条全补。
+            pending = sorted(failed_local)
+            if protocol_recovery:
+                pending = pending[:_MAX_PROTOCOL_SINGLE_RETRIES]
+            for local_idx in pending:
+                prompt = (
+                    "以下是本批字幕原文，用于理解语境：\n"
+                    f"{context_lines}\n\n"
+                    f"{SHARED_TRANSLATION_RULES}\n"
+                    f"只翻译第 {local_idx} 条，只输出这一条的译文，"
+                    "不要编号、不要分隔符、不要解释。\n"
+                    f"原文：{batch[local_idx]}"
+                )
+                _used, retry = paid(
+                    lambda b, _prompt=prompt: b.translate_raw(_prompt, max_tokens=512)
+                )
+                batch_tokens = _merge_tokens(batch_tokens, retry.tokens_used)
+
+                # 后端理论上该守 list[str] 的契约，但它自己就破过（见 base.py
+                # translate_raw）。这里再兜一道：非字符串一律当空，绝不让 .strip()
+                # 把整个翻译任务打崩、连免费引擎兜底都跑不到。
+                raw_candidate = retry.translated[0] if retry.translated else ""
+                candidate = (
+                    raw_candidate.strip() if isinstance(raw_candidate, str) else ""
+                )
+                retry_kind = getattr(retry, "failure_kind", None)
+                if not candidate:
+                    retry_kind = retry_kind or "empty_translation"
+                if retry_kind == "empty_translation":
+                    failure_local[local_idx] = retry_kind
+                    empty_streak += 1
+                    if empty_streak >= 2:
+                        _log.debug(
+                            "R4 连续空返回熔断: backend=%s idx=%d",
+                            getattr(backend, "name", "unknown"),
+                            local_idx,
+                        )
+                        fused = True
+                        break
+                    continue
+
+                empty_streak = 0
+
+                if (
+                    retry_kind is None
+                    and is_clean_translation_text(candidate)
+                    and _is_valid_translation_for_source(batch[local_idx], candidate)
+                ):
+                    batch_results[local_idx] = candidate
+                    failed_local.discard(local_idx)
+                    failure_local.pop(local_idx, None)
+                else:
+                    failure_local[local_idx] = retry_kind or "quality_rejected"
+                    _log.debug(
+                        "R3 单条结果拒绝: backend=%s idx=%d kind=%s",
+                        getattr(backend, "name", "unknown"),
+                        local_idx,
+                        retry_kind or "quality_rejected",
+                    )
+
+            # P404：一旦进过分级恢复，无论结果如何都锁定当前付费后端 ——
+            # break 走出循环（剩下的句子保留原文），绝不 continue 到第二个付费厂商。
+            if protocol_recovery:
+                break
+            if fused:
+                continue
+
+        api_total_count += len(batch)
+        api_success_indexes = sorted(set(range(len(batch))) - failed_local)
+        api_success_count += len(api_success_indexes)
+        # D-1 A5：付费路线不再交给免费引擎。格式修复后仍失败的句子保留原文，
+        # 以普通结果回报（第 4 个参数 False）——不是「免费补全」，任务也不进「部分完成」。
+        kept_local = sorted(failed_local)
+        for local_idx in kept_local:
+            batch_results[local_idx] = batch[local_idx]
+        kept_original_count += len(kept_local)
+        if item_result_callback:
+            for local_idx in sorted(api_success_indexes + kept_local):
+                item_result_callback(
+                    batch_offset + local_idx,
+                    batch_results[local_idx],
+                    True,
+                    False,
+                )
+        if translation_stats_callback:
+            translation_stats_callback({
+                "api_success_count": api_success_count,
+                "api_total_count": api_total_count,
+                "kept_original_count": kept_original_count,
+            })
 
         all_results.extend(batch_results)
         token_usage_total = _merge_tokens(token_usage_total, batch_tokens)
+        for local_idx in failed_local:
+            failure_by_index[batch_offset + local_idx] = failure_local.get(
+                local_idx, "unknown"
+            )
+        if batch_progress_callback:
+            batch_progress_callback(
+                len(all_results),
+                sum(1 for value in all_results if value != FAILED_TRANSLATION),
+            )
 
         if bi < len(batches) - 1:
             time.sleep(1.5)
 
     final_failed = [i for i, r in enumerate(all_results) if r == "[翻译失败]"]
     llm_names = [b.name for b in llm_backends]
-    _log.info("LLM 逐段翻译完成: %d/%d 条 (%s)", len(texts) - len(final_failed), len(texts), ", ".join(llm_names))
-    return all_results, final_failed, token_usage_total, {}
+    # D-1 C7：付费成功与保留原文分开数；逐段付费路线免费翻译恒为 0。
+    _log.info(
+        "LLM 逐段翻译完成: 共 %d 条，付费成功 %d 条，保留原文 %d 条，免费翻译 0 条 (%s)",
+        len(texts), api_success_count, kept_original_count, ", ".join(llm_names),
+    )
+    return all_results, final_failed, token_usage_total, {}, failure_by_index
 
 
 def _translate_free_only(
@@ -797,7 +1220,9 @@ def _translate_free_only(
     mode: str,
     ordered_backends: list,
     progress_callback=None,
-) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
+    batch_progress_callback=None,
+    item_result_callback=None,
+) -> tuple[list[str], list[int], dict | None, dict[int, list[str]], dict[int, str]]:
     """Free backends only (no LLM keys)."""
     all_backends = ordered_backends
     batches = _split_into_batches(texts)
@@ -805,6 +1230,7 @@ def _translate_free_only(
     all_failed = []
     token_usage_total = None
     used_backends = set()
+    failure_by_index: dict[int, str] = {}
 
     for bi, batch in enumerate(batches):
         if progress_callback:
@@ -812,11 +1238,13 @@ def _translate_free_only(
             progress_callback(pct, f"翻译中… (批 {bi + 1}/{len(batches)})")
 
         if mode == "speed":
-            batch_results, backend, _ = _run_speed_mode_batch(batch, all_backends)
+            batch_results, backend, _, batch_failures = _run_speed_mode_batch(
+                batch, all_backends
+            )
             if backend:
                 used_backends.add(backend.name)
         else:
-            batch_results, backend, failed_indices, _ = _run_quality_mode_batch(
+            batch_results, backend, failed_indices, _, batch_failures = _run_quality_mode_batch(
                 batch, all_backends, context=""
             )
             if backend:
@@ -824,7 +1252,25 @@ def _translate_free_only(
             for fi in failed_indices:
                 all_failed.append(fi + len(all_results))
 
+        batch_offset = len(all_results)
+        for local_idx, failure_kind in batch_failures.items():
+            failure_by_index[batch_offset + local_idx] = failure_kind
+
         all_results.extend(batch_results)
+        if item_result_callback:
+            for local_idx, value in enumerate(batch_results):
+                success = bool(value and value != FAILED_TRANSLATION)
+                item_result_callback(
+                    batch_offset + local_idx,
+                    value if success else None,
+                    success,
+                    False,
+                )
+        if batch_progress_callback:
+            batch_progress_callback(
+                len(all_results),
+                sum(1 for value in all_results if value != FAILED_TRANSLATION),
+            )
         time.sleep(1)
 
     final_failed = [
@@ -834,7 +1280,13 @@ def _translate_free_only(
     actual_names = list(used_backends) if used_backends else [b.name for b in all_backends]
     _log.info("免费引擎翻译完成: %d/%d 条 (实际使用: %s)", len(texts) - len(final_failed), len(texts), ", ".join(actual_names))
 
-    return all_results, final_failed, token_usage_total, {}
+    return (
+        all_results,
+        final_failed,
+        token_usage_total,
+        {},
+        {idx: failure_by_index.get(idx, "unknown") for idx in final_failed},
+    )
 
 
 def _run_llm_fallback_chain(
@@ -930,31 +1382,153 @@ def _retry_failed_with_llm(texts, translated, failed_indices, last_llm):
         for fi in list(failed_indices):
             try:
                 simple_prompt = (
-                    f"将以下内容翻译成{_TARGET_LANGUAGE}。只输出译文，不要解释。\n\n{texts[fi]}"
+                    f"将以下内容翻译成{_TARGET_LANGUAGE}。{SHARED_TRANSLATION_RULES}"
+                    f"只输出译文，不要解释。\n\n{texts[fi]}"
                 )
                 retry = last_llm.translate_raw(simple_prompt, max_tokens=512)
                 retry_text = (retry.translated[0] if retry.translated else "").strip()
-                if retry_text and _is_valid_translation(retry_text):
+                if (
+                    retry_text
+                    and is_clean_translation_text(retry_text)
+                    and _is_valid_translation_for_source(texts[fi], retry_text)
+                ):
                     translated[fi] = retry_text
                     failed_indices.remove(fi)
+                else:
+                    _log.debug(
+                        "P230 单条结果拒绝: idx=%d kind=%s",
+                        fi,
+                        "quality_rejected",
+                    )
             except Exception:
                 pass  # fall through to free backend retry below
 
 
-def _fill_gaps_with_free(texts, translated, failed_indices, ordered_backends, progress_callback):
-    """Fill remaining failed segments with free backends. Mutates translated in place."""
-    # Fill gaps with free backends
-    if failed_indices and ordered_backends:
-        if progress_callback:
-            progress_callback(96, f"补全 {len(failed_indices)} 条遗漏字幕…")
-        texts_to_retry = [texts[i] for i in failed_indices]
-        retry_batches = _split_into_batches(texts_to_retry)
-        retry_results = []
-        for batch in retry_batches:
-            batch_res, _, _ = _run_speed_mode_batch(batch, ordered_backends)
-            retry_results.extend(batch_res)
-        for idx, retry_text in zip(failed_indices, retry_results):
-            translated[idx] = retry_text
+# G8：免费补全进度。前缀是**结构化标记**，不是给用户看的文字——worker 靠它认出
+# 「这条是免费补全进度」，然后换上自己那条路的标签（自动兜底 / 人工重试）。
+# orchestrator 不知道也不需要知道自己在哪条路上。
+FREE_FILL_PREFIX = "免费补全｜"
+
+
+def _free_fill_text(total, processed, success, failed, *, waiting):
+    """G8/C4：五数字文案的**唯一作者**。两条路共用，改一次两条路一起变。
+
+    口径 = 「本次运行的全部句子」，不是「免费兜底那批」：
+      总数 = len(texts)；已处理 = API 成功数 + 免费已结算数；剩余 = 总数 - 已处理。
+    恒等式 `已处理 == 成功 + 失败` 由调用方的累加保证，
+    `总数 == 已处理 + 剩余` 在这里由 remaining 的定义保证——不可能算错。
+
+    合同 A16：只输出数字和固定词，绝不带字幕原文或译文。
+    """
+    remaining = total - processed
+    tail = f"成功 {success} 句，失败 {failed} 句，还剩 {remaining} 句。"
+    if waiting:
+        return (f"{FREE_FILL_PREFIX}正在等待免费翻译返回第 {processed + 1}/{total} 句。"
+                f"已完成 {processed} 句，{tail}")
+    return f"{FREE_FILL_PREFIX}已处理 {processed}/{total} 句，{tail}"
+
+
+def _make_free_fill_reporter(progress_callback, pct_of):
+    """G8/A13：把「发一条免费补全进度」包成一个不会掀桌子的函数。
+
+    浏览器关掉后写管道会抛 BrokenPipeError。**这个异常绝不能冒到补全循环里**——
+    否则剩下的句子一句都补不到，用户拿到的是缺一半的字幕。
+    把「页面不更新」换成「字幕少一半」是拿新病换旧病，⑤ 走查 Q6 抓到的就是这个。
+    """
+    def report(total, processed, success, failed, *, waiting):
+        if not progress_callback:
+            return
+        try:
+            progress_callback(
+                pct_of(processed),
+                _free_fill_text(total, processed, success, failed, waiting=waiting),
+            )
+        except (BrokenPipeError, OSError):
+            pass
+    return report
+
+
+def _fill_gaps_with_free(
+    texts,
+    translated,
+    failed_indices,
+    ordered_backends,
+    progress_callback,
+    item_result_callback=None,
+):
+    """Fill remaining failed segments with free backends. Mutates translated in place.
+
+    G8（P378/P379）：**在向引擎发请求之前**先报告一次「正在等待第 k/N 句」，
+    结果出来后再报告一次五个数字。以前只有后者——而一句最坏要等 3 个引擎 × 30 秒，
+    那 90 秒里页面一个字都不变，用户分不清是在跑还是卡死了。
+    进度事件的产生点绑在「结果出来之后」，等待期天然没有事件，这是病根。
+
+    没有节流：用户要的就是每句都动一下。事件源修好之后，节流只会把它挡回去。
+    没有免费引擎时不发「正在等待」——没有东西可等，那句话是假的。
+    """
+    failure_by_index: dict[int, str] = {}
+    fallback_indexes = list(failed_indices)
+    free_total = len(fallback_indexes)
+    if not free_total:
+        return failure_by_index
+
+    total = len(texts)
+    api_settled = total - free_total          # 进入免费兜底时 API 已经成功的句数
+    processed = api_settled
+    success = api_settled
+    failed = 0
+
+    report = _make_free_fill_reporter(
+        progress_callback,
+        lambda done: 96 + int(4 * (done - api_settled) / free_total),
+    )
+
+    disabled: set[str] = set()
+
+    for idx in fallback_indexes:
+        if ordered_backends:
+            report(total, processed, success, failed, waiting=True)
+        ok = False
+        if ordered_backends:
+            for backend in ordered_backends:
+                name = getattr(backend, "name", "unknown")
+                if name in disabled:
+                    continue
+                try:
+                    result = backend.translate_batch([texts[idx]])
+                    candidate = (result.translated[0] if result.translated else "").strip()
+                    kind = getattr(result, "failure_kind", None)
+                except Exception as error:
+                    candidate = ""
+                    kind = classify_translation_failure(error)
+                if not candidate:
+                    kind = kind or "empty_translation"
+                if (
+                    kind is None
+                    and is_clean_translation_text(candidate)
+                    and _is_valid_translation_for_source(texts[idx], candidate)
+                ):
+                    translated[idx] = candidate
+                    failed_indices.remove(idx)
+                    failure_by_index.pop(idx, None)
+                    ok = True
+                    break
+                kind = kind or "quality_rejected"
+                failure_by_index[idx] = kind
+                if kind in _IMMEDIATE_LLM_FUSE_FAILURES:
+                    disabled.add(name)
+                time.sleep(0.05)
+        # 每个原始失败项恰好结算一次（含"无免费引擎"边界：ordered_backends 为空则 ok=False）
+        processed += 1
+        if ok:
+            success += 1
+        else:
+            failed += 1
+        if item_result_callback:
+            item_result_callback(idx, translated[idx] if ok else None, ok, True)
+        # 落盘必须在报告之前：报告里的数字要和 worker 记的账是同一时刻的
+        report(total, processed, success, failed, waiting=False)
+    return failure_by_index
 
 
 def _translate_llm_context_aware(
@@ -962,12 +1536,33 @@ def _translate_llm_context_aware(
     llm_backends: list,
     ordered_backends: list,
     progress_callback=None,
+    item_result_callback=None,
+    translation_stats_callback=None,
 ) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
     """Full-context LLM translation: fallback chain → LLM retry → free-backend gap fill."""
     translated, failed_indices, token_usage, sub_splits, last_llm, llm_produced = \
         _run_llm_fallback_chain(texts, llm_backends, progress_callback)
     _retry_failed_with_llm(texts, translated, failed_indices, last_llm)
-    _fill_gaps_with_free(texts, translated, failed_indices, ordered_backends, progress_callback)
+    api_success_indexes = [
+        idx for idx, value in enumerate(translated)
+        if idx not in failed_indices and value != FAILED_TRANSLATION
+    ]
+    if item_result_callback:
+        for idx in api_success_indexes:
+            item_result_callback(idx, translated[idx], True, False)
+    if translation_stats_callback:
+        translation_stats_callback({
+            "api_success_count": len(api_success_indexes),
+            "api_total_count": len(texts),
+        })
+    failure_by_index = _fill_gaps_with_free(
+        texts,
+        translated,
+        failed_indices,
+        ordered_backends,
+        progress_callback,
+        item_result_callback,
+    )
 
     final_failed = [i for i, t in enumerate(translated) if t == "[翻译失败]"]
     free_names = [b.name for b in ordered_backends[:3]] if ordered_backends else []
@@ -982,7 +1577,9 @@ def _translate_llm_context_aware(
     else:
         _log.info("所有 LLM 均失败, 免费引擎(%s)完成翻译: %d/%d 条",
                   ", ".join(free_names), len(texts) - len(final_failed), len(texts))
-    return translated, final_failed, token_usage, sub_splits
+    for idx in final_failed:
+        failure_by_index.setdefault(idx, "unknown")
+    return translated, final_failed, token_usage, sub_splits, failure_by_index
 
 
 # ── Main entry point (T1: tier removed) ──
@@ -994,6 +1591,10 @@ def translate_with_orchestrator(
     api_keys: list[dict] | None = None,
     context_aware: bool = False,
     progress_callback=None,
+    batch_progress_callback=None,
+    engine_status_callback=None,
+    item_result_callback=None,
+    translation_stats_callback=None,
 ) -> tuple[list[str], list[int], dict | None, dict[int, list[str]]]:
     """Main entry point.
 
@@ -1024,11 +1625,40 @@ def translate_with_orchestrator(
     # ── LLM path: user provided API keys ──
     if llm_backends:
         if context_aware:
-            return _translate_llm_context_aware(
-                texts, llm_backends, ordered_backends, progress_callback
+            result = _translate_llm_context_aware(
+                texts,
+                llm_backends,
+                ordered_backends,
+                progress_callback,
+                item_result_callback,
+                translation_stats_callback,
             )
+            if batch_progress_callback:
+                batch_progress_callback(
+                    len(texts),
+                    sum(1 for value in result[0] if value != FAILED_TRANSLATION),
+                )
+            return result
 
         else:
-            return _translate_llm_per_batch(texts, llm_backends, progress_callback)
+            return _translate_llm_per_batch(
+                texts,
+                llm_backends,
+                ordered_backends,
+                progress_callback,
+                batch_progress_callback,
+                engine_status_callback,
+                item_result_callback,
+                translation_stats_callback,
+            )
 
-    return _translate_free_only(texts, mode, ordered_backends, progress_callback)
+    if engine_status_callback:
+        engine_status_callback({"engine_category": "free", "phase": "free_running", "failure_kind": None})
+    return _translate_free_only(
+        texts,
+        mode,
+        ordered_backends,
+        progress_callback,
+        batch_progress_callback,
+        item_result_callback,
+    )

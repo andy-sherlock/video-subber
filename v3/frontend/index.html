@@ -67,6 +67,7 @@ body{
 .acc-body .settings-panel{background:none!important;padding:8px 0 0;margin:0;border-radius:0}
 .acc-body .settings-panel .card-label{font-size:12px;color:var(--sub);font-weight:600}
 .main-action-panel{display:flex;flex-direction:column;align-items:center;gap:12px;margin:10px 0 0}
+.app.drawer-open .main-action-panel,.app.drawer-open .main-model-summary{opacity:.28;filter:saturate(.55);pointer-events:none;transition:opacity .18s ease,filter .18s ease}
 .mode-row{display:flex;justify-content:center;gap:0}
 .mode-row button{min-width:92px;min-height:44px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;cursor:pointer}
 .mode-row button:first-child{border-radius:var(--r-md) 0 0 var(--r-md)}
@@ -82,9 +83,11 @@ body{
 .info-modal{width:min(420px,92vw);background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:22px;box-shadow:0 20px 54px rgba(0,0,0,.18)}
 .info-modal h3{font-size:18px;margin:0 0 8px}
 .info-modal p{font-size:13px;line-height:1.7;color:var(--sub);margin:0 0 16px}
+.partial-export-note{display:block;margin-top:8px;font-size:12px;line-height:1.5;color:var(--sub)}
 .info-modal-actions{display:flex;gap:8px;flex-wrap:wrap}
 .info-modal-actions button{flex:1;min-width:120px;min-height:38px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--card);color:var(--text);font-size:13px}
 .info-modal-actions .primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.info-modal-actions .danger{background:var(--red);border-color:var(--red);color:#fff}
 
 	/* ── C3: 检测三层表达（主界面轻量状态行 / 异常横幅） ── */
 	.env-status-line{display:none;margin:0 auto 14px;max-width:100%;align-items:center;justify-content:center;gap:14px 22px;flex-wrap:wrap;font-size:12px;color:var(--sub);line-height:1.5}
@@ -125,9 +128,12 @@ body{
 .milestone-dot{width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--border)}
 .milestone.done .milestone-dot{background:var(--green);border-color:var(--green)}
 .milestone.active .milestone-dot{background:var(--blue);border-color:var(--blue);box-shadow:0 0 8px rgba(0,113,227,.45)}
+.milestone.failed .milestone-dot{background:var(--red);border-color:var(--red);box-shadow:0 0 8px rgba(255,59,48,.35)}
 .milestone span{font-size:10px;color:var(--sub)}
 .milestone.active span{color:var(--text);font-weight:600}
+.milestone.failed span{color:var(--red);font-weight:600}
 .job-error-action{margin-left:8px;border:1px solid var(--blue);background:var(--card);color:var(--blue);border-radius:var(--r-sm);padding:2px 10px;font-size:11px;cursor:pointer}
+.job-card-error.job-retry-status{color:var(--sub);background:var(--surface);border-color:var(--border)}
 
 /* ── Env Bar ── */
 .env-bar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;justify-content:center}
@@ -169,6 +175,7 @@ body{
 .toggle button.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 
 select,input[type=text],input[type=password]{min-height:36px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;background:var(--card);color:var(--text);transition:border-color .15s}
+select{appearance:none;-webkit-appearance:none;padding-right:32px;background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%),linear-gradient(135deg,var(--sub) 50%,transparent 50%);background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
 .toggle button{min-height:36px;padding:8px 14px}
 select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,.12)}
 .burn-warn{font-size:11px;color:var(--red);margin-top:6px;padding:6px 10px;background:rgba(255,59,48,.06);border-radius:var(--r-sm)}
@@ -214,7 +221,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .priority-rank{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;text-align:center;line-height:20px;flex-shrink:0;font-weight:600}
 .drag-handle{color:var(--sub);font-size:16px;flex-shrink:0;cursor:grab;line-height:1}
 
-/* ── [?] info ── */
+/* ── 字幕标记说明 ── */
 .info-note{font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6}
 	/* B6 翻译分区：智能/免费两区标题层级拉开，不再用 12px 同色灰 card-label */
 	.trans-section-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px}
@@ -259,6 +266,30 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .api-custom-model{display:none;font-size:12px;padding:6px 10px;border:1px solid var(--blue);border-radius:var(--r-sm);background:var(--card);color:var(--text);width:100%}
 .api-custom-model.visible{display:inline-block}
 .model-hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.5}
+/* D-1 C2：门口测试动画（第一版规格）。旋转交给 CSS，不用脚本逐帧重算；尊重「减弱动态效果」。 */
+@keyframes d1spin{to{transform:rotate(360deg)}}
+@keyframes d1pop{0%{transform:scale(1)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes d1draw{to{stroke-dashoffset:0}}
+@keyframes d1shake{0%{transform:translateX(0)}15%{transform:translateX(-6px)}35%{transform:translateX(5px)}55%{transform:translateX(-3px)}72%{transform:translateX(2px)}87%{transform:translateX(-1px)}100%{transform:translateX(0)}}
+@keyframes d1bang{0%{opacity:0;transform:scale(.6)}55%{opacity:1;transform:scale(1.15)}100%{opacity:1;transform:scale(1)}}
+@keyframes d1fade{from{opacity:0}to{opacity:1}}
+@keyframes d1pulse{from{opacity:.35}to{opacity:1}}
+.d1-mk{display:inline-block;width:18px;height:18px;flex:none;vertical-align:-4px}
+.d1-mk svg{width:100%;height:100%;overflow:visible;display:block}
+.d1-spin{transform-origin:50% 50%;animation:d1spin .9s linear infinite}
+.d1-pop{animation:d1pop .35s ease-out}
+.d1-shake{animation:d1shake .42s ease-out}
+.d1-draw{stroke-dasharray:24;stroke-dashoffset:24;animation:d1draw .3s .15s ease-out forwards}
+.d1-bang{transform-origin:15px 15px;transform-box:view-box;animation:d1bang .32s ease-out both}
+.d1-fade{animation:d1fade .2s ease-out}
+.key-gate{display:flex;align-items:center;gap:6px;margin-top:6px;min-height:18px;font-size:12px}
+.key-gate-why{font-size:12px;margin-top:4px;line-height:1.5;min-height:0}
+.gate-panel{max-height:0;overflow:hidden;transition:max-height .25s ease-out;font-size:13px;line-height:1.6;color:#BA7517;text-align:center}
+.gate-panel.open{max-height:180px;margin-top:10px}
+.gate-panel .gate-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.gate-panel button{height:30px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer}
+.gate-panel button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+@media (prefers-reduced-motion:reduce){.d1-pop,.d1-shake{animation:none}.d1-bang{animation:d1fade .2s ease-out both}.d1-spin{animation:d1pulse .8s ease-in-out infinite alternate}.gate-panel{transition:none}}
 
 /* ── Collapsible ── */
 .collapse-toggle{font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text);width:100%;padding:0}
@@ -267,8 +298,17 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .collapse-body{display:none;margin-top:12px}
 .collapse-body.open{display:block}
 
-/* ── Style Preview ── */
-.style-preview-box{background:#1a1a1a;color:#fff;padding:16px 20px;border-radius:var(--r-sm);text-align:center;line-height:1.8;margin-top:10px;font-size:18px}
+/* ── Style Preview ── 按成片比例画（P473）：尺寸都写成“占画面宽度的比例”，数值由 updatePreview 按 SUB_FRAME 填入，小画面和放大画面共用一套 */
+.style-preview-box{position:relative;width:100%;aspect-ratio:16/9;margin-top:10px;border-radius:var(--r-sm);overflow:hidden;cursor:zoom-in;container-type:inline-size;background:linear-gradient(135deg,#5b6b7a,#2f3a44 60%,#1e252b);color:#fff}
+.style-preview-sub{position:absolute;left:calc(var(--sub-margin-x) * var(--sub-unit));right:calc(var(--sub-margin-x) * var(--sub-unit));bottom:calc(var(--sub-margin-v) * var(--sub-unit));text-align:center;line-height:var(--sub-line);font-size:calc(var(--sub-px) * var(--sub-unit));-webkit-text-stroke:calc(var(--sub-outline-w) * 2 * var(--sub-unit)) var(--sub-outline-c);paint-order:stroke fill;text-shadow:calc(var(--sub-shadow) * var(--sub-unit)) calc(var(--sub-shadow) * var(--sub-unit)) 0 rgba(0,0,0,.5)}
+.style-preview-box.top .style-preview-sub{bottom:auto;top:calc(var(--sub-margin-v) * var(--sub-unit))}
+.style-preview-hint{position:absolute;right:6px;top:6px;padding:1px 8px;border-radius:var(--r-sm);background:rgba(0,0,0,.45);color:#fff;font-size:11px;line-height:1.6;pointer-events:none}
+.style-preview-box.top .style-preview-hint{top:auto;bottom:6px}
+.preview-zoom{position:relative;width:min(682px,92vw);background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:20px;box-shadow:0 20px 54px rgba(0,0,0,.18)}
+.preview-zoom .style-preview-box{margin-top:0;cursor:default}
+.preview-zoom .style-preview-hint{display:none}
+.preview-zoom-close{position:absolute;right:4px;top:0;border:0;background:transparent;color:var(--sub);font-size:20px;cursor:pointer}
+.preview-zoom-note{font-size:12px;line-height:1.6;color:var(--sub);margin:8px 0 0}
 .style-actions{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
 .style-confirm-btn{min-height:36px;padding:8px 18px;border:1px solid var(--blue);border-radius:var(--r-sm);background:var(--card);color:var(--blue);font-size:12px;cursor:pointer;transition:all .15s}
 .style-confirm-btn:hover{background:var(--blue);color:#fff}
@@ -331,15 +371,25 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .job-card .progress-bar{height:4px;background:var(--surface);border-radius:2px;overflow:hidden;margin:6px 0}
 .job-card .progress-fill{height:100%;width:0;background:var(--blue);border-radius:2px;transition:width .3s}
 .job-card .progress-fill.working{animation:pulse 2s ease-in-out infinite}
+.job-card-status-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;margin-top:6px}
 .job-card-step{font-size:11px;color:var(--sub)}
+.job-card-percent{font-size:12px;color:var(--text);font-weight:600;min-width:38px;text-align:right}
+.job-card-stop{border:1px solid var(--border);background:var(--card);color:var(--red);border-radius:var(--r-sm);padding:4px 10px;font-size:11px;cursor:pointer}
+.job-card-stop:hover{border-color:var(--red);background:rgba(255,59,48,.06)}
 .job-card-result{display:none;gap:8px;margin-top:8px}
 .job-card-result.show{display:flex}
 .job-card-result a{font-size:11px;color:var(--blue);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:var(--r-sm)}
 .job-card-result a:hover{border-color:var(--blue)}
 .job-card-error{display:none;font-size:11px;color:var(--red);margin-top:4px}
 .job-card-error.show{display:block}
+.job-card-quality{display:none;font-size:11px;color:#8a5a00;background:rgba(255,149,0,.10);border:1px solid rgba(255,149,0,.26);border-radius:var(--r-sm);padding:6px 8px;margin-top:6px}
+.job-card-quality.show{display:block}
+.job-card-done .milestones{display:none}
+.job-card-done .job-card-stop{display:none}
 .job-card-done .job-card-close{display:none}
 .job-card-done.job-card-restored .job-card-close{display:flex}
+.job-card-error-terminal .job-card-stop{display:none}
+.job-card-interrupted .job-card-stop{display:none}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
 </style>
@@ -404,7 +454,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
     <div class="dz-hint">MP4 · TS · MKV · AVI · MOV · WMV · FLV · WebM · 建议不超过 5GB</div>
     <div class="dz-file" id="dzFile"></div>
   </div>
-  <input type="file" id="fileInput" accept="video/*,.ts,.TS,.mkv,.MKV,.avi,.AVI,.mov,.MOV,.wmv,.WMV,.flv,.FLV,.webm,.WEBM" class="hidden">
+  <input type="file" id="fileInput" accept="video/*,audio/*,.ts,.TS,.mkv,.MKV,.avi,.AVI,.mov,.MOV,.wmv,.WMV,.flv,.FLV,.webm,.WEBM,.mp3,.MP3,.m4a,.M4A,.wav,.WAV,.flac,.FLAC,.aac,.AAC,.ogg,.OGG,.opus,.OPUS" class="hidden">
 
   <!-- 第二幕：与拖拽区同位置的视频框（碗不动，饭进来） -->
   <div id="videoBox">
@@ -441,6 +491,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <p class="mode-hint" id="modeHint">标准：默认推荐，速度和质量平衡。精确：更慢，字幕准确率更高。</p>
   <div class="main-model-summary" id="mainModelSummary">识别模型：日常推荐 <button type="button" onclick="openSettingsDrawer('model')">更改</button></div>
   <button class="btn-primary" id="startBtn">开始生成字幕</button>
+  <div class="gate-panel" id="gatePanel" aria-live="polite"></div>
 </div>
 
 <!-- ═══════════════ Region 2a: Subtitle Settings ═══════════════ -->
@@ -462,6 +513,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
       <option value="srt">仅生成 SRT 文件</option>
     </select>
   </div>
+  <div id="audioOnlyHint" style="display:none;font-size:12px;color:var(--sub);margin-top:4px">音频文件没有画面，只会生成字幕文件</div>
   <div class="burn-warn" id="burnWarn">烧录后字幕将永久固定在视频画面上，无法更改或去除。</div>
   <div class="info-note" id="muxHint" style="display:none">封装后可在播放器中开关字幕，视频画质不变，处理速度极快。</div>
   <div class="row" style="font-size:12px;color:var(--sub);margin-top:4px">
@@ -476,12 +528,12 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="card-label">字幕样式</div>
   <div class="row">
     <label class="style-field"><span>字体</span><select id="styleFont"><option>PingFang SC</option><option>Noto Sans CJK SC</option><option>Heiti SC</option><option>Songti SC</option><option>Kaiti SC</option></select></label>
-    <label class="style-field"><span>字号</span><select id="styleSize"><option value="34">34px</option><option value="38">38px</option><option value="42" selected>42px</option><option value="46">46px</option><option value="50">50px</option><option value="56">56px</option></select></label>
+    <label class="style-field"><span>字号</span><select id="styleSize"><option value="34">34px</option><option value="38">38px</option><option value="42">42px</option><option value="46">46px</option><option value="50">50px</option><option value="56">56px</option><option value="72" selected>72px</option></select></label>
     <label class="style-field"><span>颜色</span><select id="styleColor"><option value="white" selected>白色</option><option value="yellow">黄色</option><option value="green">绿色</option><option value="cyan">青色</option></select></label>
     <label class="style-field"><span>描边</span><select id="styleOutline"><option value="black" selected>黑色描边</option><option value="white">白色描边</option><option value="none">无描边</option></select></label>
     <label class="style-field"><span>粗细</span><select id="styleOutlineWidth"><option value="1">描边 1px</option><option value="2" selected>描边 2px</option><option value="3">描边 3px</option><option value="4">描边 4px</option></select></label>
   </div>
-  <div class="style-preview-box" id="stylePreview">这是一段示例字幕<br>変身！必殺技全開！</div>
+  <div class="style-preview-box" id="stylePreview" title="点击放大"><div class="style-preview-sub">这是一段示例字幕<br>変身！必殺技全開！</div><span class="style-preview-hint">点击放大</span></div>
   <div class="style-actions">
     <button class="style-confirm-btn" id="styleConfirmBtn">确认样式</button>
   </div>
@@ -543,7 +595,9 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
               <svg id="eyeOnIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
-          <div class="api-field-help">1. 先粘贴 API Key；2. 选择平台和模型后添加</div>
+          <div class="key-gate" id="keyGate"><span class="d1-mk" id="keyGateMk"></span><span id="keyGateLab"></span></div>
+          <div class="key-gate-why" id="keyGateWhy"></div>
+          <div class="api-field-help">1. 先粘贴 API Key；2. 选择平台和模型后添加<br>使用前请确认账户余额充足</div>
         </div>
       </div>
       <div class="api-line">
@@ -583,11 +637,10 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 </div>
 
 <!-- 字幕标记说明 -->
-<div class="info-note" id="subtitleMarkerNote">字幕中 <b>- </b> 前缀表示系统检测到说话人切换。句尾 <b>[?]</b> 标记表示翻译准确性存疑：画面中确实有人说话 → 字幕大概率正确；若无人说话 → 可能误判。</div>
+<div class="info-note" id="subtitleMarkerNote">字幕中 <b>- </b> 前缀表示系统检测到说话人切换。字幕质量情况（存疑句数、显示偏短的条数等）不再写进字幕正文，处理完成后显示在任务卡上。</div>
 
 <!-- 语音识别模块底部：实验性说话人检测 -->
 <div class="card settings-panel" id="voiceSpeakerPanel">
-  <div class="card-label">说话人检测</div>
   <div class="row">
     <span style="font-size:13px;min-width:70px">说话人检测</span>
     <div class="toggle" id="speakerToggle">
@@ -601,15 +654,14 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 <div id="jobCards"></div>
 
 <div class="qm-warn" id="qmWarn"></div>
+<!-- E2：转录欠账说明。与 qmWarn 分开，两者可能同时出现。 -->
+<div class="qm-warn" id="shortfallWarn"></div>
 
 <div class="progress-section" id="progressSection" style="display:none">
   <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   <div class="progress-step" id="progressStep">准备中…</div>
 </div>
-<div class="result-section" id="resultSection" style="display:none">
-  <a href="#" id="dlVideo">下载字幕视频</a>
-  <a href="#" id="dlSrt">下载 SRT 字幕</a>
-</div>
+<div class="result-section" id="resultSection" style="display:none"></div>
 <div class="failed-detail" id="failedDetail" style="display:none"></div>
 
 <div class="error-overlay" id="errorOverlay">
@@ -618,29 +670,27 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 
 <div class="info-modal-overlay" id="infoModalOverlay">
   <div class="info-modal">
+    <button type="button" aria-label="稍后再说" onclick="closeInfoModal()" style="float:right;border:0;background:transparent;color:var(--sub);font-size:18px;cursor:pointer">×</button>
     <h3 id="infoModalTitle">提示</h3>
     <p id="infoModalBody"></p>
     <div class="info-modal-actions" id="infoModalActions"></div>
   </div>
 </div>
 
-<!-- LLM Fallback Modal -->
-<div class="dev-login-overlay" id="llmFallbackOverlay">
-  <div class="dev-login-box">
-    <h3 style="margin:0 0 8px">智能翻译失败</h3>
-    <p style="font-size:13px;color:var(--sub);margin:0 0 16px" id="llmFallbackMsg">翻译全部失败，是否改用 Google/Bing/有道免费翻译继续？</p>
-    <div style="display:flex;gap:8px">
-      <button onclick="llmFallbackDecide('use_free')" style="flex:1;padding:8px;background:var(--blue);color:#fff;border:none;border-radius:var(--r-sm);font-size:14px;cursor:pointer">降级为免费翻译</button>
-      <button onclick="llmFallbackDecide('keep_failed')" style="flex:1;padding:8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:var(--r-sm);font-size:14px;cursor:pointer">保留失败结果</button>
-    </div>
+<!-- 样式预览放大层（P473）：只借用弹窗的遮罩样式，不共用 infoModalOverlay（那个给失败提示用，关掉时会弹出下一条） -->
+<div class="info-modal-overlay" id="previewZoomOverlay">
+  <div class="preview-zoom">
+    <button type="button" class="preview-zoom-close" aria-label="关闭放大预览">×</button>
+    <div id="previewZoomMount"></div>
+    <p class="preview-zoom-note">按成片比例显示：字号、边距、描边和烧进视频的一样，只是整个画面缩小了。</p>
   </div>
 </div>
-
 
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
+const DEFAULT_MODEL='large-v2';
 
 // ============ State ============
 const State={
@@ -650,12 +700,12 @@ const State={
   doneJobConfig:null,
   availableBackends:{free:[],llm:[]},
   settings:{
-    subtitles:"no",outputMode:"burn",model:"large-v2",
+    subtitles:"no",outputMode:"burn",model:DEFAULT_MODEL,
     translationMode:"speed",translationPriority:["google","bing","youdao"],
     contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
     speakerDetect:false,
     transcriptionTier:"standard",
-    style:{font:"PingFang SC",size:42,color:"white",outlineColor:"black",bgColor:"transparent"}
+    style:{font:"PingFang SC",size:72,color:"white",outlineColor:"black",bgColor:"transparent"}
   }
 };
 const MODELS=["large-v3-turbo","large-v2","large-v3"];
@@ -687,7 +737,7 @@ function renderBackendUnreachable(){
 }
 // B4: 每个组件只有一个名字，就绪态和缺失态用同一个名字。文案写成字面量，回归测试直接锁。
 const _COMP_COPY={
-  whisper:{ok:'语音识别已就绪',no_pkg:'语音识别组件未安装',no_model:'语音识别模型未下载',bad:'语音识别不可用'},
+  whisper:{ok:'语音识别已就绪',no_pkg:'语音识别组件未安装',no_model:'语音识别模型未下载',runtime:'语音识别运行环境不可用',bad:'语音识别不可用'},
   qwen_asr:{ok:'识别增强已就绪',no_pkg:'识别增强组件未安装',no_model:'识别增强模型未下载',bad:'识别增强不可用'},
   qwen_aligner:{ok:'时间轴对齐已就绪',no_pkg:'时间轴对齐组件未安装',no_model:'时间轴对齐模型未下载',bad:'时间轴对齐不可用'},
   sensevoice:{ok:'声音分类已就绪',no_pkg:'声音分类组件未安装',no_model:'声音分类模型未下载',bad:'声音分类不可用'},
@@ -695,19 +745,20 @@ const _COMP_COPY={
 function _envComponents(d){
   const ff=d.ffmpeg||{},wh=d.whisper||{},sv=d.sensevoice||{},qa=d.qwen_asr||{},fa=d.qwen_aligner||{};
   const split=(o,copy)=>{
-    if(o.installed_pkg===false)return{dot:'err',text:copy.no_pkg,repairable:false};
-    if(o.model_ready===false)return{dot:'err',text:copy.no_model,repairable:true};
-    if(o.ready===false)return{dot:'err',text:copy.bad,repairable:false};
-    return{dot:'ok',text:copy.ok,repairable:false};
+    if(o.installed_pkg===false)return{dot:'err',text:copy.no_pkg,repairable:false,preparable:true};
+    if(o.model_ready===false)return{dot:'err',text:copy.no_model,repairable:true,preparable:true};
+    if(o.runtime_ready===false)return{dot:'err',text:copy.runtime||copy.bad,detail:o.runtime_error||'',repairable:false,preparable:false};
+    if(o.ready===false)return{dot:'err',text:copy.bad,repairable:false,preparable:true};
+    return{dot:'ok',text:copy.ok,repairable:false,preparable:false};
   };
   const asr=split(qa,_COMP_COPY.qwen_asr);
   const align=split(fa,_COMP_COPY.qwen_aligner);
   const enhanceOk=asr.dot==='ok'&&align.dot==='ok';
   return [
     {key:'voice',name:'语音识别',...split(wh,_COMP_COPY.whisper)},
-    {key:'enhance',name:'识别增强',dot:enhanceOk?'ok':'err',text:enhanceOk?'识别增强已就绪':[asr.text,align.text].filter(Boolean).join('；'),repairable:asr.repairable||align.repairable},
+    {key:'enhance',name:'识别增强',dot:enhanceOk?'ok':'err',text:enhanceOk?'识别增强已就绪':[asr.text,align.text].filter(Boolean).join('；'),repairable:asr.repairable||align.repairable,preparable:asr.preparable||align.preparable},
     {key:'sound',name:'声音分类',...split(sv,_COMP_COPY.sensevoice)},
-    {key:'video',name:'视频处理',dot:ff.installed?'ok':'err',text:ff.installed?'视频处理已就绪':'视频处理组件（FFmpeg）未安装',repairable:false}
+    {key:'video',name:'视频处理',dot:ff.installed?'ok':'err',text:ff.installed?'视频处理已就绪':'视频处理组件（FFmpeg）未安装',repairable:false,preparable:false}
   ];
 }
 function renderEnvStatusLine(items){
@@ -722,14 +773,14 @@ function renderEnv(d){
   const blocking=items.filter(it=>it.dot==='err');
   const allReady=blocking.length===0;
   renderEnvStatusLine(items);
-  $('envPill').classList.toggle('show',allReady);
+  $('envPill').classList.add('show');
   if(!_prepareBannerActive){
     const b=$('envBanner');
     if(allReady){
       b.classList.remove('show')
     }else{
-      const missNames=blocking.map(it=>it.name).join('、');
-      const canPrepare=ff.installed!==false;
+      const missNames=blocking.map(it=>it.text||it.name).join('、');
+      const canPrepare=ff.installed!==false&&blocking.some(it=>it.preparable===true);
       const repairable=blocking.some(it=>it.repairable===true);
       b.className='env-banner show warn';
       b.innerHTML='<div class="env-banner-row"><span class="grow"><strong>运行环境未准备好</strong>：'+missNames+'</span>'+
@@ -767,9 +818,9 @@ reloadEnv();
 function updateBackendLists(data){
   State.availableBackends=data;
   const newPriority=data.free.map(b=>b.id);
-  const existing=new Set(State.settings.translationPriority);
-  const merged=newPriority.filter(b=>existing.has(b));
-  newPriority.forEach(b=>{if(!existing.has(b))merged.push(b)});
+  const available=new Set(newPriority);
+  const merged=(State.settings.translationPriority||[]).filter(b=>available.has(b));
+  newPriority.forEach(b=>{if(!merged.includes(b))merged.push(b)});
   State.settings.translationPriority=merged.length?merged:newPriority;
   buildPriorityList();
   const sel=$('apiPlatform');sel.innerHTML='';
@@ -821,12 +872,18 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('active');
 fi.addEventListener('change',()=>{const f=fi.files[0];if(f)selectFile(f)});
 lpi.addEventListener('input',()=>{
   const p=lpi.value.trim();
-  if(p){State.localPath=p;State.videoFile=null;State.sourceUrl=null;uri.value='';State.forceRerun=false;State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
+  // P462：这个入口**绕过 selectFile**，所以校验必须在这里再做一次。
+  // 三个文件入口共用 selectFile，唯独本地路径是自己一条路。
+  if(p&&['video','audio'].indexOf(fileKind(p))<0){
+    State.localPath=null;sbtn.disabled=true;refreshStartBtn();
+    rejectInput(p.split(/[\\/]/).pop(),fileKind(p));return
+  }
+  if(p){State.localPath=p;State.videoFile=null;State.sourceUrl=null;uri.value='';State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
   else{State.localPath=null;refreshStartBtn()}
 });
 uri.addEventListener('input',()=>{
   const u=uri.value.trim();
-  if(u){State.sourceUrl=u;State.videoFile=null;State.localPath=null;lpi.value='';State.forceRerun=false;State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
+  if(u){State.sourceUrl=u;State.videoFile=null;State.localPath=null;lpi.value='';State.doneJobConfig=null;df.style.display='none';sbtn.disabled=false;refreshStartBtn()}
   else{State.sourceUrl=null;refreshStartBtn()}
 });
 // 链接是边输入边生效的，输入完（回车/失焦）才切到第二幕，避免打字时输入框消失
@@ -838,16 +895,52 @@ uri.addEventListener('change',()=>{
     setScene('selected');
   }
 });
+// P462：支持的输入格式。**只有一份清单**——accept 属性和这里都从它来，
+// 两份会漂移（加格式时必然漏改一处）。
+const VIDEO_EXTS=['mp4','ts','mkv','avi','mov','wmv','flv','webm','m4v','mpg','mpeg'];
+const AUDIO_EXTS=['mp3','m4a','wav','aac','flac','ogg','opus','wma','aiff'];
+const SUBTITLE_EXTS=['srt','ass','ssa','vtt'];
+function fileKind(name){
+  // **按扩展名判断，MIME 只做辅助**：.mkv / .ts 的 MIME 常常是空字符串，
+  // 只信 MIME 会把合法媒体拒之门外。
+  const ext=(String(name||'').split('.').pop()||'').toLowerCase();
+  if(VIDEO_EXTS.includes(ext))return 'video';
+  if(AUDIO_EXTS.includes(ext))return 'audio';
+  if(SUBTITLE_EXTS.includes(ext))return 'subtitle';
+  return 'unsupported';
+}
+function rejectInput(name,kind){
+  // 在花掉几十分钟算力**之前**就说清楚。
+  // 原来的行为是一路跑完转录和翻译，最后死在封装那步，
+  // 只留一句「我们没能识别出具体原因」。
+  if(kind==='subtitle'){
+    showToast('当前版本暂不支持字幕文件输入：'+name);
+  }else{
+    showToast('不支持这个格式：'+name+'。只支持视频、音频文件。');
+  }
+}
 function selectFile(f){
-  State.videoFile=f;State.localPath=null;lpi.value='';State.sourceUrl=null;uri.value='';State.forceRerun=false;State.doneJobConfig=null;
+  const kind=fileKind(f.name);
+  if(kind!=='video'&&kind!=='audio'){rejectInput(f.name,kind);return}
+  State.videoFile=f;State.localPath=null;lpi.value='';State.sourceUrl=null;uri.value='';State.doneJobConfig=null;
   df.style.display='block';df.textContent=f.name+' ('+(f.size/1024/1024).toFixed(0)+'MB)';
-  showVideoBox(f.name,(f.size/1024/1024).toFixed(0)+'MB 视频文件');
+  // 文案跟着实际类型走。写死「视频文件」时，拖 mp3 会显示「45MB 视频文件」。
+  showVideoBox(f.name,(f.size/1024/1024).toFixed(0)+'MB '+(kind==='audio'?'音频文件':'视频文件'));
   setScene('selected');
   refreshStartBtn()
 }
+function normalizeJobOutputMode(config){
+  const c=config||{};
+  if(c.outputMode!==undefined&&c.outputMode!==null)return c.outputMode;
+  return (c.burn===undefined||Boolean(c.burn))?'burn':'srt';
+}
+function jobOutputNeedsVideo(config){
+  const mode=normalizeJobOutputMode(config);
+  return mode==='burn'||mode==='mux';
+}
 // 第二幕：换一个 → 回第一幕；拖新视频到视频框直接替换
 $('videoChangeBtn').addEventListener('click',()=>{
-  State.videoFile=null;State.sourceUrl=null;State.localPath=null;State.doneJobConfig=null;State.forceRerun=false;
+  State.videoFile=null;State.sourceUrl=null;State.localPath=null;State.doneJobConfig=null;
   uri.value='';lpi.value='';df.style.display='none';showVideoBox('','');
   setScene('first');refreshStartBtn();
 });
@@ -857,8 +950,8 @@ _vb.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[
 function _settingsMatchDone(){
   const c=State.doneJobConfig;if(!c)return false;const s=State.settings;
   if(String(s.subtitles)!==String(c.subtitles??'no'))return false;
-  if(String(s.outputMode??'burn')!==String(c.outputMode??(c.burn?'burn':'srt')))return false;
-  if(String(s.model)!==String(c.model??'large-v2'))return false;
+  if(String(normalizeJobOutputMode(s))!==String(normalizeJobOutputMode(c)))return false;
+  if(String(s.model)!==String(c.model??DEFAULT_MODEL))return false;
   if(String(s.translationMode)!==String(c.translationMode??'speed'))return false;
   if(String(s.contextAware)!==String(c.contextAware??false))return false;
   if(JSON.stringify(s.apiKeys||[])!==JSON.stringify(c.apiKeys||[]))return false;
@@ -867,18 +960,50 @@ function _settingsMatchDone(){
   if(String(s.savePath||'')!==String(c.savePath||''))return false;
   return true;
 }
+// 当前选中的输入是不是「只有声音」的文件。
+// **从文件名算，不存新状态**：加一个 State.inputKind 就要在 selectFile / lpi /
+// uri / 清空 / 重置五个地方同步，其中一处忘了改就是下一个 bug——
+// 这个项目反复栽在「同一件事存两份」这个形状上。
+// URL 下载前不知道里面是什么，**不许猜**：保持用户选择，后端拿到真文件再收敛。
+function inputIsAudioOnly(){
+  const name=State.videoFile?State.videoFile.name:(State.localPath||'');
+  return name?fileKind(name)==='audio':false;
+}
+// 界面**只承诺做得到的事**。拖 mp3 时后端必然降级成只出字幕（P462），
+// 界面若还写着「开始翻译并烧录」，就是当着用户的面说一句做不到的话。
+// 注意只改**显示**，不动 State.settings.outputMode——那是用户的设置，
+// 换回视频文件时要原样恢复。
+function effectiveOutputMode(){
+  return inputIsAudioOnly()?'srt':State.settings.outputMode;
+}
+// 输出方式相关的界面显隐**全部在这里**，别处只准调用它。
+// 外审第五轮②：这段显隐原本散在三处（下拉框 change、加载配置、这里），
+// 改按钮文案时只改到其中一处，于是拖 mp3 时按钮写着「生成字幕」，
+// 底下还挂着「烧录后字幕将永久固定在视频画面上」——自相矛盾。
+// **同一件事三份，改一处漏两处**（CLAUDE.md 第四问的第一种形状）。
+function syncOutputModeUI(){
+  const sel=$('outputModeSelect');if(!sel)return;
+  const audioOnly=inputIsAudioOnly();
+  const mode=effectiveOutputMode();
+  sel.value=mode;
+  sel.disabled=audioOnly;
+  const hint=$('audioOnlyHint');
+  if(hint)hint.style.display=audioOnly?'block':'none';
+  const burnWarn=$('burnWarn');
+  if(burnWarn)burnWarn.style.display=mode==='burn'?'block':'none';
+  const muxHint=$('muxHint');
+  if(muxHint)muxHint.style.display=mode==='mux'?'block':'none';
+  const styleSec=$('styleSubSection');
+  if(styleSec)styleSec.style.display=mode==='burn'?'block':'none';
+}
 function refreshStartBtn(){
   sbtn.disabled=false;
   syncMainModelSummary();
+  syncOutputModeUI();
   if(!State.videoFile&&!State.localPath&&!State.sourceUrl){sbtn.textContent='开始生成字幕';return}
-  if(State.doneJobConfig){
-    if(_settingsMatchDone()){sbtn.disabled=false;sbtn.textContent='重新处理';State.forceRerun=true}
-    else{sbtn.disabled=false;sbtn.textContent='用新设置重跑';State.forceRerun=true}
-    return;
-  }
   sbtn.disabled=false;
   const _modeLabels={burn:'开始翻译并烧录',mux:'开始翻译并封装字幕',srt:'开始生成字幕'};
-  sbtn.textContent=_modeLabels[State.settings.outputMode]||'开始生成字幕'
+  sbtn.textContent=_modeLabels[effectiveOutputMode()]||'开始生成字幕'
 }
 
 // ============ Save Path ============
@@ -895,8 +1020,8 @@ $('savePathBtn').addEventListener('click',()=>{
 function updateSavePathDisplay(){$('savePathDisplay').textContent=State.settings.savePath||'~/Downloads/Video-Subber'}
 
 // ============ Subtitle ============
-$('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.subtitles=e.target.dataset.v;refreshStartBtn()});
-$('outputModeSelect').addEventListener('change',()=>{State.settings.outputMode=$('outputModeSelect').value;const _burn=State.settings.outputMode==='burn';$('burnWarn').style.display=_burn?'block':'none';$('muxHint').style.display=State.settings.outputMode==='mux'?'block':'none';$('styleSubSection').style.display=_burn?'block':'none';refreshStartBtn()});
+$('subToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.subtitles=e.target.dataset.v;refreshStartBtn();updatePreview()});
+$('outputModeSelect').addEventListener('change',()=>{State.settings.outputMode=$('outputModeSelect').value;refreshStartBtn()});
 
 // ============ Model Slider ============
 let modelDownloads={}; // model_id → {downloading, progress}
@@ -930,6 +1055,7 @@ function formatModelStatusText(md){
   return '可使用，但来自共享缓存，不能在这里删除';
 }
 function buildModelSlider(){
+  if(!MODELS.includes(State.settings.model))State.settings.model=DEFAULT_MODEL;
   const dots=$('modelDots');dots.innerHTML='';
   const hint=$('modelHintText');
   const hasMissing=MODELS.some(m=>!modelDownloads[m]||(!modelDownloads[m].downloaded&&!modelDownloads[m].downloading));
@@ -1057,7 +1183,7 @@ async function deleteModel(modelId){
       else showToast(data.error||'删除模型失败');
       return
     }
-    const fallback=MODELS.find(m=>m!==modelId&&modelDownloads[m]&&modelDownloads[m].downloaded)||'large-v2';
+    const fallback=MODELS.find(m=>m!==modelId&&modelDownloads[m]&&modelDownloads[m].downloaded)||DEFAULT_MODEL;
     State.settings.model=fallback;
     showToast(data.deleted?'模型已删除':'模型文件不存在');
     fetchModelStatus();refreshStartBtn();
@@ -1251,6 +1377,186 @@ function _pickBestModel(models){
   return best;
 }
 
+// ── D-1 C6 / A8：拉模型失败要说原因，提示不许卡在「正在识别…」 ──
+let _modelReqSeq=0;
+function modelFetchHint(platform,error){
+  if(platform==='custom')return '没查到，请手动输入模型名';
+  if(/\b(401|403)\b/.test(String(error||'')))return 'Key 不对或已过期';
+  return '没查到可用模型：请检查 Key，或手动填写模型名';
+}
+function _clearLoadingHint(reqId){
+  // 回复已过期：只有这是最新一次请求时，才收起它留下的「正在识别…」——更新的请求自己会写提示。
+  if(reqId!==_modelReqSeq)return;
+  const hint=$('modelHint');
+  if(hint&&/^正在/.test(hint.textContent))hint.style.display='none';
+}
+
+// ── D-1 C1 / C2：门口测试（设置里填 Key / 换平台 / 换模型时自动测；点「开始」时先测再锁设置） ──
+const GATE_G='#1D9E75',GATE_A='#BA7517';
+function gateReasonText(kind){
+  return ({connection:'连不上，可能没开代理',timeout:'连不上，可能没开代理',auth:'Key 不对或已过期',
+    insufficient_balance:'余额不足，请先充值',rate_limit:'平台太忙，请稍后重新检测',
+    service_error:'平台服务器出错，请稍后重新检测',request_rejected:'平台拒绝了请求，请检查模型名',
+    no_key:'请先填写 API Key',unknown:'检测失败，详细原因已写入日志'})[kind]||'检测失败，请稍后重新检测';
+}
+function gateMark(el,state){
+  if(!el)return;
+  const tok=(el._gateTok||0)+1;el._gateTok=tok;
+  el.className='d1-mk';
+  if(state==='spin'){
+    el.innerHTML='<svg viewBox="0 0 30 30" class="d1-spin"><circle cx="15" cy="15" r="11" fill="none" stroke="'+GATE_G+'" stroke-width="2.5" stroke-dasharray="52 70" stroke-linecap="round"/></svg>';
+    return;
+  }
+  if(state==='ok'){
+    el.innerHTML='<svg viewBox="0 0 30 30"><circle cx="15" cy="15" r="11" fill="none" stroke="'+GATE_G+'" stroke-width="2.5"/><path class="d1-draw" d="M9 14.5l3.5 3.5 6.5-7" fill="none" stroke="'+GATE_G+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    void el.offsetWidth;el.className='d1-mk d1-pop';
+    return;
+  }
+  if(state==='fail'){
+    el.innerHTML='<svg viewBox="0 0 30 30"><circle cx="15" cy="15" r="11" fill="none" stroke="'+GATE_A+'" stroke-width="2.5"/></svg>';
+    void el.offsetWidth;el.className='d1-mk d1-shake';
+    setTimeout(()=>{
+      const svg=el.querySelector('svg');
+      if(el._gateTok===tok&&svg)svg.insertAdjacentHTML('beforeend','<g class="d1-bang"><path d="M15 9V15.5" fill="none" stroke="'+GATE_A+'" stroke-width="2.5" stroke-linecap="round"/><circle cx="15" cy="20.4" r="1.55" fill="'+GATE_A+'"/></g>');
+    },430);
+    return;
+  }
+  el.innerHTML='';
+}
+async function testKeys(apiKeys){
+  try{
+    const r=await fetch('/api/llm-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKeys})});
+    if(!r.ok)return {ok:false,translate_only:false,kind:'unknown'};
+    return await r.json();
+  }catch(e){return {ok:false,translate_only:false,kind:'unknown'}}
+}
+async function testGate(){
+  // P512：门口检测不带 Key——后台读本机设置文件，和紧接着的运行用同一份。
+  try{
+    const r=await fetch('/api/llm-gate',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    if(!r.ok)return {ok:false,translate_only:false,kind:'unknown'};
+    return await r.json();
+  }catch(e){return {ok:false,translate_only:false,kind:'unknown'}}
+}
+function _gateMinShown(started){
+  // 至少显示 0.6 秒，免得一闪而过看不清。
+  const left=600-(Date.now()-started);
+  return left>0?new Promise(r=>setTimeout(r,left)):Promise.resolve();
+}
+let _keyGateTok=0,_keyGateTimer=null;
+function keyGateEntry(){
+  const platform=$('apiPlatform').value,key=$('apiKeyInput').value.trim();
+  if(!platform||!key)return null;
+  const entry={platform,key};
+  const model=_readModelFromForm();if(model)entry.model=model;
+  if(platform==='custom')entry.api_endpoint=$('apiEndpoint').value.trim();
+  return entry;
+}
+function clearKeyGate(){
+  _keyGateTok++;clearTimeout(_keyGateTimer);
+  gateMark($('keyGateMk'),'');
+  if($('keyGateLab'))$('keyGateLab').textContent='';
+  if($('keyGateWhy'))$('keyGateWhy').textContent='';
+}
+function scheduleKeyGate(){clearTimeout(_keyGateTimer);_keyGateTimer=setTimeout(runKeyGate,600)}
+async function runKeyGate(){
+  const mk=$('keyGateMk'),lab=$('keyGateLab'),why=$('keyGateWhy');
+  if(!mk)return;
+  const tok=++_keyGateTok,entry=keyGateEntry();
+  lab.textContent='';why.textContent='';
+  if(!entry){gateMark(mk,'');return}
+  gateMark(mk,'spin');
+  setTimeout(()=>{if(tok===_keyGateTok&&mk.querySelector('.d1-spin')){lab.className='';lab.style.color='var(--sub)';lab.textContent='正在检测…'}},400);
+  const started=Date.now();
+  const res=await testKeys([entry]);
+  await _gateMinShown(started);
+  if(tok!==_keyGateTok)return;
+  lab.textContent='';
+  if(res.ok){
+    gateMark(mk,'ok');
+    setTimeout(()=>{
+      if(tok!==_keyGateTok)return;
+      lab.style.color=GATE_G;lab.className='d1-fade';lab.textContent='可以使用';
+      setTimeout(()=>{if(tok===_keyGateTok)lab.textContent=''},2000);
+    },350);
+    return;
+  }
+  gateMark(mk,'fail');
+  setTimeout(()=>{
+    if(tok!==_keyGateTok)return;
+    why.className='key-gate-why d1-fade';why.textContent='';
+    const reason=document.createElement('span');reason.style.color=GATE_A;
+    reason.textContent=res.translate_only?'这个平台目前只能用于翻译，AI 断句和润色暂不支持':gateReasonText(res.kind);
+    why.appendChild(reason);
+    if(!res.translate_only){
+      why.appendChild(document.createTextNode(' · '));
+      if(res.kind==='auth'){
+        why.appendChild(document.createTextNode('重新粘贴一次'));
+        try{$('apiKeyInput').select()}catch(e){}
+      }else{
+        const again=document.createElement('span');again.style.color='var(--blue)';again.style.cursor='pointer';
+        again.textContent='重新检测';again.onclick=runKeyGate;why.appendChild(again);
+      }
+    }
+  },430);
+}
+function closeGatePanel(panel){panel=panel||$('gatePanel');if(panel){panel.classList.remove('open');panel.textContent=''}}
+function openGatePanel(message,actions,panel){
+  panel=panel||$('gatePanel');if(!panel)return;
+  panel.textContent='';
+  const text=document.createElement('div');text.textContent=message;panel.appendChild(text);
+  const row=document.createElement('div');row.className='gate-actions';
+  for(const action of actions){
+    const button=document.createElement('button');button.type='button';button.textContent=action.text;
+    if(action.primary)button.className='primary';
+    button.onclick=action.onclick;row.appendChild(button);
+  }
+  panel.appendChild(row);
+  void panel.offsetWidth;panel.classList.add('open');
+}
+function askTranslateOnly(platform,panel){
+  return new Promise(resolve=>{
+    openGatePanel(`${platform||'这个平台'} 目前只能用于翻译，AI 断句和润色暂不支持`,[
+      {text:'继续（只用 AI 翻译）',primary:true,onclick:()=>{closeGatePanel(panel);resolve({aiTranslateOnly:true})}},
+      {text:'换平台',onclick:()=>{closeGatePanel(panel);openSettingsDrawer('api');resolve(null)}},
+    ],panel);
+  });
+}
+function gatePanelFor(btn){
+  // 处理中 / 已完成画面里「开始」下面的面板是隐藏的：卡片按钮的提示放进按钮所在的卡片区域。
+  if(!btn||btn===sbtn||!btn.parentNode)return $('gatePanel');
+  const holder=btn.parentNode;
+  let panel=(holder.children?Array.from(holder.children):[]).find(c=>c.className==='gate-panel');
+  if(!panel){panel=document.createElement('div');panel.className='gate-panel';holder.appendChild(panel)}
+  return panel;
+}
+async function startGate(button){
+  // 返回本次任务要额外带上的设置（{} 或 {aiTranslateOnly:true}）；null = 不开始、不锁设置。
+  // 转圈的是被点的那个按钮（开始 / 卡片上的继续、重试）。P512：Key 由后台从设置文件读。
+  const btn=button||sbtn;
+  const panel=gatePanelFor(btn);
+  closeGatePanel(panel);
+  const label=btn.textContent;
+  btn.style.width=btn.offsetWidth+'px';btn.disabled=true;
+  btn.innerHTML='<span class="d1-mk" id="startGateMk"></span> 正在检测连接';
+  gateMark($('startGateMk'),'spin');
+  const started=Date.now();
+  const res=await testGate();
+  await _gateMinShown(started);
+  if(res.ok||res.kind==='no_key'){
+    // 设置里没填 Key：照旧放行（免费翻译兜底仍在，方案 §5）
+    if(res.ok)gateMark($('startGateMk'),'ok');
+    await new Promise(r=>setTimeout(r,300));
+    btn.style.width='';btn.textContent=label;
+    return {};
+  }
+  btn.style.width='';btn.textContent=label;btn.disabled=false;if(btn===sbtn)refreshStartBtn();
+  if(res.translate_only)return await askTranslateOnly(res.platform,panel);
+  btn.classList.remove('d1-shake');void btn.offsetWidth;btn.classList.add('d1-shake');
+  openGatePanel(gateReasonText(res.kind),[{text:'去设置',onclick:()=>{closeGatePanel(panel);if($('infoModalOverlay').classList.contains('active'))closeInfoModal();openSettingsDrawer('api')}}],panel);
+  return null;
+}
+
 async function fetchAndFillModels(){
   const platform=$('apiPlatform').value;
   const key=$('apiKeyInput').value.trim();
@@ -1267,37 +1573,40 @@ async function fetchAndFillModels(){
   const _isStale=()=>$('apiPlatform').value!==platform||$('apiKeyInput').value.trim()!==key||(platform==='custom'&&$('apiEndpoint').value.trim()!==endpoint);
   if(hint && _editingKeyIdx<0){hint.style.display='';hint.textContent='正在识别可用模型…'}
   if(hint && _editingKeyIdx>=0){hint.style.display='';hint.textContent='正在刷新模型列表…'}
+  const reqId=++_modelReqSeq;
   try{
     const body={platform,key};
     if(platform==='custom')body.endpoint=endpoint;
     const r=await fetch('/api/llm-models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
-    if(_isStale())return;
+    if(_isStale()){_clearLoadingHint(reqId);return}
     if(d&&d.models&&d.models.length){
       if(platform==='custom')State._llmModelSigs[platform]={key,endpoint};
       State._llmModels[platform]=d.models;
       onPlatformChange();
       _restoreEditModel();
-      if(hint){hint.style.display='';hint.textContent='已识别 '+d.models.length+' 个可用模型'}
+      if(hint){hint.style.display='';hint.style.color='';hint.textContent='已识别 '+d.models.length+' 个可用模型'}
     }else{
       // 后端默认给 custom 一个 custom-default，这里查不到就得清掉旧注册，
       // 否则 onPlatformChange 仍以为有列表、apiModelNameField 不显示，保存会误存 custom-default。
       if(platform==='custom')_clearCustomModelRegistry();
       onPlatformChange();_restoreEditModel();
-      if(platform==='custom' && hint){hint.style.display='';hint.textContent='没查到，请手动输入模型名';hint.style.color='var(--warn,#b8860b)'}
-      else if(hint)hint.style.display='none';
+      if(hint){hint.style.display='';hint.textContent=modelFetchHint(platform,d&&d.error);hint.style.color='var(--warn,#b8860b)'}
     }
   }catch(e){
-    if(_isStale())return;
+    if(_isStale()){_clearLoadingHint(reqId);return}
     if(platform==='custom')_clearCustomModelRegistry();
     onPlatformChange();_restoreEditModel();
-    if(platform==='custom' && hint){hint.style.display='';hint.textContent='没查到，请手动输入模型名';hint.style.color='var(--warn,#b8860b)'}
-    else if(hint)hint.style.display='none';
+    if(hint){hint.style.display='';hint.textContent=modelFetchHint(platform,'');hint.style.color='var(--warn,#b8860b)'}
   }
 }
 $('apiPlatform').addEventListener('change',()=>{onPlatformChange();onModelChange();fetchAndFillModels()});
 $('apiModel').addEventListener('change',onModelChange);
 $('apiKeyInput').addEventListener('blur',fetchAndFillModels);
+// D-1 C1：填 Key / 换平台 / 换模型 → 停止输入约 0.6 秒后自动测；打开软件时不测。
+['apiKeyInput','apiPlatform','apiModel','apiCustomModel','apiModelName','apiEndpoint'].forEach(id=>{
+  const el=$(id);if(el){el.addEventListener('input',scheduleKeyGate);el.addEventListener('change',scheduleKeyGate)}
+});
 $('apiEndpoint').addEventListener('blur',fetchAndFillModels);
 
 $('apiAddBtn').addEventListener('click',()=>{
@@ -1413,6 +1722,7 @@ function editKey(i){
 
 function cancelEdit(){
   _editingKeyIdx=-1;
+  clearKeyGate();
 
   $('apiKeyInput').value='';$('apiKeyInput').type='password';
   $('apiName').value='';
@@ -1429,20 +1739,50 @@ function cancelEdit(){
 }
 
 // ============ Style Preview ============
+// 字幕引擎的字号 × 系数 ≈ 1080p 成片里每个汉字的宽度（纯黑画面烧 12 个字实测，72 号，P473）。
+// 系数随字体不同；思源黑体本机没装，引擎退回苹方，这里按苹方近似。字体下拉框每一项都要有（测试锁住）。
+const SUB_FONT_FACTOR={"PingFang SC":0.708,"Noto Sans CJK SC":0.708,"Heiti SC":0.988,"Songti SC":0.990,"Kaiti SC":0.994};
+// 成片口径：画面宽 1920、左右边距 96、上下边距 46、阴影 2——与 subtitle_style.py 写进字幕文件的相同（测试锁住）。
+const SUB_FRAME={width:1920,marginX:96,marginV:46,shadow:2};
 function _readStyleFromDOM(){
   return {font:$('styleFont').value,size:parseInt($('styleSize').value),color:$('styleColor').value,outlineColor:$('styleOutline').value,outlineWidth:parseInt($('styleOutlineWidth').value)||2,bgColor:'transparent'};
 }
 function updatePreview(){
   const p=$('stylePreview');
   const s=_readStyleFromDOM();
-  p.style.fontFamily=s.font;p.style.fontSize=s.size+'px';
   const cmap={white:'#fff',yellow:'#ff0',green:'#0f0',cyan:'#0ff'};
+  p.style.fontFamily=s.font;
   p.style.color=cmap[s.color]||'#fff';
-  const olc=s.outlineColor==='none'?'transparent':(s.outlineColor==='white'?'#fff':'#000');
-  p.style.textShadow=olc==='transparent'?'none':`-1px -1px 0 ${olc},1px -1px 0 ${olc},-1px 1px 0 ${olc},1px 1px 0 ${olc}`;
-  $('styleConfirmed').style.display='none';
+  p.style.setProperty('--sub-unit',`calc(100cqw / ${SUB_FRAME.width})`);
+  const k=SUB_FONT_FACTOR[s.font]||SUB_FONT_FACTOR['PingFang SC'];
+  p.style.setProperty('--sub-px',String(s.size*k));
+  p.style.setProperty('--sub-line',String(1/k));   // 字幕引擎的行距等于字号本身，换算成网页行高是 1 ÷ 系数
+  p.style.setProperty('--sub-margin-x',String(SUB_FRAME.marginX));
+  p.style.setProperty('--sub-margin-v',String(SUB_FRAME.marginV));
+  p.style.setProperty('--sub-shadow',String(SUB_FRAME.shadow));
+  // 描边和成片同一规则（subtitle_style.py，P478）：白色描边画白边，无描边宽度 0，其余黑边
+  p.style.setProperty('--sub-outline-c',s.outlineColor==='white'?'#fff':'#000');
+  p.style.setProperty('--sub-outline-w',String(s.outlineColor==='none'?0:s.outlineWidth));
+  // 原视频有字幕时，成片把中文放在画面顶部
+  p.classList.toggle('top',State.settings.subtitles==='yes');
 }
-['styleFont','styleSize','styleColor','styleOutline','styleOutlineWidth'].forEach(id=>$(id).addEventListener('change',updatePreview));
+function openPreviewZoom(){
+  const frame=$('stylePreview').cloneNode(true);
+  frame.removeAttribute('id');frame.removeAttribute('title');
+  $('previewZoomMount').replaceChildren(frame);
+  $('previewZoomOverlay').classList.add('active');
+}
+function closePreviewZoom(){
+  $('previewZoomOverlay').classList.remove('active');
+  $('previewZoomMount').replaceChildren();
+}
+function bindStylePreview(){
+  ['styleFont','styleSize','styleColor','styleOutline','styleOutlineWidth'].forEach(id=>$(id).addEventListener('change',()=>{$('styleConfirmed').style.display='none';updatePreview()}));
+  $('stylePreview').addEventListener('click',openPreviewZoom);
+  $('previewZoomOverlay').addEventListener('click',e=>{if(e.target===e.currentTarget||e.target.closest('.preview-zoom-close'))closePreviewZoom()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('previewZoomOverlay').classList.contains('active'))closePreviewZoom()});
+}
+bindStylePreview();
 $('styleConfirmBtn').addEventListener('click',()=>{
   State.settings.style=_readStyleFromDOM();
   $('styleConfirmed').style.display='block';
@@ -1451,40 +1791,92 @@ $('styleConfirmBtn').addEventListener('click',()=>{
 });
 
 // ============ Config Persistence ============
-async function saveConfig(){
+let _configSavePromise=Promise.resolve(true);
+function saveConfig(){
   const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,outputMode:State.settings.outputMode,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect,transcriptionTier:State.settings.transcriptionTier};
   // localStorage: strip key values, save metadata only
   const safeCfg={...cfg,apiKeys:(cfg.apiKeys||[]).map(k=>({platform:k.platform,name:k.name,model:k.model,api_endpoint:k.api_endpoint}))};
   localStorage.setItem('video-subber-config',JSON.stringify(safeCfg));
-  for(let attempt=0;attempt<2;attempt++){try{const r=await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(r.ok)return}catch(e){if(attempt===0)await new Promise(r=>setTimeout(r,1000))}}}
+  const run=async()=>{for(let attempt=0;attempt<2;attempt++){try{const r=await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});if(r.ok)return true}catch(e){}if(attempt===0)await new Promise(resolve=>setTimeout(resolve,1000))}return false};
+  _configSavePromise=_configSavePromise.then(run,run);
+  return _configSavePromise;
+}
 function loadConfig(){
   const raw=localStorage.getItem('video-subber-config');
   if(raw){try{const c=JSON.parse(raw);if(c.burn!==undefined&&c.outputMode===undefined){c.outputMode=c.burn?'burn':'srt'}delete c.apiKeys;Object.assign(State.settings,c)}catch(e){}}
   fetch('/api/config').then(r=>r.json()).then(c=>{
     if(c&&c.translationMode)Object.assign(State.settings,c);
-    State.configReady=true;syncUI();updateSavePathDisplay();
-  }).catch(()=>{State.configReady=true;syncUI();updateSavePathDisplay()});
+    syncUI();updateSavePathDisplay();
+  }).catch(()=>{syncUI();updateSavePathDisplay()});
 }
 
 // ============ Job ============
+function mergeableJobSettings(config){const blocked=new Set(['source_url','source_dir','video_filename','video_path','force','local_path','apiKeys']);return Object.fromEntries(Object.entries(config||{}).filter(([key])=>!blocked.has(key)))}
+async function readJobResponse(response){
+  if(response.status===404)return {kind:'missing'};
+  if(!response.ok)return {kind:'temporary'};
+  try{return {kind:'ok',job:await response.json()}}catch(e){return {kind:'temporary'}}
+}
+function taskStateView(state,details={}){
+  const result=(state&&state.result)||{},quality=result.quality||{},actions=(state&&state.actions)||{},counts=(state&&state.progress)||{};
+  return {status:state&&state.status,stage:state&&state.phase,progress:state&&state.percent,
+    message:state&&state.display_message,detail:state&&state.activity,
+    output_ready:Boolean(result.output_ready),can_show_output_folder:Boolean(result.can_show_output_folder),
+    resume_action:actions.resume_action,can_resume:Boolean(actions.can_resume),can_retry:Boolean(actions.can_retry),
+    question_mark_count:quality.question_mark_count,subtitle_quality:quality.subtitle_quality,
+    translation_summary:quality.translation_summary,fa_quality:quality.fa_quality,
+    alignment_fallback:quality.alignment_fallback,sound_reference:quality.sound_reference,
+    transcription_shortfall:quality.transcription_shortfall,
+    segment_count:counts.total,success_count:counts.succeeded,failed_count:counts.failed,
+    ...(details||{})};
+}
+function applyTaskDetails(jid,state,details){
+  const job=activeJobs[jid];if(!job||!state)return;
+  if(details&&details.config)job.config={...details.config};
+  const view=taskStateView(state,details);
+  if(state.status==='partial')handlePartialState(jid,view);
+}
+function fetchTaskDetails(jid,state){
+  return fetch('/api/jobs/'+jid).then(readJobResponse).then(result=>{
+    if(result.kind!=='ok'||!result.job||!result.job.state)return;
+    const latest=result.job.state;
+    if(state&&latest.revision!==state.revision)return;
+    applyTaskDetails(jid,latest,result.job.details||{});
+  }).catch(()=>{});
+}
+function showMissingJobCard(jid,filename){
+  if(!$('card-'+jid))addJobCard(jid,filename||'恢复任务');
+  renderCardError(jid,{message:'后台已找不到该任务，请重新提交。'});
+  markRestoredCard(jid,'error');
+  const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer)}
+  delete activeJobs[jid];removeActiveJobId(jid);checkAllDone('error');
+}
 function reconnectJobs(){
   const raw=localStorage.getItem('activeJobs');
   if(!raw)return;
   let ids=[];try{ids=JSON.parse(raw)}catch(e){return}
   if(!ids.length)return;
   let firstReconnect=true;
-  ids.forEach(jid=>{
-    fetch('/api/jobs/'+jid).then(r=>{if(!r.ok)throw new Error('gone');return r.json()}).then(j=>{
-      if(firstReconnect&&j.config){const jobMeta=Object.fromEntries(Object.entries(j.config).filter(([k])=>!['source_url','source_dir','video_filename','video_path','force','local_path'].includes(k)));State.settings={...State.settings,...jobMeta};syncUI();firstReconnect=false}
-      const filename=j.video_filename||'恢复中…';
-      if(j.status==='running'||j.status==='queued'){addJobCard(jid,filename);if(!settingsLocked){lockUI();settingsLocked=true}$('fill-'+jid).style.width=(j.progress||0)+'%';$('step-'+jid).textContent=j.message||j.stage||'处理中…';showVideoBox(filename,'处理中');setScene('processing');connectCard(jid)}
-      else if(j.status==='done'){addJobCard(jid,filename);markRestoredCard(jid,'done');renderCardDone(jid,{result_video:!!(j.config&&(j.config.burn||j.config.outputMode==='burn'||j.config.outputMode==='mux')),result_srt:j.result_srt});removeActiveJobId(jid)}
-      else if(j.status==='error'){addJobCard(jid,filename);markRestoredCard(jid,'error');const step=$('step-'+jid);const err=$('err-'+jid);if(step)step.textContent='处理失败';if(err){err.textContent=formatJobErrorText(j.error||'未知错误');err.classList.add('show');renderErrorActions(err,err.textContent)}removeActiveJobId(jid)}
-      else if(j.status==='model_missing'){showRecoveryModelMissingModal(j,filename);removeActiveJobId(jid)}
-      else if(j.status==='interrupted'){if(!isOriginalModelReady(j.config||{})){showRecoveryModelMissingModal(j,filename);removeActiveJobId(jid);return}addJobCard(jid,filename);markRestoredCard(jid,'interrupted');const step=$('step-'+jid);const fill=$('fill-'+jid);if(step){step.textContent='任务中断，可重新提交恢复';step.style.color='var(--yellow)'}if(fill){fill.style.width='50%';fill.style.background='var(--yellow)'}removeActiveJobId(jid)}
+  const reconnectOne=jid=>{
+    fetch('/api/jobs/'+jid).then(readJobResponse).then(result=>{
+      // 自审④：重开软件时后台已没有这个任务（如没下载完的链接半成品，启动时已删）→ 悄悄划掉编号，不弹卡
+      if(result.kind==='missing'){removeActiveJobId(jid);return}
+      if(result.kind==='temporary'){setTimeout(()=>reconnectOne(jid),2000);return}
+      const payload=result.job,state=payload.state,details=payload.details||{},view=taskStateView(state,details);
+      if(!state){setTimeout(()=>reconnectOne(jid),2000);return}
+      if(firstReconnect&&details.config){State.settings={...State.settings,...mergeableJobSettings(details.config)};syncUI();firstReconnect=false}
+      const filename=details.video_filename||'恢复中…';
+      if(state.status==='running'||state.status==='queued'){addJobCard(jid,filename);activeJobs[jid].config={...(details.config||{})};if(!settingsLocked){lockUI();settingsLocked=true}
+        applyTaskState(jid,state);showVideoBox(filename,'处理中');setScene('processing');connectCard(jid)}
+      else if(state.status==='done'){addJobCard(jid,filename);activeJobs[jid].config={...(details.config||{})};markRestoredCard(jid,'done');renderCardDone(jid,view);showQmWarning(view,true);showTranscriptionShortfall(view,true,jid);removeActiveJobId(jid)}
+      else if(state.status==='partial'){if(isPartialIgnored(jid,view)){removeActiveJobId(jid);return}addJobCard(jid,filename);markRestoredCard(jid,'partial');handlePartialState(jid,view)}
+      else if(state.status==='error'){addJobCard(jid,filename);markRestoredCard(jid,'error');renderCardError(jid,view);showTranscriptionShortfall(view,true,jid);if(!state.actions.resume_action)removeActiveJobId(jid)}
+      else if(state.status==='model_missing'){showRecoveryModelMissingModal({config:details.config||{}},filename);removeActiveJobId(jid)}
+      else if(state.status==='interrupted'){if(!isOriginalModelReady(details.config||{})){showRecoveryModelMissingModal({config:details.config||{}},filename);removeActiveJobId(jid);return}addJobCard(jid,filename);activeJobs[jid].config={...(details.config||{})};markRestoredCard(jid,'interrupted');renderInterruptedCard(jid,(state.actions||{}).resume_action)}
       else{removeActiveJobId(jid)}
-    }).catch(()=>{removeActiveJobId(jid)});
-  });
+    }).catch(()=>{setTimeout(()=>reconnectOne(jid),2000)});
+  };
+  ids.forEach(reconnectOne);
 }
 function showToast(msg){
   const t=document.createElement('div');t.textContent=msg;
@@ -1492,20 +1884,27 @@ function showToast(msg){
   document.body.appendChild(t);setTimeout(()=>t.remove(),2000);
 }
 
+function fetchWithTimeout(url,options={},timeoutMs=6000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  return fetch(url,{...options,signal:controller.signal}).finally(()=>clearTimeout(timer));
+}
+
 function setInfoModal(title,body,actions){
   $('infoModalTitle').textContent=title;
   $('infoModalBody').textContent=body;
   const box=$('infoModalActions');box.innerHTML='';
-  actions.forEach(a=>{
-    const b=document.createElement('button');
-    b.textContent=a.label;
-    if(a.primary)b.classList.add('primary');
-    b.addEventListener('click',()=>{if(a.close!==false)closeInfoModal();if(a.onClick)a.onClick()});
-    box.appendChild(b);
-  });
+	  actions.forEach(a=>{
+	    const b=document.createElement('button');
+	    b.textContent=a.label;
+	    if(a.primary)b.classList.add('primary');
+	    if(a.danger)b.classList.add('danger');
+	    b.addEventListener('click',()=>{if(a.close!==false)closeInfoModal();if(a.onClick)a.onClick()});
+	    box.appendChild(b);
+	  });
   $('infoModalOverlay').classList.add('active');
 }
-function closeInfoModal(){$('infoModalOverlay').classList.remove('active')}
+function closeInfoModal(){$('infoModalOverlay').classList.remove('active');if(_partialPromptCurrent)_partialPromptCurrent=null;showNextPartialPrompt()}
 function showModelOccupiedModal(){
   setInfoModal('模型文件正在被占用','暂时删不了这个模型。请关闭正在处理的任务，或重启 App 后再试。',[
     {label:'知道了',primary:true}
@@ -1515,6 +1914,11 @@ function openPrepareModal(){
   setInfoModal('需要先准备运行环境','第一次使用需要下载语音识别模型、识别增强组件和声音分类模型。准备的同时，你可以先把视频拖进来。',[
     {label:'一键准备',primary:true,onClick:startPrepareNow},
     {label:'取消'}
+  ]);
+}
+function openRuntimeBlockedModal(){
+  setInfoModal('语音识别运行环境不可用','语音识别模型已经下载，但当前启动方式无法访问 Metal/运行环境，无法开始转录。请用普通桌面或 Tauri 环境重新启动后再试。',[
+    {label:'知道了',primary:true}
   ]);
 }
 function openRepairModal(target,onReady){
@@ -1604,10 +2008,12 @@ function toggleAcc(name,forceOpen){
   if(willOpen)target.classList.add('open');
 }
 function openSettingsDrawer(section){
+  document.querySelector('.app').classList.add('drawer-open');
   $('settingsDrawer').classList.add('open');$('settingsScrim').classList.add('open');
   if(section==='model'){toggleAcc('voice',true)}
+  if(section==='api'){toggleAcc('smart-translate',true)}
 }
-function closeSettingsDrawer(){$('settingsDrawer').classList.remove('open');$('settingsScrim').classList.remove('open')}
+function closeSettingsDrawer(){document.querySelector('.app').classList.remove('drawer-open');$('settingsDrawer').classList.remove('open');$('settingsScrim').classList.remove('open')}
 function mountSettingsDrawer(){
   // 语音识别模型控件挂进 voice 模块
   const modelMount=$('drawerModelMount');
@@ -1633,18 +2039,26 @@ function syncMainModelSummary(){
 function flashDropzone(){
   dz.classList.remove('pulse');void dz.offsetWidth;dz.classList.add('pulse');
 }
+function envRuntimeBlocked(){
+  if(!latestEnvStatus)return false;
+  const wh=latestEnvStatus.whisper||{};
+  return wh.installed_pkg!==false&&wh.model_ready!==false&&wh.runtime_ready===false;
+}
 function envNeedsPrepare(){
   if(!latestEnvStatus)return false;
   const d=latestEnvStatus;
   if(d.ffmpeg&&d.ffmpeg.installed===false)return true;
-  if(d.whisper&&d.whisper.installed===false)return true;
+  const wh=d.whisper||{};
+  if(wh.installed_pkg===false||wh.model_ready===false)return true;
+  if(wh.runtime_ready===false)return false;
+  if(wh.installed===false)return true;
   return ['sensevoice','qwen_asr','qwen_aligner'].some(k=>{
     const item=d[k]||{};
     return item.installed_pkg===false||item.model_ready===false||item.ready===false;
   });
 }
 function isOriginalModelReady(config){
-  const model=(config&&config.model)||'large-v2';
+  const model=(config&&config.model)||DEFAULT_MODEL;
   const md=modelDownloads[model];
   // B5: 模型状态还没拉回来时不要误报「模型不存在」，前端检查只是提前提示，
   // 后端 _handle_existing_job 才是权威判定，未知时放行。
@@ -1652,15 +2066,20 @@ function isOriginalModelReady(config){
   return !!md.downloaded;
 }
 function showRecoveryModelMissingModal(job,filename){
-  const original=(job.config&&job.config.model)||'large-v2';
+  const original=(job.config&&job.config.model)||DEFAULT_MODEL;
   setInfoModal('之前使用的模型已经不存在','这个任务之前使用的语音识别模型已经被删除或损坏。请重新下载原模型后重新跑，或换一个当前可用模型重新跑。',[
     {label:'重新下载原模型',primary:true,onClick:()=>{State.settings.model=original;saveConfig();buildModelSlider();startPrepareNow()}},
-    {label:'换模型重新跑',onClick:()=>{State.doneJobConfig={...(job.config||{})};State.forceRerun=true;showToast('已切换为当前模型，请重新提交任务')}},
+    {label:'换模型重新跑',onClick:()=>{State.doneJobConfig={...(job.config||{})};showToast('已切换为当前模型，请重新提交任务')}},
     {label:'取消'}
   ]);
 }
 
 function handleFoundJob(d,filename){
+  if(d&&d.state){
+    const state=d.state,details=d.details||{};
+    d={...taskStateView(state,details),found:d.found,job_id:state.job_id,
+      config:details.config||{},video_filename:state.video_filename||details.video_filename||filename};
+  }
   let card=document.getElementById('card-'+d.job_id);
   if(d.status==='model_missing'||((d.status==='interrupted'||d.status==='error')&&!isOriginalModelReady(d.config||{}))){
     showRecoveryModelMissingModal(d,filename);
@@ -1668,14 +2087,27 @@ function handleFoundJob(d,filename){
     return;
   }
   if(d.status==='done'){
-    if(!card){addJobCard(d.job_id,d.config?.video_filename||filename);renderCardDone(d.job_id,{result_video:!!(d.config&&(d.config.burn||d.config.outputMode==='burn'||d.config.outputMode==='mux'))})}
+    if(!card){addJobCard(d.job_id,d.video_filename||filename);renderCardDone(d.job_id,d);showQmWarning(d,true);showTranscriptionShortfall(d,true,d.job_id)}
     else{card.scrollIntoView({behavior:'smooth'});card.classList.add('flash-highlight');setTimeout(()=>card.classList.remove('flash-highlight'),1000)}
     State.doneJobConfig={...d.config};unlockUI();settingsLocked=false;
     const _same=_settingsMatchDone();
     showToast(_same?'该视频已完成，修改设置后可重跑':'检测到设置已变更，可直接重跑');
     refreshStartBtn();return
   }
-  if(!card){const jobMeta=Object.fromEntries(Object.entries(d.config).filter(([k])=>!['source_url','source_dir','video_filename','video_path','force','local_path'].includes(k)));State.settings={...State.settings,...jobMeta};syncUI();addJobCard(d.job_id,d.config?.video_filename||filename);connectCard(d.job_id);showToast('已检测到后台任务，正在恢复…')}
+  if(d.status==='partial'){clearPartialIgnore(d.job_id);if(!card)addJobCard(d.job_id,d.video_filename||filename);handlePartialState(d.job_id,d);unlockUI();settingsLocked=false;return}
+  if(d.status==='interrupted'){
+    // D-1 补修 C2：只显示原中断卡（带一键继续），不接回、不开跑。
+    if(!card)addJobCard(d.job_id,d.video_filename||filename);
+    renderInterruptedCard(d.job_id,d.resume_action);delete activeJobs[d.job_id];
+    unlockUI();settingsLocked=false;refreshStartBtn();return
+  }
+  if(d.status==='error'){
+    if(!card)addJobCard(d.job_id,d.video_filename||filename);
+    renderCardError(d.job_id,{...d,message:d.error||d.message});
+    if(!d.output_ready&&!d.resume_action)removeActiveJobId(d.job_id);
+    unlockUI();settingsLocked=false;refreshStartBtn();return
+  }
+  if(!card){State.settings={...State.settings,...mergeableJobSettings(d.config)};syncUI();addJobCard(d.job_id,d.video_filename||filename);connectCard(d.job_id);showToast('已检测到后台任务，正在恢复…')}
   else{
     card.classList.remove('job-card-done');
     const fill=$('fill-'+d.job_id);const step=$('step-'+d.job_id);
@@ -1690,7 +2122,11 @@ connectCard(d.job_id)
   showVideoBox(filename,'处理中');setScene('processing')
 }
 
-sbtn.addEventListener('click',async()=>{
+async function startJob(){
+  if(envRuntimeBlocked()){
+    openRuntimeBlockedModal();
+    return;
+  }
   if(envNeedsPrepare()){
     openPrepareModal();
     if(!State.videoFile&&!State.localPath&&!State.sourceUrl)showToast('准备环境后，请先拖入视频，或粘贴视频链接');
@@ -1702,14 +2138,22 @@ sbtn.addEventListener('click',async()=>{
     return;
   }
 
+  // D-1 C1：付费模式先测连接，测通了才锁设置、才开始；测不通不开始、不锁设置。
+  // 用户在「只能翻译」提示里选了继续 → 本次任务设置带上 aiTranslateOnly（只这一份）。
+  // D-1 补修 A1：点下「开始」那一刻固定本轮设置；检测和三种提交只用这一份。
+  const runSettings=JSON.parse(JSON.stringify(State.settings));
+  delete runSettings.apiKeys;  // P512：Key 由后台从设置文件读
+  const gateCfg=await startGate(sbtn);
+  if(!gateCfg)return;
+
   // ── 本地路径模式 ──
   if(State.localPath){
     sbtn.disabled=true;sbtn.textContent='读取本地文件中…';
     if(!settingsLocked){lockUI();settingsLocked=true}
-    const cfg={...State.settings,local_path:State.localPath};
-    if(State.forceRerun){cfg.force=true;State.forceRerun=false}
+    const cfg={...runSettings,...gateCfg};
     try{
-      const r=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:JSON.stringify(cfg)})});
+      // P494：地址放请求外层（后台在外层读）；最终桌面版拖进来的地址也走这里
+      const r=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({local_path:State.localPath,config:JSON.stringify(cfg)})});
       if(!r.ok){const err=await r.json().catch(()=>({error:'读取失败'}));showToast(err.error||'读取失败');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}return}
       const d=await r.json();
       const _lpName=State.localPath.split('/').pop()||'本地视频';
@@ -1724,7 +2168,7 @@ sbtn.addEventListener('click',async()=>{
   if(State.sourceUrl){
     sbtn.disabled=true;sbtn.textContent='正在提交链接…';
     if(!settingsLocked){lockUI();settingsLocked=true}
-    const cfg={...State.settings};if(State.forceRerun){cfg.force=true;State.forceRerun=false}
+    const cfg={...runSettings,...gateCfg};
     const urlFname=State.sourceUrl.split('/').pop().split('?')[0]||'在线视频';
     try{
       const r=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:State.sourceUrl,config:JSON.stringify(cfg)})});
@@ -1741,7 +2185,7 @@ sbtn.addEventListener('click',async()=>{
   const file=State.videoFile;
   sbtn.disabled=true;sbtn.textContent='上传中… 0%';
   if(!settingsLocked){lockUI();settingsLocked=true}
-  const cfg={...State.settings};if(State.forceRerun){cfg.force=true;State.forceRerun=false}
+  const cfg={...runSettings,...gateCfg};
   const fd=new FormData();fd.append('file',file);fd.append('config',JSON.stringify(cfg));
   const xhr=new XMLHttpRequest();
   xhr.open('POST','/api/jobs');
@@ -1756,7 +2200,8 @@ sbtn.addEventListener('click',async()=>{
   });
   xhr.addEventListener('error',()=>{showToast('上传失败，请重试');sbtn.disabled=false;refreshStartBtn();if(Object.keys(activeJobs).length===0){unlockUI();settingsLocked=false}});
   xhr.send(fd);
-});
+}
+sbtn.addEventListener('click',startJob);
 
 function resetAllJobs(){Object.keys(activeJobs).forEach(jid=>cancelCard(jid));settingsLocked=false;unlockUI();refreshStartBtn()}
 function lockUI(){
@@ -1864,11 +2309,40 @@ function addJobCard(jid,filename){
     `<div class="milestones" id="ms-${jid}">`+
       _MILESTONES.map(m=>`<div class="milestone"><div class="milestone-dot"></div><span>${m}</span></div>`).join('')+
     `</div>`+
-    `<div class="job-card-step" id="step-${jid}">排队中…</div>`+
-    `<div class="job-card-result" id="result-${jid}"><a href="#" id="dlV-${jid}" target="_blank">下载视频</a><a href="#" id="dlS-${jid}" target="_blank">下载 SRT</a></div>`+
+    `<div class="job-card-status-row"><div class="job-card-step" id="step-${jid}">排队中…</div><div class="job-card-percent" id="pct-${jid}">0%</div><button class="job-card-stop" id="stop-${jid}" onclick="cancelCard('${jid}')">停止任务</button></div>`+
+    `<div class="job-card-quality" id="quality-${jid}"></div>`+
+    `<div class="job-card-result" id="result-${jid}"></div>`+
     `<div class="job-card-error" id="err-${jid}"></div>`;
   $('jobCards').appendChild(card);
   activeJobs[jid]={ws:null,pollTimer:null,filename:filename,config:{...State.settings}};
+}
+function normalizeJobPercent(percent){
+  const n=Number(percent);
+  if(!Number.isFinite(n))return 0;
+  return Math.max(0,Math.min(100,Math.round(n)));
+}
+function applyWorkflowProgress(jid,workflowProgress,runId){
+  if(workflowProgress==null||workflowProgress==='')return;
+  const value=Number(workflowProgress);
+  if(!Number.isFinite(value)||value<0||value>100)return;
+  const job=activeJobs[jid];if(!job)return;
+  if(runId!=null&&runId!==job.lastRunId){job.lastRunId=runId;job.lastWorkflowProgress=undefined}
+  const pct=value;
+  if(job.lastWorkflowProgress!==undefined&&pct<job.lastWorkflowProgress)return;
+  job.lastWorkflowProgress=pct;
+  const fill=$('fill-'+jid),pctEl=$('pct-'+jid);
+  if(fill)fill.style.width=pct+'%';
+  if(pctEl)pctEl.textContent=pct+'%';
+}
+function setJobProgress(jid,percent,stage,message,detail){
+  const runId=arguments[5];
+  const pct=normalizeJobPercent(percent);
+  const fill=$('fill-'+jid);const step=$('step-'+jid);const pctEl=$('pct-'+jid);
+  applyWorkflowProgress(jid,percent,runId);
+  if(fill){fill.style.background='';fill.classList.add('working')}
+  if(step){step.textContent=formatJobProgressText(stage,message,detail);step.style.color=''}
+  updateMilestones(jid,stage,message);
+  if(stage==='transcribe'&&pct>=10&&pct<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}
 }
 // 进度条下的里程碑圆点：走到哪个亮哪个，完成的变绿
 function updateMilestones(jid,stage,message){
@@ -1885,6 +2359,16 @@ function finishMilestones(jid){
   const box=$('ms-'+jid);if(!box)return;
   box.querySelectorAll('.milestone').forEach(el=>{el.classList.add('done');el.classList.remove('active')});
 }
+function hideMilestones(jid){const box=$('ms-'+jid);if(box)box.style.display='none'}
+function showAlignmentFallbackNotice(jid,msg){
+  if(!msg)return;
+  const raw=[msg.message,msg.detail,msg.warning,msg.error].filter(Boolean).join(' ');
+  const fallback=msg.fa_quality==='fallback'||msg.alignment_fallback===true||raw.includes('粗时间')||raw.includes('词级对齐未成功')||raw.includes('时间轴对齐失败');
+  if(!fallback)return;
+  const q=$('quality-'+jid);if(!q)return;
+  q.textContent='时间轴对齐失败，已使用粗时间继续';
+  q.classList.add('show');
+}
 // 错误提示里出现「一键准备/一键修复」时给可点的按钮，别让文案指路却没有路
 function renderErrorActions(errEl,text){
   if(!errEl||!text)return;
@@ -1898,95 +2382,586 @@ function renderErrorActions(errEl,text){
     b.addEventListener('click',()=>openRepairModal());errEl.appendChild(b);
   }
 }
-function connectCard(jid){
-  const job=activeJobs[jid];if(!job)return;
-  const proto=location.protocol==='https:'?'wss:':'ws:';
-  try{job.ws=new WebSocket(`${proto}//${location.host}/ws/${jid}`);job.ws.onmessage=e=>{try{handleCardMsg(jid,JSON.parse(e.data))}catch(ex){}};job.ws.onclose=()=>{job.ws=null};job.ws.onerror=()=>{job.ws=null}}catch(e){}
-  const poll=()=>{if(!activeJobs[jid])return;fetch('/api/jobs/'+jid).then(r=>r.json()).then(j=>{
-    const fill=$('fill-'+jid);const step=$('step-'+jid);
-    const processDead=(j.status==='running'||j.status==='queued')&&j.process_alive===false;
-    if(processDead){
-      if(fill){fill.style.width='100%';fill.style.background='var(--red)';fill.classList.remove('working')}
-      if(step){step.textContent='处理异常中断，请取消后重试';step.style.color='var(--red)'}
-      job.pollTimer=setTimeout(poll,5000)}
-    else if(j.status==='running'||j.status==='queued'){if(fill){fill.style.width=j.progress+'%';fill.style.background='';fill.classList.add('working')}if(step){step.textContent=formatJobProgressText(j.stage,j.message);step.style.color=''}updateMilestones(jid,j.stage,j.message);if(j.stage==='transcribe'&&j.progress>=10&&j.progress<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}job.pollTimer=setTimeout(poll,2000)}
-    else if(j.status==='done'){handleCardMsg(jid,{type:'done',result_video:j.result_video,result_srt:j.result_srt,failed_segments:j.failed_segments,segment_count:j.segment_count,success_count:j.success_count,question_mark_count:j.question_mark_count})}
-    else if(j.status==='error'){handleCardMsg(jid,{type:'error',message:j.error})}
-    else if(j.status==='cancelled'){removeCard(jid)}
-    else{job.pollTimer=setTimeout(poll,2000)}
-  }).catch(()=>{job.pollTimer=setTimeout(poll,2000)})};
-  job.pollTimer=setTimeout(poll,1000);
+function terminalJobReason(message){
+  return String(message||'').includes('中断')?'interrupted':'error';
 }
-function handleCardMsg(jid,msg){
-  const card=$('card-'+jid);if(!card)return;const fill=$('fill-'+jid);const step=$('step-'+jid);
-  if(msg.type==='progress'){if(fill){fill.style.width=msg.percent+'%';fill.style.background=''}if(step){step.textContent=formatJobProgressText(msg.stage,msg.message,msg.detail);step.style.color=''}updateMilestones(jid,msg.stage,msg.message);if(msg.stage==='transcribe'&&msg.percent>=10&&msg.percent<35){if(fill)fill.classList.add('working')}else{if(fill)fill.classList.remove('working')}}
-  else if(msg.type==='done'){renderCardDone(jid,msg);showQmWarning(msg);const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone();refreshStartBtn()}
-  else if(msg.type==='error'){if(step)step.textContent='出错';const err=$('err-'+jid);if(err){err.textContent=formatJobErrorText(msg.message);err.classList.add('show');renderErrorActions(err,err.textContent)}const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);delete activeJobs[jid]}removeActiveJobId(jid);checkAllDone()}
-  else if(msg.type==='llm_failed'){
-    if(step)step.textContent='等待选择…';step.style.color='var(--yellow)';
-    $('llmFallbackMsg').textContent=msg.message||'智能翻译全部失败，是否改用免费引擎继续？';
-    window._pendingFallbackJob=jid;
-    $('llmFallbackOverlay').classList.add('active');
+function terminalVideoSubtitle(message){
+  return terminalJobReason(message)==='interrupted'?'任务已中断':'处理失败';
+}
+function errorStageText(stage,failureKind){
+  const stageLabel={download:'下载视频',extract:'分析视频',transcribe:'识别语音',translate:'翻译字幕',subtitle:'生成字幕文件',burn:'生成带字幕的视频'}[stage]||'处理任务';
+  if(['output_mux_failed','output_mux_timeout','output_burn_failed','output_burn_timeout','output_identity_unknown','ffmpeg_not_installed'].includes(failureKind))return '生成带字幕的视频失败';
+  return stageLabel+'失败';
+}
+function failMilestones(jid,stage){
+  const box=$('ms-'+jid);if(!box)return;
+  const index={download:0,extract:0,transcribe:1,translate:3,subtitle:4,burn:4}[stage];
+  if(index===undefined)return;
+  box.querySelectorAll('.milestone').forEach((element,i)=>{
+    element.classList.toggle('done',i<index);
+    element.classList.toggle('failed',i===index);
+    element.classList.remove('active');
+  });
+}
+// B2：成品已经交付到用户目录，应用内不再提供下载，只提供「在文件夹中显示」。
+// 显示与否只看后端的 can_show_output_folder，前端不推导、不保存任何路径。
+async function revealJobOutput(jid,button){
+  if(button&&button.disabled)return;
+  if(button)button.disabled=true;
+  try{
+    const response=await fetch('/api/jobs/'+jid+'/output/reveal',{method:'POST',headers:{'X-Video-Subber-Action':'reveal-output'}});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok){showToast(result.error||'无法打开成品所在文件夹，请稍后重试');return}
+  }catch(error){
+    showToast('无法打开成品所在文件夹，请稍后重试');
+  }finally{
+    if(button)button.disabled=false;
   }
 }
-let _llmFallbackPending=null;
-async function llmFallbackDecide(decision){
-  const jid=window._pendingFallbackJob;
-  if(!jid)return;
-  $('llmFallbackOverlay').classList.remove('active');
-  try{await fetch('/api/jobs/'+jid+'/llm-fallback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})})}catch(e){}
-  const step=$('step-'+jid);if(step){step.style.color='';step.textContent=decision==='use_free'?'正在用免费引擎重新翻译…':'已保留失败结果'}
-  window._pendingFallbackJob=null;
+function renderOutputFolder(jid,msg){
+  const result=$('result-'+jid);if(!result)return;
+  result.innerHTML='';result.children=[];
+  if(!msg.can_show_output_folder){result.classList.remove('show');return}
+  result.classList.add('show');
+  const button=document.createElement('button');
+  button.className='job-error-action';button.textContent='在文件夹中显示';
+  button.onclick=()=>revealJobOutput(jid,button);
+  result.appendChild(button);
+}
+function aiUnusedText(notes){
+  if(!Array.isArray(notes)||!notes.length)return '';
+  const STEP={breaks:'AI 断句',refine:'AI 润色',breaks_and_refine:'AI 断句和润色'};
+  const WHY={format:'AI 回复格式有误',validation:'识别结果校验未通过'};
+  const parts=notes.filter(note=>note&&STEP[note.step]).map(note=>
+    note.reason==='platform_unsupported'?STEP[note.step]:`${STEP[note.step]}（${WHY[note.reason]||'原因未知'}）`);
+  return parts.length?'本次未使用 '+parts.join('、'):'';
+}
+function renderTranslationSummary(jid,msg){
+  const target=$('quality-'+jid);if(!target)return;
+  const summary=msg&&msg.translation_summary;
+  const lines=[];
+  // E2：转录欠账排在最前——它是用户唯一的行动线索（「已处理到 20:00，模型加载失败」），
+  // 比「3 句存疑」重要得多。
+  // **必须写进任务卡**：全局提示栏只有一条，后面再跑一个任务就可能把它清掉；
+  // 而这一行跟着卡片走，卡片在它就在。
+  // 与 question_mark_count 同一个模式：全局栏醒目提示 + 卡内持久记录，两处都要。
+  const shortfall=msg&&msg.transcription_shortfall;
+  if(shortfall&&shortfall.message)lines.push(shortfall.message);
+  // 没有翻译记录就**不写这一行**——用户不需要知道我们不知道什么。
+  // 注意：只跳过翻译档位这一段，不能提前 return——这个函数后面还渲染
+  //    声音参考、存疑句数、字幕质量三样，掐掉它们等于静默交付。
+  if(summary){
+    const apiSuccess=Number(summary.api_success_count),apiTotal=Number(summary.api_total_count);
+    const countsValid=Number.isFinite(apiSuccess)&&Number.isFinite(apiTotal)&&apiSuccess>=0&&apiTotal>=0;
+    if(summary.requested_tier==='basic')lines.push('普通免费翻译');
+    else if(summary.auto_fallback===true&&countsValid&&apiSuccess===0)lines.push('全部 API 失败，已自动使用免费翻译');
+    else if(summary.auto_fallback===true&&countsValid&&apiSuccess>0)lines.push('部分字幕由免费翻译补全');
+    else if(summary.requested_tier==='api_context')lines.push('API 上下文专业翻译');
+    else lines.push('API 逐段翻译');
+    if(countsValid){
+      lines.push(`本轮 API 成功 ${apiSuccess}/${apiTotal}`);
+      // G8/A11：优先用后端送来的 fallback_success —— 它和最后一次运行中提示
+      // 是同一个来源。旧的 successCount-apiSuccess 是前端自己减出来的，
+      // 换个来源就会和运行中的数字对不上。历史任务没有这个字段，才回退。
+      const fbSuccess=Number(summary.fallback_success);
+      const successCount=Number(msg.success_count);
+      if(summary.auto_fallback===true&&Number.isFinite(fbSuccess))lines.push(`免费补全 ${fbSuccess} 条`);
+      else if(summary.auto_fallback===true&&Number.isFinite(successCount))lines.push(`免费补全 ${Math.max(0,successCount-apiSuccess)} 条`);
+    }
+    // D-1 A5：付费模式格式修不好的句子保留原文（不再用免费翻译补）。
+    const kept=Number(summary.kept_original_count);
+    if(Number.isFinite(kept)&&kept>0)lines.push(`有 ${kept} 句未能翻译，保留了原文`);
+    // D-1 C12：哪一步没用上 AI——从任务结果里那一份记录现算，不另存文案。
+    const unused=aiUnusedText(summary.ai_unused);
+    if(unused)lines.push(unused);
+  }
+  const sound=msg&&msg.sound_reference;
+  if(sound&&sound.status==='unavailable'&&sound.message)lines.push(sound.message);
+  // G6：[?] 不再写进字幕正文，存疑句数改由这一行如实报出。
+  // 与上方黄/红横幅的区别：横幅有 5%/15% 阈值，低于 5% 不弹；
+  // 这一行**没有阈值**，只要有存疑句就写出来。200 句里 4 句存疑时，
+  // 横幅仍然不弹（不打扰），但用户不会再有「一个字都看不到」的区间。
+  const qm=Number(msg&&msg.question_mark_count);
+  if(Number.isFinite(qm)&&qm>0)lines.push(qm+' 句存疑');
+  // P419：后端从 G5-1 起就在发 subtitle_quality（worker.py:3122），前端一直没读，
+  // 用户完全看不到。合同 A13：被封顶的长字幕、切不动的分屏、仍低于 0.84 秒的
+  // 条目，用户都有权知道——静默交付是不允许的。
+  const quality=msg&&msg.subtitle_quality;
+  if(quality){
+    const short=quality.below_min_display;
+    if(short&&short.count>0)lines.push(short.count+' 条字幕显示偏短');
+    const capped=quality.capped_no_legal_cut;
+    if(capped&&capped.count>0)lines.push(capped.count+' 条长字幕已按 7 秒截断');
+    const unsplit=(quality.mapping_failed_splits||0)+(quality.no_safe_boundary_splits||0)+(quality.single_word_over_max||0);
+    if(unsplit>0)lines.push(unsplit+' 条长字幕未能拆分');
+  }
+  target.textContent=lines.join(' · ');target.classList.add('show');
+}
+function renderCardError(jid,msg){
+  const fill=$('fill-'+jid),pct=$('pct-'+jid),step=$('step-'+jid),card=$('card-'+jid),err=$('err-'+jid);
+  if(fill){fill.style.width='100%';fill.style.background='var(--red)';fill.classList.remove('working')}
+  if(pct)pct.textContent='100%';
+  if(step){step.textContent=errorStageText(msg.stage,msg.failure_kind);step.style.color='var(--red)'}
+  if(card)card.classList.add('job-card-error-terminal');
+  failMilestones(jid,msg.stage);
+  const errorMessage=msg.message||'处理失败，请稍后重试。';
+  if(err){err.textContent=msg.failure_kind?errorMessage:formatJobErrorText(errorMessage);err.classList.add('show');renderErrorActions(err,err.textContent);if(typeof document!=='undefined'&&err.appendChild){
+    // A8：上一轮动作没启动起来时给一条应用内的出路，复用 /resume 继续同一动作。
+    if(msg.resume_action==='retry'||msg.resume_action==='accept'){
+      const resume=document.createElement('button');resume.className='job-error-action';
+      resume.textContent=msg.resume_action==='retry'?'继续重试剩余字幕':'继续生成字幕文件';
+      resume.onclick=()=>resumeInterruptedJob(jid,resume,{exportOnly:msg.resume_action==='accept'});err.appendChild(resume)
+    }else{
+      // D-1 补修 C2（用户 2026-10-02 定）：重拖出错任务只显示原卡片，所以一般出错也要给一个能点的出口；
+      // 与中断卡「一键继续」同一条路（先门口检测，接着用已有的中间结果）。
+      const restart=document.createElement('button');restart.className='job-error-action';
+      restart.textContent='重新开始';restart.onclick=()=>resumeInterruptedJob(jid,restart);err.appendChild(restart)
+    }
+    const logButton=document.createElement('button');logButton.className='job-error-action';logButton.textContent='打开日志文件';logButton.onclick=()=>openJobLog(jid,logButton);err.appendChild(logButton)}}
+  renderOutputFolder(jid,msg);
+  if(typeof renderTranslationSummary==='function')renderTranslationSummary(jid,msg);
+}
+async function openJobLog(jid,button){
+  if(button&&button.disabled)return;
+  if(button)button.disabled=true;
+  try{
+    const response=await fetch('/api/jobs/'+jid+'/log/open',{method:'POST',headers:{'X-Video-Subber-Action':'open-job-log'}});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok){showToast(result.error||'无法打开任务日志，请稍后重试');return}
+    showToast('日志文件已打开');
+  }catch(error){
+    showToast('无法打开任务日志，请稍后重试');
+  }finally{
+    if(button)button.disabled=false;
+  }
+}
+function renderInterruptedCard(jid,resumeAction){
+  // P517：任务已经停了，不显示「停止任务」；× 先确认再删。重新接上运行时由 connectCard 摘掉。
+  const card=$('card-'+jid);if(card)card.classList.add('job-card-interrupted');
+  const step=$('step-'+jid),fill=$('fill-'+jid),pct=$('pct-'+jid),err=$('err-'+jid);
+  if(step){step.textContent='任务已中断';step.style.color='var(--yellow)'}
+  if(fill){fill.style.width='0%';fill.style.background='var(--yellow)';fill.classList.remove('working')}
+  if(pct)pct.textContent='—';
+  if(err){err.innerHTML='';err.classList.add('show');const text=document.createElement('div');text.textContent='可以直接使用原视频和已有缓存继续处理。';err.appendChild(text);const button=document.createElement('button');button.className='job-error-action';button.textContent='一键继续';button.onclick=()=>resumeInterruptedJob(jid,button,{exportOnly:resumeAction==='accept'});err.appendChild(button)}
+}
+async function resumeInterruptedJob(jid,button,opts={}){
+  if(button)button.disabled=true;
+  // D-1 补修 A2：继续前也做门口检测（P512：Key 由后台从设置文件读）；
+  // 「继续生成字幕文件」不调用 AI（D2），不检测、不带 Key。
+  let body={};
+  if(!opts.exportOnly){
+    const gateCfg=await startGate(button);
+    if(!gateCfg){if(button)button.disabled=false;return false}
+    if(gateCfg.aiTranslateOnly)body.aiTranslateOnly=true;
+  }
+  try{
+    const response=await fetch('/api/jobs/'+jid+'/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||result.status!=='running')throw new Error(result.error||'任务暂时无法继续');
+    if(!activeJobs[jid]){const nameEl=(document.getElementById('card-'+jid)||{querySelector:()=>null}).querySelector('.job-card-name');activeJobs[jid]={ws:null,pollTimer:null,filename:nameEl?nameEl.textContent:'恢复任务',config:{}}}
+    activeJobs[jid].config={...(result.config||activeJobs[jid].config||{})};
+    const step=$('step-'+jid),fill=$('fill-'+jid),err=$('err-'+jid);
+    if(step){step.textContent='正在继续处理…';step.style.color=''}
+    if(fill){fill.style.background='';fill.classList.add('working')}
+    if(err)err.classList.remove('show');
+    saveActiveJobs();setScene('processing');showVideoBox(activeJobs[jid].filename||'恢复任务','处理中');connectCard(jid);return true;
+  }catch(error){
+    if(button)button.disabled=false;
+    showToast(error.message||'任务暂时无法继续');
+    return false;
+  }
+}
+const _partialPromptQueue=[];
+const _partialPromptKeys=new Set();
+let _partialPromptCurrent=null;
+function partialIgnores(){try{return JSON.parse(localStorage.getItem('partialJobIgnores')||'{}')}catch(e){return {}}}
+function writePartialIgnore(jid,msg,reason){const all=partialIgnores();all[jid]={job_id:jid,dismissed_retry_count:msg.retry_count||0,reason,last_prompted_retry_count:Number(localStorage.getItem('partialPrompt:'+jid)||-1)};localStorage.setItem('partialJobIgnores',JSON.stringify(all))}
+function clearPartialIgnore(jid){const all=partialIgnores();delete all[jid];localStorage.setItem('partialJobIgnores',JSON.stringify(all))}
+function resetPartialPromptTicket(jid,retryCount){localStorage.removeItem('partialPrompt:'+jid);_partialPromptKeys.delete(jid+':'+(retryCount||0))}
+function isPartialIgnored(jid,msg){const item=partialIgnores()[jid];return !!(item&&item.dismissed_retry_count===(msg.retry_count||0))}
+function partialReason(kind){return ({auth:'API Key 无效，请检查或更换 Key 后重试',rate_limit:'请求过多，请稍等后重试或切换翻译引擎',connection:'无法连接翻译服务，请检查网络后重试或切换翻译引擎',timeout:'连接翻译服务超时，请稍后重试或切换翻译引擎',service_error:'翻译服务返回错误，请稍后重试或切换翻译引擎',request_rejected:'翻译服务返回错误，请稍后重试或切换翻译引擎',insufficient_balance:'账户余额不足，请充值后重试',numbering_format:'翻译返回格式错误，请重试或切换翻译引擎',empty_translation:'翻译服务返回空内容，请重试或切换翻译引擎',quality_rejected:'译文未通过质量检查，请重试或切换翻译引擎',mixed:'存在多种失败原因，请按下方建议处理',unknown:'没有取得明确原因，请查看日志或切换翻译引擎后重试'})[kind]||'没有取得明确原因，请查看日志或切换翻译引擎后重试'}
+function partialCopy(msg){
+  const total=msg.segment_count||0,failed=msg.failed_count||0,recovered=msg.recovered_count||0,noProgress=msg.consecutive_no_progress||0,reason=partialReason(msg.primary_failure_kind);
+  if(msg.retry_status==='completed'){
+    const gained=Number(msg.retry_new_success_count)||0,currentSuccess=Number(msg.success_count)||Math.max(0,total-failed),previousSuccess=Math.max(0,currentSuccess-gained),previousFailed=Number(msg.retry_initial_failed_count)||failed+gained;
+    return {title:`最新结果：成功 ${currentSuccess} 句，仍失败 ${failed} 句`,body:`上一轮：成功 ${previousSuccess} 句，失败 ${previousFailed} 句。本轮新成功 ${gained} 句。最新：成功 ${currentSuccess} 句，仍失败 ${failed} 句。原因：${reason}。`};
+  }
+  if(noProgress>=2)return {title:'重试没有效果',body:`已重试 2 次，这 ${failed} 句仍未翻出来，原因：${reason}。建议直接导出；解决问题后可回任务卡再试。`};
+  if(noProgress===1)return {title:'这次一句都没补回来',body:`仍是这 ${failed} 句没翻出来，原因：${reason}。可以稍等再试，或直接导出。`};
+  if(recovered>0)return {title:`补回了 ${recovered} 句，还差 ${failed} 句`,body:`剩下 ${failed} 句仍未成功，原因：${reason}。`};
+  return {title:`还差 ${failed} 句没翻完`,body:`全片 ${total} 句，已翻好 ${total-failed} 句。剩下 ${failed} 句没成功，原因：${reason}。`};
+}
+async function requestPartialAction(jid,action,button){
+  if(button)button.disabled=true;
+  const actionState=activeJobs[jid]?activeJobs[jid].partialState:null;
+  // D-1 补修 A2/D2：重试前做门口检测；导出不调用 AI，只发动作。P512：Key 由后台从设置文件读。
+  const body={action};
+  if(action==='retry'){
+    const gateCfg=await startGate(button);
+    if(!gateCfg){if(button)button.disabled=false;return false}
+    if(gateCfg.aiTranslateOnly)body.aiTranslateOnly=true;
+  }
+  if(activeJobs[jid])activeJobs[jid].partialActionPending=true;
+  try{const r=await fetch('/api/jobs/'+jid+'/partial-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'操作失败');if(d.config&&activeJobs[jid])activeJobs[jid].config={...d.config};if(action==='retry'){clearPartialIgnore(jid);if(actionState)resetPartialPromptTicket(jid,actionState.retry_count);renderRetryProgress(jid,{retry_initial_failed_count:Number(actionState&&actionState.failed_count)||0,retry_processed_count:0,retry_new_success_count:0,retry_status:'running'})}if(action==='accept'&&actionState){writePartialIgnore(jid,actionState,'user_accepted');removeActiveJobId(jid)}if(activeJobs[jid]&&!activeJobs[jid].ws)connectCard(jid);if(_partialPromptCurrent&&_partialPromptCurrent.jid===jid){_partialPromptCurrent=null;$('infoModalOverlay').classList.remove('active');showNextPartialPrompt()}return true}catch(e){if(activeJobs[jid])activeJobs[jid].partialActionPending=false;showToast(e.message||'操作失败');if(button)button.disabled=false;return false}
+}
+function renderRetryProgress(jid,msg){
+  const job=activeJobs[jid];if(job){job.partialActionPending=true;job.retryState={...(job.retryState||{}),...msg}}
+  const initial=Number(msg.retry_initial_failed_count)||0,processed=Number(msg.retry_processed_count)||0,newSuccess=Number(msg.retry_new_success_count)||0,valid=initial>=0&&processed>=0&&newSuccess>=0&&newSuccess<=processed&&processed<=initial,stillFailed=processed-newSuccess,remaining=initial-processed;
+  const step=$('step-'+jid),fill=$('fill-'+jid),pct=$('pct-'+jid),err=$('err-'+jid),stop=$('stop-'+jid);
+  // G8/A14：数字只能有一个作者。message 里已经带了完整的五个数字（后端算的），
+  // 这时候再拼一行自己的，两组数字迟早当着用户面对不上。没有 message 时
+  // （刚点下「重试」那一瞬间）才回退到本地拼的那行。
+  const live=typeof msg.message==='string'&&msg.message.trim()?msg.message.trim():'';
+  if(step){step.textContent=live||'正在重试';step.style.color=''}
+  if(fill){fill.style.width='0%';fill.style.background='';fill.classList.add('working')}
+  if(pct)pct.textContent='—';
+  if(stop)stop.style.display='';
+  if(err&&live){err.innerHTML='';err.classList.remove('show','job-retry-status')}
+  else if(err){err.innerHTML='';err.classList.add('show','job-retry-status');const text=document.createElement('div');if(valid)text.textContent=`本轮待处理 ${initial} · 已处理 ${processed} · 本轮新成功 ${newSuccess} · 仍失败 ${stillFailed} · 剩余 ${remaining}`;else{text.textContent='任务统计状态异常，请查看日志';console.error('retry statistics invalid',{retry_initial_failed_count:initial,retry_processed_count:processed,retry_new_success_count:newSuccess})}err.appendChild(text)}
+}
+function renderPartialCard(jid,msg){
+  if(msg.retry_status==='running'){renderRetryProgress(jid,msg);return}
+  const copy=partialCopy(msg),step=$('step-'+jid),err=$('err-'+jid),card=$('card-'+jid),fill=$('fill-'+jid),pct=$('pct-'+jid),stop=$('stop-'+jid);
+  const hasTerminalCounts=msg.success_count!==undefined&&msg.failed_count!==undefined&&msg.segment_count!==undefined,terminalCountsValid=!hasTerminalCounts||Number(msg.success_count)+Number(msg.failed_count)===Number(msg.segment_count);
+  if(step)step.textContent=msg.output_ready?'已按你的选择导出，仍有 '+msg.failed_count+' 句未翻译':copy.title;
+  if(fill){fill.style.width='0%';fill.classList.remove('working')};if(pct)pct.textContent='—';if(stop)stop.style.display='none';if(card)card.classList.add('job-card-partial');
+  if(err){err.classList.remove('job-retry-status');err.classList.add('show');err.innerHTML='';const text=document.createElement('div');text.textContent=terminalCountsValid?copy.body:'任务统计状态异常，请查看日志';if(!terminalCountsValid)console.error('terminal statistics invalid',msg);err.appendChild(text);if(terminalCountsValid&&(msg.failed_count||0)>0){const retry=document.createElement('button');retry.className='job-error-action';retry.textContent='再次重试剩余字幕';retry.onclick=()=>requestPartialAction(jid,'retry',retry);err.appendChild(retry);const accept=document.createElement('button');accept.className='job-error-action';accept.textContent='保留未翻译字幕并生成文件';accept.onclick=()=>requestPartialAction(jid,'accept',accept);err.appendChild(accept)}}
+  renderOutputFolder(jid,msg);
+  if(typeof renderTranslationSummary==='function')renderTranslationSummary(jid,msg);
+}
+async function openPartialOptions(jid){
+  if(_partialPromptCurrent&&_partialPromptCurrent.jid===jid&&$('infoModalOverlay').classList.contains('active'))return;
+  let msg=activeJobs[jid]&&activeJobs[jid].partialState;
+  if(!msg){
+    try{
+      const response=await fetch('/api/jobs/'+jid);
+      if(!response.ok)throw new Error('无法读取任务状态');
+      const payload=await response.json(),state=payload.state,details=payload.details||{},current=taskStateView(state,details);
+      if(!state||state.status!=='partial')throw new Error('这个任务已经不需要处理');
+      if(!activeJobs[jid])activeJobs[jid]={ws:null,pollTimer:null,filename:details.video_filename||'任务',config:details.config||{}};
+      activeJobs[jid].partialState=current;
+      activeJobs[jid].restoredStatus='partial';
+      msg=current;
+    }catch(e){showToast(e.message||'无法读取任务状态');return}
+  }
+  clearPartialIgnore(jid);
+  resetPartialPromptTicket(jid,msg.retry_count);
+  enqueuePartialPrompt(jid,msg);
+}
+function enqueuePartialPrompt(jid,msg){const key=jid+':'+(msg.retry_count||0);if(_partialPromptKeys.has(key))return;_partialPromptKeys.add(key);_partialPromptQueue.push({jid,msg,key});showNextPartialPrompt()}
+function showNextPartialPrompt(){
+  if(_partialPromptCurrent||$('infoModalOverlay').classList.contains('active'))return;
+  while(_partialPromptQueue.length){
+    const item=_partialPromptQueue.shift(),job=activeJobs[item.jid];
+    if(!job||!job.partialState||job.partialActionPending||(job.partialState.failed_count||0)<=0||job.partialState.retry_count!==item.msg.retry_count||isPartialIgnored(item.jid,job.partialState))continue;
+    _partialPromptCurrent=item;
+    const copy=partialCopy(item.msg),actions=[];
+    if(item.msg.output_ready||(item.msg.consecutive_no_progress||0)<2)actions.push({label:'再次重试剩余字幕',primary:true,action:'retry'});
+    if(!item.msg.output_ready)actions.push({label:'保留未翻译字幕并生成文件',action:'accept'});
+    $('infoModalTitle').textContent=copy.title;
+    const body=$('infoModalBody');body.textContent=copy.body;
+    if(actions.some(a=>a.action==='accept')){const note=document.createElement('small');note.className='partial-export-note';note.textContent='未翻译的句子会在字幕里显示英文原文';body.appendChild(note)}
+    const box=$('infoModalActions');box.innerHTML='';
+    actions.forEach(a=>{const b=document.createElement('button');b.textContent=a.label;if(a.primary)b.classList.add('primary');b.onclick=()=>requestPartialAction(item.jid,a.action,b);box.appendChild(b)});
+    localStorage.setItem('partialPrompt:'+item.jid,String(item.msg.retry_count||0));
+    $('infoModalOverlay').classList.add('active');
+    break
+  }
+}
+function handlePartialState(jid,msg){
+  if(!activeJobs[jid])activeJobs[jid]={ws:null,pollTimer:null,filename:'任务',config:{}};
+  const job=activeJobs[jid];
+  const wasDismissed=isPartialIgnored(jid,msg);
+  if(msg.action_error&&wasDismissed){clearPartialIgnore(jid);resetPartialPromptTicket(jid,msg.retry_count)}
+  const alreadyDismissed=isPartialIgnored(jid,msg);
+  job.partialActionPending=false;job.partialState=msg;job.restoredStatus='partial';renderPartialCard(jid,msg);if(alreadyDismissed){removeActiveJobId(jid)}else{saveActiveJobs()}unlockUI();settingsLocked=false;refreshStartBtn();
+  if(msg.action_error&&job.lastActionError!==msg.action_error){job.lastActionError=msg.action_error;showToast(msg.action_error)}
+  if(!alreadyDismissed&&(msg.failed_count||0)>0&&localStorage.getItem('partialPrompt:'+jid)!==String(msg.retry_count||0))enqueuePartialPrompt(jid,msg);
+}
+function computePollDelay(s){
+  if(s.first)return 0;
+  if(s.wsClosed||!s.wsHealthy)return 3000;
+  if(s.silentMs>=10000)return 0;
+  return null;
+}
+function shouldApplyState(current,incoming){
+  if(!incoming)return false;
+  if(!current)return true;
+  return (incoming.revision||0)>(current.revision||0);
+}
+function applyTaskState(jid,state){
+  const job=activeJobs[jid];if(!job||!state)return false;
+  if(!shouldApplyState(job.lastState,state))return false;
+  job.lastState=state;job.lastMsgAt=Date.now();
+  // P516 / Z2：卡片名只认后台从原视频地址算出的名字（链接任务下载完成后从占位名换成真名）
+  if(state.video_filename&&state.video_filename!==job.filename){
+    job.filename=state.video_filename;
+    const card=$('card-'+jid),nameEl=card&&card.querySelector('.job-card-name');if(nameEl)nameEl.textContent=state.video_filename;
+  }
+  const status=state.status;
+  if(status==='running'||status==='queued'||status==='unknown'){
+    setJobProgress(jid,state.percent,state.phase,state.display_message,state.activity,state.run_id);
+    return true;
+  }
+  if(status==='done'){
+    const view=taskStateView(state,job.pendingDetails||{});job.pendingDetails=null;
+    // 黄条必须在**跑完的这一刻**出现。原来只有恢复/重新发现任务的路径叫了它，
+    // 用户坐着等任务跑完什么都看不到，刷新一下才看得见——第一批栽过的同一个坑。
+    renderCardDone(jid,view);showQmWarning(view);showTranscriptionShortfall(view,false,jid);if(job.ws)try{job.ws.close()}catch(e){};
+    clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid];
+    removeActiveJobId(jid);checkAllDone('done');refreshStartBtn();return true;
+  }
+  if(status==='partial'){
+    const details=job.pendingDetails;job.pendingDetails=null;
+    job.terminal=true;
+    if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);
+    if(details)applyTaskDetails(jid,state,details);else fetchTaskDetails(jid,state);
+    return true;
+  }
+  if(status==='error'){
+    const view=taskStateView(state,job.pendingDetails||{});job.pendingDetails=null;
+    renderCardError(jid,view);showTranscriptionShortfall(view,false,jid);showVideoBox($('vbName')?$('vbName').textContent:'',terminalVideoSubtitle(view.message));
+    if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);delete activeJobs[jid];
+    if(!state.result.output_ready&&!state.actions.resume_action)removeActiveJobId(jid);
+    checkAllDone(terminalJobReason(view.message));return true;
+  }
+  if(status==='interrupted'){
+    // D-1 补修 B1 后，关软件 / 后台被系统结束都会走到这里：移出「进行中」名单、解锁界面（任务编号留着，刷新后仍能看到中断卡）。
+    job.terminal=true;if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer);
+    renderInterruptedCard(jid,(state.actions||{}).resume_action);delete activeJobs[jid];checkAllDone('interrupted');return true
+  }
+  if(status==='cancelled'){removeCard(jid);return true}
+  return true;
+}
+function shouldStopPolling(status){
+  return status==='done'||status==='partial'||status==='error'
+      ||status==='interrupted'||status==='cancelled';
+}
+function connectCard(jid){
+  const job=activeJobs[jid];if(!job)return;
+  // P517：卡片接上运行中的任务（一键继续、重新开始、重拖后重跑都经过这里）就不再是中断卡。
+  const card=$('card-'+jid);if(card)card.classList.remove('job-card-interrupted');
+  // P520：重新在跑就不再是「已结束的恢复卡」，停止 / × 要先确认（cancelCard 见到这个标记会不问直接删）。
+  delete job.restoredStatus;
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  job.wsHealthy=false;job.terminal=false;job.lastMsgAt=Date.now();
+  try{
+    job.ws=new WebSocket(`${proto}//${location.host}/ws/${jid}`);
+    job.ws.onopen=()=>{job.wsHealthy=true;job.lastMsgAt=Date.now()};
+    job.ws.onmessage=e=>{try{job.wsHealthy=true;job.lastMsgAt=Date.now();handleCardMsg(jid,JSON.parse(e.data))}catch(ex){}};
+    job.ws.onclose=()=>{job.ws=null;job.wsHealthy=false;clearTimeout(job.pollTimer);if(!job.terminal)poll()};
+    job.ws.onerror=()=>{job.wsHealthy=false};
+  }catch(e){job.ws=null}
+  const schedule=first=>{
+    if(!activeJobs[jid])return;
+    const silentMs=Date.now()-(job.lastMsgAt||0);
+    const delay=computePollDelay({first:!!first,wsHealthy:!!job.wsHealthy,
+                                  wsClosed:!job.ws,silentMs:silentMs});
+    clearTimeout(job.pollTimer);
+    job.pollTimer=setTimeout(delay===null?()=>schedule(false):poll,delay===null?2000:delay);
+  };
+  const poll=()=>{if(!activeJobs[jid])return;
+    if(job.wsHealthy&&Date.now()-(job.lastMsgAt||0)>=10000)job.lastMsgAt=Date.now();
+    fetch('/api/jobs/'+jid).then(readJobResponse).then(result=>{
+      if(!activeJobs[jid])return;
+      if(result.kind==='missing'){showMissingJobCard(jid,job.filename);return}
+      if(result.kind==='temporary'){schedule(false);return}
+      const payload=result.job,state=payload&&payload.state;
+      if(!state){schedule(false);return}
+      job.pendingDetails=payload.details||{};
+      applyTaskState(jid,state);
+      if(shouldStopPolling(state.status)){clearTimeout(job.pollTimer);return}
+      if(activeJobs[jid])schedule(false);
+    }).catch(()=>{if(activeJobs[jid])schedule(false)})};
+  schedule(true);
+}
+function handleCardMsg(jid,msg){
+  if(msg&&msg.type==='state'&&msg.state)applyTaskState(jid,msg.state)
 }
 function renderCardDone(jid,msg){
   const fill=document.getElementById('fill-'+jid);const step=document.getElementById('step-'+jid);
-  const card=document.getElementById('card-'+jid);const result=document.getElementById('result-'+jid);
+  const pct=document.getElementById('pct-'+jid);const card=document.getElementById('card-'+jid);const result=document.getElementById('result-'+jid);
+  const priorStatus=document.getElementById('err-'+jid);if(priorStatus){priorStatus.innerHTML='';priorStatus.classList.remove('show','job-retry-status')}
   if(fill){fill.style.width='100%';fill.classList.remove('working')}
-  if(step)step.textContent='完成';
-  finishMilestones(jid);
-  if(card)card.classList.add('job-card-done');
-  if(result){result.classList.add('show');const va=document.getElementById('dlV-'+jid);if(va&&msg.result_video){va.href='/api/jobs/'+jid+'/download/video'}else if(va)va.style.display='none';const sa=document.getElementById('dlS-'+jid);if(sa)sa.href='/api/jobs/'+jid+'/download/srt'}
+  if(pct)pct.textContent='100%';
+  // B2：成品已交付到用户目录；能不能给「在文件夹中显示」只看后端的
+  // can_show_output_folder，它只在本轮 delivery.delivered 存在时为真。
+  const canShow=Boolean(msg.can_show_output_folder);
+  if(step)step.textContent=canShow?'已完成，成品已保存到目标文件夹':(msg.output_ready?'已完成':'处理已结束，但没有找到这次生成的字幕文件。');
+  hideMilestones(jid);
+  showAlignmentFallbackNotice(jid,msg);
+  if(typeof renderTranslationSummary==='function')renderTranslationSummary(jid,msg);
+  // 一张卡不能同时是「失败」和「成功」。renderCardError 加的标记全项目没人移除，
+  // 而关闭卡片时要靠它判断该不该删后端记录——不摘掉，成功卡会被当成失败卡删掉记录。
+  if(card){card.classList.remove('job-card-error-terminal');card.classList.add('job-card-done')}
+  if(result){
+    result.innerHTML='';result.children=[];
+    if(canShow){
+      result.classList.add('show');
+      const button=document.createElement('button');
+      button.className='job-error-action';button.textContent='在文件夹中显示';
+      button.onclick=()=>revealJobOutput(jid,button);
+      result.appendChild(button);
+    }else{result.classList.remove('show')}
+  }
   if(msg.failed_segments&&msg.failed_segments.length){const err=document.getElementById('err-'+jid);if(err){err.textContent=msg.failed_segments.length+' 条翻译失败（共 '+(msg.segment_count||'?')+' 条）';err.classList.add('show')}}
 }
-function dismissRestoredCard(jid){const job=activeJobs[jid];if(job&&job.restoredStatus!=='done'){fetch('/api/jobs/'+jid,{method:'DELETE'}).catch(()=>{})}removeCard(jid)}
-function cancelCard(jid){const job=activeJobs[jid];if(job&&job.restoredStatus){dismissRestoredCard(jid);return}const name=job&&job.filename||'此任务';if(!confirm(`确定要取消「${name}」吗？已完成的进度将丢失。`))return;fetch('/api/jobs/'+jid,{method:'DELETE'}).catch(()=>{});removeCard(jid)}
-function markRestoredCard(jid,status){if(activeJobs[jid])activeJobs[jid].restoredStatus=status;const card=$('card-'+jid);if(card)card.classList.add('job-card-restored')}
-function removeCard(jid){const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer)}delete activeJobs[jid];const card=$('card-'+jid);if(card)card.remove();removeActiveJobId(jid);checkAllDone()}
-function checkAllDone(){
-  if(Object.keys(activeJobs).length===0&&settingsLocked){
-    settingsLocked=false;unlockUI();
-    // 任务全部结束：视频框留在原地，「换一个」恢复可见（碗不动）
-    if(currentScene()==='scene-processing')setScene('done');
+function dismissRestoredCard(jid){const job=activeJobs[jid];if(job&&job.restoredStatus==='partial'){writePartialIgnore(jid,job.partialState||{},job.partialState&&job.partialState.output_ready?'seen_output':'dismissed_pending')}else if(job&&job.restoredStatus!=='done'){fetch('/api/jobs/'+jid,{method:'DELETE'}).catch(()=>{})}removeCard(jid);refreshShortfallBanner(jid)}
+// 用户明确关掉一张失败卡 = 他不想再看到它。**必须同步删掉后端的可发现记录**，
+// 否则刷新一下它又回来——那是上一轮「让带欠账的失败任务刷新后能重新发现」的副作用。
+// 旁边的 dismissRestoredCard 早就这么做了，只有实时终态这条路漏了。
+// **done 卡片不删**：成品还要能「在文件夹中显示」（同 dismissRestoredCard 的既有规则）。
+// 顶部只有一条提示栏，它属于「还存在的失败卡」这个集合，不属于某一张卡。
+// 关掉一张卡之后按剩余卡片重算：**不能无条件清空**——页面上可能还有另一张失败卡。
+function refreshShortfallBanner(closedJid){
+  const w=$('shortfallWarn');if(!w)return;
+  const noneLeft=document.querySelectorAll('.job-card-error-terminal').length===0;
+  const wasOwner=closedJid!=null&&w.dataset&&w.dataset.jid===String(closedJid);
+  // 两种情况才清：一张失败卡都不剩了，或者关掉的正是这条提示的主人。
+  // **不能只看前者**——A、B 都失败时红条显示的是 B，关掉 B 后 A 还在，
+  // 红条会继续挂着已经被关掉的 B 的错误。
+  if(noneLeft||wasOwner)w.classList.remove('active','yellow','red');
+}
+function dismissTerminalCard(jid){
+  const card=$('card-'+jid);
+  if(card&&card.classList.contains('job-card-error-terminal'))fetch('/api/jobs/'+jid,{method:'DELETE'}).catch(()=>{});
+  removeCard(jid,{after:'terminal-dismiss'});refreshShortfallBanner(jid);refreshStartBtn()
+}
+function resetAfterUserCancel(){
+  if(Object.keys(activeJobs).length>0){refreshStartBtn();return}
+  settingsLocked=false;unlockUI();
+  State.videoFile=null;State.sourceUrl=null;State.localPath=null;State.doneJobConfig=null;
+  uri.value='';lpi.value='';df.style.display='none';
+  showVideoBox('','');
+  setScene('first');
+  sbtn.disabled=false;refreshStartBtn();
+}
+async function requestCancelCard(jid){
+  const job=activeJobs[jid];if(!job){dismissTerminalCard(jid);return}
+  const step=$('step-'+jid);
+  if(step){step.textContent='正在取消…';step.style.color='var(--sub)'}
+  try{
+    const r=await fetchWithTimeout('/api/jobs/'+jid,{method:'DELETE'},6000);
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||data.error)throw new Error(data.error||'取消任务失败');
+    removeCard(jid,{after:'user-cancel'});
+  }catch(e){
+    if(step){step.textContent='取消失败，请稍后重试';step.style.color='var(--red)'}
+    showToast('取消任务失败：后端暂时没有响应，请稍后再试。');
   }
 }
-function saveActiveJobs(){localStorage.setItem('activeJobs',JSON.stringify(Object.keys(activeJobs)))}
-function removeActiveJobId(jid){const ids=Object.keys(activeJobs).filter(id=>id!==jid);localStorage.setItem('activeJobs',JSON.stringify(ids))}
+function cancelCard(jid){
+  const job=activeJobs[jid];
+  const card=$('card-'+jid);
+  if(card&&card.classList.contains('job-card-interrupted')){
+    const name=job&&job.filename||(card.querySelector('.job-card-name')||{}).textContent||'此任务';
+    setInfoModal('关掉这张卡？',`「${name}」的任务会被删除，之后不能再继续。`,[
+      {label:'保留',primary:true},
+      {label:'删除任务',danger:true,onClick:()=>discardInterruptedCard(jid)}
+    ]);
+    return;
+  }
+  if(job&&job.restoredStatus){dismissRestoredCard(jid);return}
+  if(!job){dismissTerminalCard(jid);return}
+  const name=job&&job.filename||'此任务';
+  setInfoModal('取消这个任务？',`「${name}」已识别的进度会全部丢失，无法恢复。`,[
+    {label:'继续处理',primary:true},
+    {label:'取消任务',danger:true,onClick:()=>requestCancelCard(jid)}
+  ]);
+}
+async function discardInterruptedCard(jid){
+  try{
+    const r=await fetchWithTimeout('/api/jobs/'+jid,{method:'DELETE'},6000);
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||data.error)throw new Error(data.error||'删除任务失败');
+    removeCard(jid,{after:'interrupted'});refreshStartBtn();
+  }catch(e){showToast('删除任务失败：后端暂时没有响应，请稍后再试。')}
+}
+function markRestoredCard(jid,status){if(activeJobs[jid])activeJobs[jid].restoredStatus=status;const card=$('card-'+jid);if(card)card.classList.add('job-card-restored')}
+function removeCard(jid,opts={}){const job=activeJobs[jid];if(job){if(job.ws)try{job.ws.close()}catch(e){};clearTimeout(job.pollTimer)}delete activeJobs[jid];const card=$('card-'+jid);if(card)card.remove();removeActiveJobId(jid);if(opts.after==='user-cancel')resetAfterUserCancel();else checkAllDone(opts.after)}
+function checkAllDone(reason){
+  if(Object.keys(activeJobs).length!==0)return;
+  if(settingsLocked){settingsLocked=false;unlockUI()}
+  // 任务全部结束：视频框留在原地，「换一个」恢复可见。
+  if((reason==='done'||reason==='error'||reason==='interrupted')&&currentScene()==='scene-processing')setScene('done');
+}
+function readActiveJobIds(){
+  try{const ids=JSON.parse(localStorage.getItem('activeJobs')||'[]');return Array.isArray(ids)?ids.filter(id=>typeof id==='string'&&id):[]}
+  catch(e){return []}
+}
+function writeActiveJobIds(ids){const unique=[...new Set((ids||[]).filter(id=>typeof id==='string'&&id))];localStorage.setItem('activeJobs',JSON.stringify(unique));return unique}
+function addActiveJobIds(ids){return writeActiveJobIds([...readActiveJobIds(),...(ids||[])])}
+function saveActiveJobs(){addActiveJobIds(Object.keys(activeJobs))}
+function removeActiveJobId(jid){let ids=[];try{ids=JSON.parse(localStorage.getItem('activeJobs')||'[]')}catch(e){};const next=[...new Set(ids)].filter(id=>id!==jid);localStorage.setItem('activeJobs',JSON.stringify(next))}
 function showError(msg){$('errorText').textContent=msg;$('errorOverlay').classList.add('active');sbtn.disabled=false;sbtn.textContent='重试'}
 function closeError(){$('errorOverlay').classList.remove('active')}
-function showQmWarning(msg){
+// keepIfClean：干净任务只是不发言，**不清空**已有横幅。
+// 为什么需要它：#qmWarn 是**全局唯一**的一个元素，而恢复/补建路径会对
+// **每一个**已完成任务各调一次本函数。若干净任务照常执行清空，
+// 一批恢复里最后那个干净任务就会把前面某个真有问题的任务的红/黄横幅擦掉，
+// 用户看到的是「什么问题都没有」。实时完成那一条路径仍然按原样清空，
+// 因为那里一次只处理一个任务，清空是对的。
+// E2：转录欠账说明。**走终态状态，不走进度文案**——
+// 进度文案任务一跑完就被后续消息覆盖，用户刷新页面再也看不到
+// （第一批的「有几块没挂上标点」就是这么丢的）。
+// null = 没有欠账，什么都不显示：正常路由不是降级，说了反而吓人。
+// 全局只有一条提示栏。恢复多个任务时逐个调用，`keepIfClean=true` 让
+// **没有欠账的正常任务不去擦掉前一个任务的警告**——旁边的 showQmWarning
+// 早就有这个参数，这个函数抄结构时漏了，于是后一个正常任务把前一个的红字清空。
+function showTranscriptionShortfall(msg,keepIfClean,jid){
+  const w=$('shortfallWarn');if(!w)return;
+  const s=msg&&msg.transcription_shortfall;
+  if(!s||!s.message){if(!keepIfClean)w.classList.remove('active','yellow','red');return}
+  w.textContent=s.message;
+  // 记下这条提示属于哪个任务。顶部只有一条提示栏（全局），
+  // 它描述的错误却属于某一张卡——关掉那张卡时它必须一起走，
+  // 关掉别人时它得留着。不记主人就只能靠「还有没有失败卡」猜，会留下已关任务的错误。
+  if(w.dataset)w.dataset.jid=jid==null?'':String(jid);
+  w.className='qm-warn '+(s.severity==='error'?'red':'yellow')+' active';
+}
+function showQmWarning(msg,keepIfClean){
   const qm=msg.question_mark_count||0;const total=msg.segment_count||0;
   const w=$('qmWarn');
-  if(total<20||qm===0){w.classList.remove('active','yellow','red');return}
+  if(total<20||qm===0){if(!keepIfClean)w.classList.remove('active','yellow','red');return}
   const r=qm/total;
   if(r>0.15){w.textContent='音频质量较差（'+Math.round(r*100)+'% 字幕存疑），建议手动校对后使用';w.className='qm-warn red active'}
-  else if(r>=0.05||qm>=50){w.textContent='部分字幕可能不准确（'+Math.round(r*100)+'%），可查看 [?] 标记';w.className='qm-warn yellow active'}
-  else{w.classList.remove('active','yellow','red')}
+  else if(r>=0.05||qm>=50){w.textContent='部分字幕可能不准确（'+Math.round(r*100)+'%），详见任务卡的字幕质量';w.className='qm-warn yellow active'}
+  else{if(!keepIfClean)w.classList.remove('active','yellow','red')}
+}
+
+async function restoreActiveJobsAtStartup(){
+  let ids=readActiveJobIds();
+  try{
+    const res=await fetchWithTimeout('/api/active-jobs',{},5000);
+    if(res.ok){
+      const data=await res.json(),backendIds=[],ignoredIds=new Set();
+      for(const job of (data.jobs||[])){
+        const state=job&&job.state,details=(job&&job.details)||{};
+        if(!state||!state.job_id)continue;
+        const view=taskStateView(state,details);
+        if(state.status==='partial'&&isPartialIgnored(state.job_id,view)){ignoredIds.add(state.job_id);continue}
+        backendIds.push(state.job_id)
+      }
+      ids=[...new Set([...ids,...backendIds])].filter(id=>!ignoredIds.has(id))
+    }
+  }catch(e){}
+  writeActiveJobIds(ids);
+  if(typeof reconnectJobs==='function')reconnectJobs()
 }
 
 // ============ Init ============
 document.addEventListener('DOMContentLoaded',async()=>{
   mountSettingsDrawer();
   fetch('/api/health').then(r=>r.json()).then(d=>{const v=$('versionTag');if(v)v.textContent='v'+d.version}).catch(()=>{});
-  const burnSelect=document.getElementById('outputModeSelect');if(burnSelect){const v=State.settings.outputMode||'burn';burnSelect.value=v;$('burnWarn').style.display=v==='burn'?'block':'none';$('muxHint').style.display=v==='mux'?'block':'none';$('styleSubSection').style.display=v==='burn'?'block':'none'}
+  if(typeof syncOutputModeUI==='function')syncOutputModeUI();
   if(typeof loadConfig==='function')loadConfig();
   try{const res=await fetch('/api/backends');if(res.ok){const data=await res.json();if(typeof updateBackendLists==='function')updateBackendLists(data)}}catch(err){}
   if(typeof buildModelSlider==='function'){try{buildModelSlider()}catch(e){}}
-  updatePreview();
+  // 预览出错不能挡住下面的任务恢复（两者没有数据依赖）；报到控制台，不静默吞掉
+  try{updatePreview()}catch(e){console.error('样式预览出错（不影响任务恢复）',e)}
   // B5: 恢复旧任务前先拿到模型状态，避免 isOriginalModelReady 在空缓存上误判
   try{await fetchModelStatus()}catch(e){}
-  const rawActive=localStorage.getItem('activeJobs');
-  if(!rawActive||rawActive==='[]'){try{const res=await fetch('/api/active-jobs');if(res.ok){const data=await res.json();if(data.jobs&&data.jobs.length>0){const ids=data.jobs.map(j=>j.job_id);localStorage.setItem('activeJobs',JSON.stringify(ids))}}}catch(e){}}
-  if(typeof reconnectJobs==='function')reconnectJobs();
+  await restoreActiveJobsAtStartup();
 });
 </script>
 </body>

@@ -6,22 +6,25 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-def test_standard_router_uses_qwen_for_high_confidence_japanese():
+def test_standard_router_uses_qwen_for_japanese():
+    """CI-08 #4：结论方向不变（ja 走 qwen），概率入参随 G11 删除门槛一并消失。"""
     from backend.transcriber_v2 import choose_standard_primary_engine
 
-    assert choose_standard_primary_engine("ja", 0.95) == "qwen"
+    assert choose_standard_primary_engine("ja") == "qwen"
 
 
-def test_standard_router_keeps_whisper_for_low_confidence():
-    from backend.transcriber_v2 import choose_standard_primary_engine
-
-    assert choose_standard_primary_engine("ja", 0.20) == "whisper"
+# CI-08 #3：原 test_standard_router_keeps_whisper_for_low_confidence
+# 断言 choose_standard_primary_engine("ja", 0.20) == "whisper"，
+# 锁的正是 G11 要删除的 0.70 把握度门槛。**整条删除，不是改断言**——
+# 把 "whisper" 改成 "qwen" 就是保留错误合同、让红灯变绿。
+# 「路由不看概率」的新合同由 test_g11_language_decision.py 覆盖。
 
 
 def test_standard_router_keeps_whisper_for_non_qwen_primary_language():
+    """CI-08 #5：结论仍成立（fr 不在 QWEN_PRIMARY_LANGS），签名改变故重写。"""
     from backend.transcriber_v2 import choose_standard_primary_engine
 
-    assert choose_standard_primary_engine("fr", 0.95) == "whisper"
+    assert choose_standard_primary_engine("fr") == "whisper"
 
 
 def test_standard_primary_state_respects_whisper_choice():

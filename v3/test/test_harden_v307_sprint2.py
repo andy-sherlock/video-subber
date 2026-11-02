@@ -2,6 +2,7 @@
 
 Run: cd v3 && .venv/bin/python -m pytest test/test_harden_v307_sprint2.py -v
 """
+import json
 import sys
 import logging
 import tempfile
@@ -40,7 +41,7 @@ class _FakeWhisperSeg:
 # ═══════════════════════════════════════════════════════════
 
 class TestP240PathTraversal(unittest.TestCase):
-    """P240: llm_fallback_decision must validate job_id against path traversal."""
+    """P240: shared job_id validation must reject path traversal."""
 
     def test_validate_job_path_helper_exists(self):
         from backend.main import _validate_job_path
@@ -66,12 +67,6 @@ class TestP240PathTraversal(unittest.TestCase):
         from backend.main import _validate_job_path
         result = _validate_job_path("abc123-def456")
         self.assertIsNotNone(result)
-
-    def test_llm_fallback_uses_validation(self):
-        """llm_fallback_decision source must call _validate_job_path."""
-        from backend.main import llm_fallback_decision
-        src = inspect.getsource(llm_fallback_decision)
-        self.assertIn("_validate_job_path", src)
 
 
 class TestP243SSRF(unittest.TestCase):
@@ -231,10 +226,14 @@ class TestP303ActiveJobsRecovery(unittest.TestCase):
                 job_dir = main.JOBS_DIR / jid
                 job_dir.mkdir()
                 (job_dir / "input.mp4").write_bytes(b"video")
-                self._index_job(main, jid, "interrupted", {"video_filename": "input.mp4"})
+                # P516：能否恢复看任务记录里的原视频地址
+                (job_dir / "meta.json").write_text(json.dumps(
+                    {"status": "interrupted", "config": {}, "source_path": str(job_dir / "input.mp4")}),
+                    encoding="utf-8")
+                self._index_job(main, jid, "interrupted", {})
 
                 jobs = main.get_active_jobs()["jobs"]
-                self.assertEqual([job["job_id"] for job in jobs], [jid])
+                self.assertEqual([job["state"]["job_id"] for job in jobs], [jid])
         finally:
             self._restore_main_state(state)
 
@@ -321,28 +320,46 @@ class TestP246GreenExemption(unittest.TestCase):
                          "L4 should not filter repeated-words when l2_status=GREEN")
 
     def test_repeated_pattern_still_filters_non_green(self):
-        """Non-GREEN segment with repeated pattern should still be filtered."""
+        """Non-GREEN segment with repeated pattern should still be filtered.
+
+        闸门 2 真跑补漏：L4 三条文本重复分支已交出删除权，改为只标记。
+        全库审计它们删掉的是 'Canada. Canada.'、'Oh yeah. Oh yeah.'、'Meow Meow'
+        ——全是真话。本条意图不变，只把断言从「删除」改为「标可疑」。
+        """
         from backend.core.hallucination_filter import _layer4_regex
         seg = _make_seg(text="abcabcabc", l2_status="YELLOW")
         _layer4_regex(seg)
-        self.assertTrue(seg.filtered,
-                        "L4 should filter repeated-pattern when l2_status=YELLOW")
+        self.assertFalse(seg.filtered, "重复模式已交出删除权")
+        self.assertTrue(seg.uncertain,
+                        "L4 should still MARK repeated-pattern when l2_status=YELLOW")
 
     def test_repeated_words_still_filters_non_green(self):
-        """Non-GREEN segment with repeated words should still be filtered."""
+        """Non-GREEN segment with repeated words should still be filtered.
+
+        闸门 2 真跑补漏：L4 三条文本重复分支已交出删除权，改为只标记。
+        全库审计它们删掉的是 'Canada. Canada.'、'Oh yeah. Oh yeah.'、'Meow Meow'
+        ——全是真话。本条意图不变，只把断言从「删除」改为「标可疑」。
+        """
         from backend.core.hallucination_filter import _layer4_regex
         seg = _make_seg(text="hey hey hey", l2_status="YELLOW")
         _layer4_regex(seg)
-        self.assertTrue(seg.filtered,
-                        "L4 should filter repeated-words when l2_status=YELLOW")
+        self.assertFalse(seg.filtered, "真人说 hey hey hey 是常态，不许删")
+        self.assertTrue(seg.uncertain,
+                        "L4 should still MARK repeated-words when l2_status=YELLOW")
 
     def test_repeated_words_filters_when_no_l2_status(self):
-        """Segment without l2_status should be filtered (default unsafe)."""
+        """Segment without l2_status should be filtered (default unsafe).
+
+        闸门 2 真跑补漏：L4 三条文本重复分支已交出删除权，改为只标记。
+        全库审计它们删掉的是 'Canada. Canada.'、'Oh yeah. Oh yeah.'、'Meow Meow'
+        ——全是真话。本条意图不变，只把断言从「删除」改为「标可疑」。
+        """
         from backend.core.hallucination_filter import _layer4_regex
         seg = _make_seg(text="hey hey hey")
         _layer4_regex(seg)
-        self.assertTrue(seg.filtered,
-                        "L4 should filter repeated-words when l2_status is missing")
+        self.assertFalse(seg.filtered, "真人说 hey hey hey 是常态，不许删")
+        self.assertTrue(seg.uncertain,
+                        "L4 should still MARK repeated-words when l2_status is missing")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -432,7 +449,7 @@ class TestP284EnglishWhisperReference(unittest.TestCase):
             _FakeWhisperSeg(1.20, 3.40, "Oh gosh I don't know I wish I had clock"),
         ]
 
-        result = _smart_assemble(qwen_chunks, whisper_segs, "en", "qwen")
+        result = _smart_assemble(qwen_chunks, whisper_segs, "en")
 
         self.assertGreaterEqual(len(result), 2)
         self.assertEqual(result[0].text, "Hey Taylor what time is it")
@@ -458,7 +475,7 @@ class TestP284EnglishWhisperReference(unittest.TestCase):
             _FakeWhisperSeg(0.7, 1.3, "やめて"),
         ]
 
-        result = _smart_assemble(qwen_chunks, whisper_segs, "ja", "qwen")
+        result = _smart_assemble(qwen_chunks, whisper_segs, "ja")
 
         self.assertEqual([s.text for s in result], ["何するのやめて"])
 
@@ -476,19 +493,31 @@ class TestP284EnglishWhisperReference(unittest.TestCase):
         self.assertEqual(result[0].text, "Oh gosh I had claw")
         self.assertEqual(result[0].whisper_text, "Oh gosh I had clock")
 
-    def test_whisper_text_switches_refiner_to_dual_conflict_prompt(self):
+    def test_both_engine_versions_reach_the_model_in_dual_mode(self):
+        """P284 的关切：英语路线上副引擎的说法要能到模型面前。
+
+        G2/B1+B3+B5：原来靠段上的 `whisper_text` + `[CONFLICT]` 块，
+        那套按时间重叠拼接已删（边界对不齐，实测 68% 的「冲突」是纯错位）。
+        现在主引擎的 claw 在 A 块、副引擎的 clock 在 B 块，两个都送到。
+        """
+        from types import SimpleNamespace
+
         from backend.worker import _build_refiner_prompt, _choose_refiner_mode
 
         seg = _make_seg(id=3, start=0.0, end=2.0, text="I wish I had claw")
-        seg.whisper_text = "I wish I had clock"
+        receipt = SimpleNamespace(
+            reference_text="I wish I had clock", reference_usable=True,
+        )
 
-        mode = _choose_refiner_mode([seg])
-        user_prompt, _system_prompt = _build_refiner_prompt([seg], mode)
+        mode = _choose_refiner_mode(receipt)
+        user_prompt, _system_prompt = _build_refiner_prompt(
+            [seg], mode, reference_text=receipt.reference_text,
+        )
 
         self.assertEqual(mode, "dual")
-        self.assertIn("[CONFLICT seg_id: 3]", user_prompt)
-        self.assertIn("claw", user_prompt)
+        self.assertIn("段落 3: I wish I had claw", user_prompt)
         self.assertIn("clock", user_prompt)
+        self.assertNotIn("CONFLICT", user_prompt)
 
 
 class TestJobStatusPersistence(unittest.TestCase):
