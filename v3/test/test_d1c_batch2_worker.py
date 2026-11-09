@@ -55,7 +55,7 @@ def _run_translate(tmp_path, monkeypatch, *, config, spy, cached=None):
     segments = [worker.Segment(0, 0.0, 1.0, "one")]
     monkeypatch.setattr("backend.translation.orchestrator.translate_with_orchestrator", spy)
     worker._step_translate(
-        "subtitle", segments, translated_path, "speed", ["google"], [],
+        "subtitle", segments, translated_path, [],
         False, config, tmp_path, 1, _Ck(),
     )
 

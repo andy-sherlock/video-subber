@@ -20,6 +20,15 @@ _SOUND_REASONS = {
 }
 
 
+def is_valid_saved_translation(value) -> bool:
+    """「这句算不算翻好了」的唯一规则（R2）：worker 写记录前、main.py 数失败句都用它。"""
+    return bool(
+        isinstance(value, str)
+        and value.strip()
+        and value.strip() != "[翻译失败]"
+    )
+
+
 def _int(value):
     if isinstance(value, bool):
         return None
@@ -117,12 +126,10 @@ def _quality(job):
     translation_public = {
         "requested_tier": safe_public_text(translation.get("requested_tier"), job),
         **{key: _int(translation.get(key)) for key in (
-            "api_success_count", "api_total_count", "fallback_success",
+            "api_success_count", "api_total_count",
             # D-1 A5：格式修复后仍失败、保留原文的句子数。
             "kept_original_count",
         )},
-        "auto_fallback": translation.get("auto_fallback")
-        if isinstance(translation.get("auto_fallback"), bool) else None,
         # D-1 C12：哪一步没用上 AI、为什么。只放白名单里的值，文字由前端现算。
         "ai_unused": _ai_unused(translation.get("ai_unused")),
     }
@@ -147,10 +154,6 @@ def _quality(job):
             value is not None for value in subtitle_public.values()) else None,
         "translation_summary": translation_public if any(
             value is not None for value in translation_public.values()) else None,
-        "fa_quality": job.get("fa_quality")
-        if job.get("fa_quality") in {"ok", "fallback"} else None,
-        "alignment_fallback": job.get("alignment_fallback")
-        if isinstance(job.get("alignment_fallback"), bool) else None,
         "sound_reference": sound_public,
     }
 
@@ -182,9 +185,7 @@ def _display(job, status, phase):
     engine = job.get("engine_status")
     if phase == "translate" and isinstance(engine, dict):
         labels = {"trying_api": "正在使用用户配置的 API",
-                  "api_failed": "用户配置的 API 失败",
-                  "switching_to_free": "正在切换免费翻译引擎",
-                  "free_running": "免费翻译引擎运行中"}
+                  "api_failed": "用户配置的 API 失败"}
         return message or labels.get(engine.get("phase"), "正在翻译字幕"), activity
     return message or "正在处理任务", activity
 

@@ -4,7 +4,7 @@ P186: _MODEL_CONTEXT_CACHE was previously defined in main.py and imported via
 lazy import from translation/base.py. Moving it here breaks the reverse dependency.
 
 P407: Added file persistence so worker subprocesses can read the cache.
-P408: Added compute_fatigue_chunk — shared formula for both translation and sentence chunking.
+P408: Added compute_fatigue_chunk — shared chunking formula (P500: translation no longer uses it; sentence chunking does).
 """
 import json
 import os

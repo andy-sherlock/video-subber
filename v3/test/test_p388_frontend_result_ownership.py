@@ -59,7 +59,6 @@ def _done_harness(msg_js):
         "const document={getElementById:id=>els[id]||null,"
         "createElement:()=>element()};",
         "function hideMilestones(){}",
-        "function showAlignmentFallbackNotice(){}",
         "const revealJobOutput=()=>{};",
         _function_source("renderCardDone"),
         f"renderCardDone('j',{msg_js});",

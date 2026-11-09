@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.translation.base import LLMBackend, TranslationResult
+from backend.translation.base import LLMBackend
 
 
 class FakeLLMBackend(LLMBackend):
@@ -40,19 +40,6 @@ class FakeLLMBackend(LLMBackend):
     def _call_api_raw(self, prompt: str, max_tokens: int = 8192) -> tuple[str, dict]:
         self.last_prompt = prompt
         return self.raw, {"usage": {"prompt_tokens": 1, "completion_tokens": 1}}
-
-
-class StaticBackend:
-    def __init__(self, translated, name="static"):
-        self.translated = translated
-        self.name = name
-
-    def translate_batch(self, batch, context=""):
-        return TranslationResult(
-            translated=list(self.translated),
-            backend_name=self.name,
-            tokens_used=None,
-        )
 
 
 class FakeSegment:
@@ -163,34 +150,6 @@ class TestP352NumberedBatchProtocol(unittest.TestCase):
         self.assertEqual(result, ["甲", "", "丙"])
 
 
-class TestP352OrchestratorPollutionGate(unittest.TestCase):
-    def test_quality_mode_rejects_polluted_backend_and_uses_next_backend(self):
-        from backend.translation.orchestrator import _run_quality_mode_batch
-
-        polluted = StaticBackend(["甲\n---\n乙\n---\n丙", "[翻译失败]", "[翻译失败]"], "polluted")
-        clean = StaticBackend(["甲", "乙", "丙"], "clean")
-
-        result, backend, failed, _, _failures = _run_quality_mode_batch(
-            ["one", "two", "three"], [polluted, clean])
-
-        self.assertEqual(result, ["甲", "乙", "丙"])
-        self.assertEqual(failed, [])
-        self.assertEqual(backend.name, "clean")
-
-    def test_speed_mode_counts_only_clean_translations(self):
-        from backend.translation.orchestrator import _run_speed_mode_batch
-
-        polluted = StaticBackend(["甲\n---\n乙\n---\n丙", "乙", "丙"], "polluted")
-        clean = StaticBackend(["甲", "乙", "丙"], "clean")
-
-        result, backend, _, _failures = _run_speed_mode_batch(
-            ["one", "two", "three"], [polluted, clean]
-        )
-
-        self.assertEqual(result, ["甲", "乙", "丙"])
-        self.assertEqual(backend.name, "clean")
-
-
 class TestP352SentenceSplitterGuard(unittest.TestCase):
     def test_two_second_segment_is_not_split_into_dozen_tiny_subtitles(self):
         from backend.core.sentence_splitter import _build_split_segments
@@ -246,8 +205,6 @@ class TestP352WorkerCachePollutionGate(unittest.TestCase):
                     "subtitle",
                     segments,
                     translated_path,
-                    "speed",
-                    ["google"],
                     [],
                     False,
                     {},
@@ -280,8 +237,6 @@ class TestP352WorkerCachePollutionGate(unittest.TestCase):
                     "subtitle",
                     segments,
                     translated_path,
-                    "speed",
-                    ["google"],
                     [],
                     False,
                     {},
@@ -313,8 +268,6 @@ class TestP352WorkerCachePollutionGate(unittest.TestCase):
                     "subtitle",
                     segments,
                     translated_path,
-                    "speed",
-                    ["google"],
                     [],
                     False,
                     {},

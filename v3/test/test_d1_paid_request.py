@@ -98,13 +98,6 @@ def test_existing_kinds_unchanged(code, kind):
     assert classify_translation_failure(_http_error(code)) == kind
 
 
-def test_new_kinds_keep_context_route_free_fill_behaviour():
-    """用户裁决：新类别加进停用名单，上下文感知路线 :1650 的行为不变。"""
-    from backend.translation.orchestrator import _IMMEDIATE_LLM_FUSE_FAILURES
-
-    assert {"insufficient_balance", "request_rejected"} <= _IMMEDIATE_LLM_FUSE_FAILURES
-
-
 def test_new_kinds_are_public_detail_kinds():
     from backend.main import _DETAIL_FAILURE_KINDS
 

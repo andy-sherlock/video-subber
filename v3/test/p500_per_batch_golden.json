@@ -1,0 +1,63 @@
+{
+ "录制代码版本": "a07b277（P500 施工 ③ 改动前）",
+ "全对": {
+  "prompts": [
+   "你是专业视频字幕翻译。将以下字幕逐段翻译成zh。\n<SHARED_TRANSLATION_RULES>\n<LAYOUT_FRIENDLY_RULES>\n仅按 [编号] 译文 格式输出。除编号和译文外，不要输出解释、分隔符或 Markdown。\n必须返回和输入完全相同的条数，不许合并、不许拆分，哪怕两条本来是一句话。\n\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.\n[2] My friend Sarah is very nervous.\n[3] Bonjour. Bonjour."
+  ],
+  "translated": [
+   "大家好，欢迎来到皇后镇。",
+   "今天我们去蹦极。",
+   "我的朋友莎拉很紧张。",
+   "你好。你好。"
+  ],
+  "failed": [],
+  "tokens": {
+   "input_tokens": 10,
+   "output_tokens": 5
+  },
+  "splits": {},
+  "failures": {}
+ },
+ "一句没翻": {
+  "prompts": [
+   "你是专业视频字幕翻译。将以下字幕逐段翻译成zh。\n<SHARED_TRANSLATION_RULES>\n<LAYOUT_FRIENDLY_RULES>\n仅按 [编号] 译文 格式输出。除编号和译文外，不要输出解释、分隔符或 Markdown。\n必须返回和输入完全相同的条数，不许合并、不许拆分，哪怕两条本来是一句话。\n\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.\n[2] My friend Sarah is very nervous.\n[3] Bonjour. Bonjour.",
+   "以下是本批字幕原文，用于理解语境：\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.\n[2] My friend Sarah is very nervous.\n[3] Bonjour. Bonjour.\n\n<SHARED_TRANSLATION_RULES>\n只翻译第 3 条，只输出这一条的译文，不要编号、不要分隔符、不要解释。\n原文：Bonjour. Bonjour."
+  ],
+  "translated": [
+   "大家好，欢迎来到皇后镇。",
+   "今天我们去蹦极。",
+   "我的朋友莎拉很紧张。",
+   "你好。你好。"
+  ],
+  "failed": [],
+  "tokens": {
+   "input_tokens": 20,
+   "output_tokens": 10
+  },
+  "splits": {},
+  "failures": {}
+ },
+ "条数不对": {
+  "prompts": [
+   "你是专业视频字幕翻译。将以下字幕逐段翻译成zh。\n<SHARED_TRANSLATION_RULES>\n<LAYOUT_FRIENDLY_RULES>\n仅按 [编号] 译文 格式输出。除编号和译文外，不要输出解释、分隔符或 Markdown。\n必须返回和输入完全相同的条数，不许合并、不许拆分，哪怕两条本来是一句话。\n\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.\n[2] My friend Sarah is very nervous.\n[3] Bonjour. Bonjour.",
+   "语境: 上一次返回条数与输入不符，很可能合并了相邻两条。这一次必须严格一条对一条，即使两条原文本是一句话。\n\n你是专业视频字幕翻译。将以下字幕逐段翻译成zh。\n<SHARED_TRANSLATION_RULES>\n<LAYOUT_FRIENDLY_RULES>\n仅按 [编号] 译文 格式输出。除编号和译文外，不要输出解释、分隔符或 Markdown。\n必须返回和输入完全相同的条数，不许合并、不许拆分，哪怕两条本来是一句话。\n\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.\n[2] My friend Sarah is very nervous.\n[3] Bonjour. Bonjour.",
+   "语境: 上一次返回条数与输入不符，很可能合并了相邻两条。这一次必须严格一条对一条，即使两条原文本是一句话。\n\n你是专业视频字幕翻译。将以下字幕逐段翻译成zh。\n<SHARED_TRANSLATION_RULES>\n<LAYOUT_FRIENDLY_RULES>\n仅按 [编号] 译文 格式输出。除编号和译文外，不要输出解释、分隔符或 Markdown。\n必须返回和输入完全相同的条数，不许合并、不许拆分，哪怕两条本来是一句话。\n\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.",
+   "语境: 上一次返回条数与输入不符，很可能合并了相邻两条。这一次必须严格一条对一条，即使两条原文本是一句话。\n\n你是专业视频字幕翻译。将以下字幕逐段翻译成zh。\n<SHARED_TRANSLATION_RULES>\n<LAYOUT_FRIENDLY_RULES>\n仅按 [编号] 译文 格式输出。除编号和译文外，不要输出解释、分隔符或 Markdown。\n必须返回和输入完全相同的条数，不许合并、不许拆分，哪怕两条本来是一句话。\n\n[0] My friend Sarah is very nervous.\n[1] Bonjour. Bonjour.",
+   "以下是本批字幕原文，用于理解语境：\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.\n[2] My friend Sarah is very nervous.\n[3] Bonjour. Bonjour.\n\n<SHARED_TRANSLATION_RULES>\n只翻译第 2 条，只输出这一条的译文，不要编号、不要分隔符、不要解释。\n原文：My friend Sarah is very nervous.",
+   "以下是本批字幕原文，用于理解语境：\n[0] Hello everyone, welcome to Queenstown.\n[1] Today we are going bungee jumping.\n[2] My friend Sarah is very nervous.\n[3] Bonjour. Bonjour.\n\n<SHARED_TRANSLATION_RULES>\n只翻译第 3 条，只输出这一条的译文，不要编号、不要分隔符、不要解释。\n原文：Bonjour. Bonjour."
+  ],
+  "translated": [
+   "大家好，欢迎来到皇后镇。",
+   "今天我们去蹦极。",
+   "我的朋友莎拉很紧张。",
+   "你好。你好。"
+  ],
+  "failed": [],
+  "tokens": {
+   "input_tokens": 60,
+   "output_tokens": 30
+  },
+  "splits": {},
+  "failures": {}
+ }
+}

@@ -213,17 +213,9 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .model-current{text-align:center;font-size:13px;font-weight:600;margin-top:10px}
 .model-status-copy{display:block;font-size:11px;font-weight:400;color:var(--sub);margin-top:4px;line-height:1.4}
 
-/* ── Priority ── */
-.priority-list{margin-top:8px;display:none}
-.priority-list.show{display:block}
-.priority-item{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--surface);border-radius:var(--r-sm);margin-bottom:4px;cursor:grab;font-size:13px}
-.priority-item:active{cursor:grabbing}
-.priority-rank{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;text-align:center;line-height:20px;flex-shrink:0;font-weight:600}
-.drag-handle{color:var(--sub);font-size:16px;flex-shrink:0;cursor:grab;line-height:1}
-
 /* ── 字幕标记说明 ── */
 .info-note{font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6}
-	/* B6 翻译分区：智能/免费两区标题层级拉开，不再用 12px 同色灰 card-label */
+	/* B6 翻译分区标题：层级拉开，不再用 12px 同色灰 card-label */
 	.trans-section-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px}
 	.trans-section-sub{font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:10px}
 	.smart-trans-config{display:block;margin-top:10px;padding-top:10px;border-top:1px solid rgba(199,199,204,.45)}
@@ -238,6 +230,12 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .api-field{display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px}
 .api-field-label{font-size:11px;color:var(--sub);line-height:1.2}
 .api-field-help{font-size:11px;color:var(--sub);line-height:1.35}
+.key-guide{margin-top:10px;padding:10px 12px;border-radius:var(--r-sm);background:var(--surface);font-size:12px;line-height:1.6}
+.key-guide-title{font-weight:600}
+.key-guide-sub{color:var(--sub)}
+.key-guide-steps{margin:6px 0 0;padding-left:18px}
+.key-guide-steps code{user-select:all;word-break:break-all}
+.key-guide-copy{margin-left:4px;font-size:11px}
 .api-row .api-field input,.api-row .api-field select{width:100%;flex:none;min-width:0}
 .api-key-field{min-width:220px}
 .api-custom-model-field{display:none}
@@ -415,10 +413,6 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
         <div id="drawerModelMount"></div>
       </div>
     </section>
-    <section class="acc-item" data-acc="free-translate">
-      <button class="acc-head" type="button" onclick="toggleAcc('free-translate')"><div class="nav-icon">免</div><div class="acc-title"><strong>免费翻译</strong><span>极速、质量优先、免费引擎顺序</span></div><div class="chev">›</div></button>
-      <div class="acc-body" id="accBodyFreeTranslate"></div>
-    </section>
     <section class="acc-item" data-acc="smart-translate">
       <button class="acc-head" type="button" onclick="toggleAcc('smart-translate')"><div class="nav-icon">智</div><div class="acc-title"><strong>智能翻译</strong><span>API Key、逐段、上下文感知</span></div><div class="chev">›</div></button>
       <div class="acc-body" id="accBodySmartTranslate"></div>
@@ -551,26 +545,8 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   </div>
 </div>
 
-<!-- ═══════════════ Region 4: Translation（B6 智能/免费分区） ═══════════════ -->
-<!-- 翻译策略（translationMode：只管免费翻译路径） -->
-<div class="card settings-panel" id="translateStrategy">
-  <div class="card-label" id="transModeTitle">翻译策略</div>
-  <div class="row" id="modeRow">
-    <div class="toggle" id="modeToggle">
-      <button class="active" data-v="speed">极速模式</button>
-      <button data-v="quality">质量优先</button>
-    </div>
-  </div>
-</div>
-
-<!-- 免费翻译区（上，默认主路径；只留引擎优先顺序） -->
-<div class="card settings-panel" id="freeTransSection">
-  <div class="trans-section-title">免费翻译</div>
-  <div class="trans-section-sub">无需 API Key，随时可用。拖动可调整引擎优先顺序。</div>
-  <div class="priority-list show" id="priorityList"></div>
-</div>
-
-<!-- 智能翻译区（下，可选增强路径；contextAware 从高级挪进这里） -->
+<!-- ═══════════════ Region 4: Translation ═══════════════ -->
+<!-- 智能翻译区（contextAware 从高级挪进这里） -->
 <div class="card settings-panel" id="smartTransSection">
   <div class="trans-section-title">智能翻译</div>
   <div class="trans-section-sub">用 Claude、GPT 这类大模型翻译，更懂上下文和专业词，需要你自己的 API Key。</div>
@@ -583,6 +559,15 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
       </div>
     </div>
     <div class="info-note">上下文感知：先阅读完整字幕理解语境（主题、人物、术语），再逐段翻译。更准确，但耗时更长。</div>
+    <div class="key-guide" id="keyGuide" hidden>
+      <div class="key-guide-title">还没有 Key？三步拿到 DeepSeek 的 Key</div>
+      <div class="key-guide-sub">软件免费，翻译用你自己的 Key，一部 30 分钟片约一毛钱。</div>
+      <ol class="key-guide-steps">
+        <li data-step="1">打开 DeepSeek 开放平台并登录：<code id="keyGuideUrl">https://platform.deepseek.com/api_keys</code> <button type="button" class="key-guide-copy" onclick="copyKeyGuideUrl(this)">复制网址</button></li>
+        <li data-step="2">点「创建 API Key」，复制生成的那一串 Key</li>
+        <li data-step="3">粘贴到下面的「API Key」框里，平台选 DeepSeek，软件会自动检测能不能用</li>
+      </ol>
+    </div><!-- /keyGuide -->
     <div class="api-tip" id="apiTip">暂未配置 API Key</div>
     <div class="api-row" id="apiRow">
       <div class="api-line">
@@ -636,8 +621,6 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   </div>
 </div>
 
-<!-- 字幕标记说明 -->
-<div class="info-note" id="subtitleMarkerNote">字幕中 <b>- </b> 前缀表示系统检测到说话人切换。字幕质量情况（存疑句数、显示偏短的条数等）不再写进字幕正文，处理完成后显示在任务卡上。</div>
 
 <!-- 语音识别模块底部：实验性说话人检测 -->
 <div class="card settings-panel" id="voiceSpeakerPanel">
@@ -653,8 +636,7 @@ select:focus,input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 
 <div id="jobCards"></div>
 
-<div class="qm-warn" id="qmWarn"></div>
-<!-- E2：转录欠账说明。与 qmWarn 分开，两者可能同时出现。 -->
+<!-- E2：转录欠账说明。 -->
 <div class="qm-warn" id="shortfallWarn"></div>
 
 <div class="progress-section" id="progressSection" style="display:none">
@@ -698,10 +680,9 @@ const State={
   localPath:null,
   sourceUrl:null,
   doneJobConfig:null,
-  availableBackends:{free:[],llm:[]},
+  availableBackends:{llm:[]},
   settings:{
     subtitles:"no",outputMode:"burn",model:DEFAULT_MODEL,
-    translationMode:"speed",translationPriority:["google","bing","youdao"],
     contextAware:false,apiKeys:[],savePath:"~/Downloads/Video-Subber",
     speakerDetect:false,
     transcriptionTier:"standard",
@@ -712,7 +693,6 @@ const MODELS=["large-v3-turbo","large-v2","large-v3"];
 const MODEL_LABELS={"large-v3-turbo":"更快","large-v2":"日常推荐","large-v3":"高准确度"};
 const MODEL_INFO={"large-v3-turbo":"更快（速度优先，清晰音频）","large-v2":"日常推荐（默认下载，复杂背景更稳）","large-v3":"高准确度（更慢，音频清晰时字幕更准）"};
 const MODEL_SCENE={"large-v3-turbo":"速度最快","large-v2":"抗杂音","large-v3":"音频清晰时字幕更准"};
-const DEFAULT_LABELS={google:"Google",bing:"Bing",youdao:"有道"};
 let latestEnvStatus=null;
 
 function getSimulateParam(){
@@ -817,12 +797,6 @@ reloadEnv();
 // ============ Backends ============
 function updateBackendLists(data){
   State.availableBackends=data;
-  const newPriority=data.free.map(b=>b.id);
-  const available=new Set(newPriority);
-  const merged=(State.settings.translationPriority||[]).filter(b=>available.has(b));
-  newPriority.forEach(b=>{if(!merged.includes(b))merged.push(b)});
-  State.settings.translationPriority=merged.length?merged:newPriority;
-  buildPriorityList();
   const sel=$('apiPlatform');sel.innerHTML='';
   State._llmModels={};
   State._llmModelSigs={};
@@ -833,8 +807,7 @@ function updateBackendLists(data){
   });
   onPlatformChange();
   $('apiTip').textContent=`可用平台: ${data.llm.map(b=>b.name).join(' / ')}。添加 API Key 即可启用智能翻译。`;
-  $('apiRow').style.display='flex';$('modeRow').style.display='flex';
-  $('transModeTitle').textContent='翻译策略';
+  $('apiRow').style.display='flex';
   syncContextAwareBtn();
 }
 
@@ -952,10 +925,8 @@ function _settingsMatchDone(){
   if(String(s.subtitles)!==String(c.subtitles??'no'))return false;
   if(String(normalizeJobOutputMode(s))!==String(normalizeJobOutputMode(c)))return false;
   if(String(s.model)!==String(c.model??DEFAULT_MODEL))return false;
-  if(String(s.translationMode)!==String(c.translationMode??'speed'))return false;
   if(String(s.contextAware)!==String(c.contextAware??false))return false;
   if(JSON.stringify(s.apiKeys||[])!==JSON.stringify(c.apiKeys||[]))return false;
-  if(JSON.stringify(s.translationPriority||[])!==JSON.stringify(c.translationPriority||[]))return false;
   if(JSON.stringify(s.style||{})!==JSON.stringify(c.style||{}))return false;
   if(String(s.savePath||'')!==String(c.savePath||''))return false;
   return true;
@@ -1204,30 +1175,6 @@ function pollModelProgress(modelId){
     }catch(e){setTimeout(check,1000)}
   };
   setTimeout(check,300);
-}
-
-// ============ Translation Mode ============
-$('modeToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.translationMode=e.target.dataset.v;saveConfig();refreshStartBtn()});
-function buildPriorityList(){
-  const list=$('priorityList');
-  const labels={...DEFAULT_LABELS};
-  const avail=State.availableBackends&&State.availableBackends.free||[];
-  avail.forEach(b=>{labels[b.id]=b.name});
-  // Ensure every available backend is in the priority list
-  const cur=State.settings.translationPriority;
-  const curSet=new Set(cur);
-  avail.forEach(b=>{if(!curSet.has(b.id)){cur.push(b.id);curSet.add(b.id)}});
-  list.innerHTML='';
-  cur.forEach((bid,i)=>{
-    if(!labels[bid])return;
-    const item=document.createElement('div');item.className='priority-item';item.draggable=true;item.dataset.backend=bid;
-    item.innerHTML=`<span class="drag-handle">≡</span><span class="priority-rank">${i+1}</span><span>${labels[bid]}</span>`;
-    item.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',bid);item.style.opacity='.5'});
-    item.addEventListener('dragend',()=>{item.style.opacity='1'});
-    item.addEventListener('dragover',e=>{e.preventDefault()});
-    item.addEventListener('drop',e=>{e.preventDefault();const src=e.dataTransfer.getData('text/plain');const srcIdx=State.settings.translationPriority.indexOf(src);if(srcIdx<0)return;const dstIdx=State.settings.translationPriority.indexOf(bid);const tmp=State.settings.translationPriority[srcIdx];State.settings.translationPriority.splice(srcIdx,1);State.settings.translationPriority.splice(dstIdx,0,tmp);buildPriorityList();saveConfig();refreshStartBtn()});
-    list.appendChild(item);
-  });
 }
 
 $('ctxToggle').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;e.target.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');State.settings.contextAware=e.target.dataset.v==='true';saveConfig();refreshStartBtn()});
@@ -1522,6 +1469,23 @@ function askTranslateOnly(platform,panel){
     ],panel);
   });
 }
+function openKeyGuide(){
+  // D-6 P503：没 Key 的人只有这一条路。还没填 Key 时平台预选 DeepSeek（引导里推荐的那家），
+  // 触发 change 让模型列表跟上；粘贴 Key 后由 scheduleKeyGate 自动检测（与平时同一条路）。
+  const guide=$('keyGuide');if(!guide)return;
+  guide.hidden=false;
+  const platform=$('apiPlatform');
+  if(platform&&!$('apiKeyInput').value.trim()&&platform.value!=='deepseek'){
+    platform.value='deepseek';platform.dispatchEvent(new Event('change'));
+  }
+  try{guide.scrollIntoView({block:'nearest'})}catch(e){}
+}
+function copyKeyGuideUrl(button){
+  // 桌面壳不能替用户打开外部网址（src-tauri 无此能力），只给复制。
+  const url=$('keyGuideUrl').textContent;
+  const done=()=>{button.textContent='已复制';setTimeout(()=>{button.textContent='复制网址'},1500)};
+  try{navigator.clipboard.writeText(url).then(done,()=>{})}catch(e){}
+}
 function gatePanelFor(btn){
   // 处理中 / 已完成画面里「开始」下面的面板是隐藏的：卡片按钮的提示放进按钮所在的卡片区域。
   if(!btn||btn===sbtn||!btn.parentNode)return $('gatePanel');
@@ -1543,15 +1507,19 @@ async function startGate(button){
   const started=Date.now();
   const res=await testGate();
   await _gateMinShown(started);
-  if(res.ok||res.kind==='no_key'){
-    // 设置里没填 Key：照旧放行（免费翻译兜底仍在，方案 §5）
-    if(res.ok)gateMark($('startGateMk'),'ok');
+  if(res.ok){
+    gateMark($('startGateMk'),'ok');
     await new Promise(r=>setTimeout(r,300));
     btn.style.width='';btn.textContent=label;
     return {};
   }
   btn.style.width='';btn.textContent=label;btn.disabled=false;if(btn===sbtn)refreshStartBtn();
   if(res.translate_only)return await askTranslateOnly(res.platform,panel);
+  if(res.kind==='no_key'){
+    // D-6 P503：翻译只用付费 AI，没 Key 不开始，只给「去拿 Key」一条路。
+    openGatePanel('翻译要用你自己的 API Key。软件免费，一部 30 分钟片约一毛钱。',[{text:'去拿 Key',primary:true,onclick:()=>{closeGatePanel(panel);if($('infoModalOverlay').classList.contains('active'))closeInfoModal();openSettingsDrawer('api');openKeyGuide()}}],panel);
+    return null;
+  }
   btn.classList.remove('d1-shake');void btn.offsetWidth;btn.classList.add('d1-shake');
   openGatePanel(gateReasonText(res.kind),[{text:'去设置',onclick:()=>{closeGatePanel(panel);if($('infoModalOverlay').classList.contains('active'))closeInfoModal();openSettingsDrawer('api')}}],panel);
   return null;
@@ -1614,11 +1582,13 @@ $('apiAddBtn').addEventListener('click',()=>{
   const name=$('apiName').value.trim();
   const key=$('apiKeyInput').value.trim();
   if(!platform||!key)return;
+  // P553：自定义平台没填地址，后台会静默跳过它，最后误报「还没有填写 API Key」。
+  if(platform==='custom'&&!$('apiEndpoint').value.trim()){showToast('请填写平台地址');return}
 
   const entry={platform,name,key};
 
   if(platform==='custom'){
-    entry.api_endpoint=$('apiEndpoint').value.trim()||'';
+    entry.api_endpoint=$('apiEndpoint').value.trim();
   }
   const modelVal=_readModelFromForm();
   const needModel=$('apiModelNameField').style.display!=='none'||$('apiModel').value==='__custom__'||_isCustomPlaceholder()||_customModelCacheStaleForForm();
@@ -1793,7 +1763,7 @@ $('styleConfirmBtn').addEventListener('click',()=>{
 // ============ Config Persistence ============
 let _configSavePromise=Promise.resolve(true);
 function saveConfig(){
-  const cfg={translationMode:State.settings.translationMode,translationPriority:State.settings.translationPriority,model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,outputMode:State.settings.outputMode,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect,transcriptionTier:State.settings.transcriptionTier};
+  const cfg={model:State.settings.model,contextAware:State.settings.contextAware,apiKeys:State.settings.apiKeys,style:State.settings.style,outputMode:State.settings.outputMode,subtitles:State.settings.subtitles,savePath:State.settings.savePath,speakerDetect:State.settings.speakerDetect,transcriptionTier:State.settings.transcriptionTier};
   // localStorage: strip key values, save metadata only
   const safeCfg={...cfg,apiKeys:(cfg.apiKeys||[]).map(k=>({platform:k.platform,name:k.name,model:k.model,api_endpoint:k.api_endpoint}))};
   localStorage.setItem('video-subber-config',JSON.stringify(safeCfg));
@@ -1805,7 +1775,8 @@ function loadConfig(){
   const raw=localStorage.getItem('video-subber-config');
   if(raw){try{const c=JSON.parse(raw);if(c.burn!==undefined&&c.outputMode===undefined){c.outputMode=c.burn?'burn':'srt'}delete c.apiKeys;Object.assign(State.settings,c)}catch(e){}}
   fetch('/api/config').then(r=>r.json()).then(c=>{
-    if(c&&c.translationMode)Object.assign(State.settings,c);
+    // 服务器出错时返回的不是设置（没有 model），不能拿来覆盖本地设置。
+    if(c&&typeof c==='object'&&'model' in c)Object.assign(State.settings,c);
     syncUI();updateSavePathDisplay();
   }).catch(()=>{syncUI();updateSavePathDisplay()});
 }
@@ -1823,9 +1794,7 @@ function taskStateView(state,details={}){
     message:state&&state.display_message,detail:state&&state.activity,
     output_ready:Boolean(result.output_ready),can_show_output_folder:Boolean(result.can_show_output_folder),
     resume_action:actions.resume_action,can_resume:Boolean(actions.can_resume),can_retry:Boolean(actions.can_retry),
-    question_mark_count:quality.question_mark_count,subtitle_quality:quality.subtitle_quality,
-    translation_summary:quality.translation_summary,fa_quality:quality.fa_quality,
-    alignment_fallback:quality.alignment_fallback,sound_reference:quality.sound_reference,
+    translation_summary:quality.translation_summary,sound_reference:quality.sound_reference,
     transcription_shortfall:quality.transcription_shortfall,
     segment_count:counts.total,success_count:counts.succeeded,failed_count:counts.failed,
     ...(details||{})};
@@ -1868,7 +1837,7 @@ function reconnectJobs(){
       const filename=details.video_filename||'恢复中…';
       if(state.status==='running'||state.status==='queued'){addJobCard(jid,filename);activeJobs[jid].config={...(details.config||{})};if(!settingsLocked){lockUI();settingsLocked=true}
         applyTaskState(jid,state);showVideoBox(filename,'处理中');setScene('processing');connectCard(jid)}
-      else if(state.status==='done'){addJobCard(jid,filename);activeJobs[jid].config={...(details.config||{})};markRestoredCard(jid,'done');renderCardDone(jid,view);showQmWarning(view,true);showTranscriptionShortfall(view,true,jid);removeActiveJobId(jid)}
+      else if(state.status==='done'){addJobCard(jid,filename);activeJobs[jid].config={...(details.config||{})};markRestoredCard(jid,'done');renderCardDone(jid,view);showTranscriptionShortfall(view,true,jid);removeActiveJobId(jid)}
       else if(state.status==='partial'){if(isPartialIgnored(jid,view)){removeActiveJobId(jid);return}addJobCard(jid,filename);markRestoredCard(jid,'partial');handlePartialState(jid,view)}
       else if(state.status==='error'){addJobCard(jid,filename);markRestoredCard(jid,'error');renderCardError(jid,view);showTranscriptionShortfall(view,true,jid);if(!state.actions.resume_action)removeActiveJobId(jid)}
       else if(state.status==='model_missing'){showRecoveryModelMissingModal({config:details.config||{}},filename);removeActiveJobId(jid)}
@@ -2024,9 +1993,8 @@ function mountSettingsDrawer(){
   // 其余设置面板分发到对应手风琴模块（一处一份，不再堆进「更多设置」）
   const place=(bodyId,panelIds)=>{const body=$(bodyId);if(!body)return;panelIds.forEach(pid=>{const p=$(pid);if(p)body.appendChild(p)})};
   place('accBodyVoice',['voiceSpeakerPanel']);
-  place('accBodyFreeTranslate',['translateStrategy','freeTransSection']);
   place('accBodySmartTranslate',['smartTransSection']);
-  place('accBodyOutput',['outputPanel','styleSubSection','subtitleMarkerNote']);
+  place('accBodyOutput',['outputPanel','styleSubSection']);
   ['settingsBtn','edgeHandle'].forEach(id=>{const el=$(id);if(el)el.addEventListener('click',()=>openSettingsDrawer())});
   $('settingsClose').addEventListener('click',closeSettingsDrawer);
   $('settingsScrim').addEventListener('click',closeSettingsDrawer);
@@ -2087,7 +2055,7 @@ function handleFoundJob(d,filename){
     return;
   }
   if(d.status==='done'){
-    if(!card){addJobCard(d.job_id,d.video_filename||filename);renderCardDone(d.job_id,d);showQmWarning(d,true);showTranscriptionShortfall(d,true,d.job_id)}
+    if(!card){addJobCard(d.job_id,d.video_filename||filename);renderCardDone(d.job_id,d);showTranscriptionShortfall(d,true,d.job_id)}
     else{card.scrollIntoView({behavior:'smooth'});card.classList.add('flash-highlight');setTimeout(()=>card.classList.remove('flash-highlight'),1000)}
     State.doneJobConfig={...d.config};unlockUI();settingsLocked=false;
     const _same=_settingsMatchDone();
@@ -2236,8 +2204,6 @@ function unlockUI(){
 function renderSettingsToDOM(){
   document.querySelectorAll('#subToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.subtitles)});
   const bs=document.getElementById('outputModeSelect');bs.value=State.settings.outputMode||'burn';bs.dispatchEvent(new Event('change'));
-  document.querySelectorAll('#modeToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===State.settings.translationMode)});
-  document.getElementById('priorityList').classList.add('show');
   document.querySelectorAll('#ctxToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.contextAware))});
   document.querySelectorAll('#speakerToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.speakerDetect))});
   document.querySelectorAll('#mainTierToggle button').forEach(b=>{b.classList.toggle('active',b.dataset.v===String(State.settings.transcriptionTier||'standard'))});
@@ -2257,7 +2223,6 @@ function renderSettingsToDOM(){
 function rebuildDynamicWidgets(){
   buildModelSlider();
   buildKeyList();
-  buildPriorityList();
   fetchModelStatus();
 }
 
@@ -2360,15 +2325,6 @@ function finishMilestones(jid){
   box.querySelectorAll('.milestone').forEach(el=>{el.classList.add('done');el.classList.remove('active')});
 }
 function hideMilestones(jid){const box=$('ms-'+jid);if(box)box.style.display='none'}
-function showAlignmentFallbackNotice(jid,msg){
-  if(!msg)return;
-  const raw=[msg.message,msg.detail,msg.warning,msg.error].filter(Boolean).join(' ');
-  const fallback=msg.fa_quality==='fallback'||msg.alignment_fallback===true||raw.includes('粗时间')||raw.includes('词级对齐未成功')||raw.includes('时间轴对齐失败');
-  if(!fallback)return;
-  const q=$('quality-'+jid);if(!q)return;
-  q.textContent='时间轴对齐失败，已使用粗时间继续';
-  q.classList.add('show');
-}
 // 错误提示里出现「一键准备/一键修复」时给可点的按钮，别让文案指路却没有路
 function renderErrorActions(errEl,text){
   if(!errEl||!text)return;
@@ -2440,35 +2396,22 @@ function renderTranslationSummary(jid,msg){
   const target=$('quality-'+jid);if(!target)return;
   const summary=msg&&msg.translation_summary;
   const lines=[];
-  // E2：转录欠账排在最前——它是用户唯一的行动线索（「已处理到 20:00，模型加载失败」），
-  // 比「3 句存疑」重要得多。
+  // E2：转录欠账排在最前——它是用户唯一的行动线索（「已处理到 20:00，模型加载失败」）。
   // **必须写进任务卡**：全局提示栏只有一条，后面再跑一个任务就可能把它清掉；
-  // 而这一行跟着卡片走，卡片在它就在。
-  // 与 question_mark_count 同一个模式：全局栏醒目提示 + 卡内持久记录，两处都要。
+  // 而这一行跟着卡片走，卡片在它就在。全局栏醒目提示 + 卡内持久记录，两处都要。
   const shortfall=msg&&msg.transcription_shortfall;
   if(shortfall&&shortfall.message)lines.push(shortfall.message);
   // 没有翻译记录就**不写这一行**——用户不需要知道我们不知道什么。
   // 注意：只跳过翻译档位这一段，不能提前 return——这个函数后面还渲染
-  //    声音参考、存疑句数、字幕质量三样，掐掉它们等于静默交付。
+  //    声音参考，掐掉它等于静默交付。
   if(summary){
     const apiSuccess=Number(summary.api_success_count),apiTotal=Number(summary.api_total_count);
     const countsValid=Number.isFinite(apiSuccess)&&Number.isFinite(apiTotal)&&apiSuccess>=0&&apiTotal>=0;
-    if(summary.requested_tier==='basic')lines.push('普通免费翻译');
-    else if(summary.auto_fallback===true&&countsValid&&apiSuccess===0)lines.push('全部 API 失败，已自动使用免费翻译');
-    else if(summary.auto_fallback===true&&countsValid&&apiSuccess>0)lines.push('部分字幕由免费翻译补全');
-    else if(summary.requested_tier==='api_context')lines.push('API 上下文专业翻译');
-    else lines.push('API 逐段翻译');
-    if(countsValid){
-      lines.push(`本轮 API 成功 ${apiSuccess}/${apiTotal}`);
-      // G8/A11：优先用后端送来的 fallback_success —— 它和最后一次运行中提示
-      // 是同一个来源。旧的 successCount-apiSuccess 是前端自己减出来的，
-      // 换个来源就会和运行中的数字对不上。历史任务没有这个字段，才回退。
-      const fbSuccess=Number(summary.fallback_success);
-      const successCount=Number(msg.success_count);
-      if(summary.auto_fallback===true&&Number.isFinite(fbSuccess))lines.push(`免费补全 ${fbSuccess} 条`);
-      else if(summary.auto_fallback===true&&Number.isFinite(successCount))lines.push(`免费补全 ${Math.max(0,successCount-apiSuccess)} 条`);
-    }
-    // D-1 A5：付费模式格式修不好的句子保留原文（不再用免费翻译补）。
+    // 升级前的旧任务可能记着已删的档位，不认识的档位不写这一行，免得说错。
+    if(summary.requested_tier==='api_context')lines.push('API 上下文专业翻译');
+    else if(summary.requested_tier==='api_segment')lines.push('API 逐段翻译');
+    if(countsValid)lines.push(`本轮 API 成功 ${apiSuccess}/${apiTotal}`);
+    // D-1 A5：付费模式格式修不好的句子保留原文。
     const kept=Number(summary.kept_original_count);
     if(Number.isFinite(kept)&&kept>0)lines.push(`有 ${kept} 句未能翻译，保留了原文`);
     // D-1 C12：哪一步没用上 AI——从任务结果里那一份记录现算，不另存文案。
@@ -2477,25 +2420,11 @@ function renderTranslationSummary(jid,msg){
   }
   const sound=msg&&msg.sound_reference;
   if(sound&&sound.status==='unavailable'&&sound.message)lines.push(sound.message);
-  // G6：[?] 不再写进字幕正文，存疑句数改由这一行如实报出。
-  // 与上方黄/红横幅的区别：横幅有 5%/15% 阈值，低于 5% 不弹；
-  // 这一行**没有阈值**，只要有存疑句就写出来。200 句里 4 句存疑时，
-  // 横幅仍然不弹（不打扰），但用户不会再有「一个字都看不到」的区间。
-  const qm=Number(msg&&msg.question_mark_count);
-  if(Number.isFinite(qm)&&qm>0)lines.push(qm+' 句存疑');
-  // P419：后端从 G5-1 起就在发 subtitle_quality（worker.py:3122），前端一直没读，
-  // 用户完全看不到。合同 A13：被封顶的长字幕、切不动的分屏、仍低于 0.84 秒的
-  // 条目，用户都有权知道——静默交付是不允许的。
-  const quality=msg&&msg.subtitle_quality;
-  if(quality){
-    const short=quality.below_min_display;
-    if(short&&short.count>0)lines.push(short.count+' 条字幕显示偏短');
-    const capped=quality.capped_no_legal_cut;
-    if(capped&&capped.count>0)lines.push(capped.count+' 条长字幕已按 7 秒截断');
-    const unsplit=(quality.mapping_failed_splits||0)+(quality.no_safe_boundary_splits||0)+(quality.single_word_over_max||0);
-    if(unsplit>0)lines.push(unsplit+' 条长字幕未能拆分');
-  }
-  target.textContent=lines.join(' · ');target.classList.add('show');
+  // D-3：存疑句数、排版毛病（显示偏短 / 7 秒截断 / 未能拆分）不写给用户——
+  //    是程序内部的怀疑和我们自己的毛病（P498、P530）。
+  // 没有一行可写就收起框，不留一个空的橙色框（D-3 收尾审查）。
+  target.textContent=lines.join(' · ');
+  if(lines.length)target.classList.add('show');else target.classList.remove('show');
 }
 function renderCardError(jid,msg){
   const fill=$('fill-'+jid),pct=$('pct-'+jid),step=$('step-'+jid),card=$('card-'+jid),err=$('err-'+jid);
@@ -2579,7 +2508,7 @@ function writePartialIgnore(jid,msg,reason){const all=partialIgnores();all[jid]=
 function clearPartialIgnore(jid){const all=partialIgnores();delete all[jid];localStorage.setItem('partialJobIgnores',JSON.stringify(all))}
 function resetPartialPromptTicket(jid,retryCount){localStorage.removeItem('partialPrompt:'+jid);_partialPromptKeys.delete(jid+':'+(retryCount||0))}
 function isPartialIgnored(jid,msg){const item=partialIgnores()[jid];return !!(item&&item.dismissed_retry_count===(msg.retry_count||0))}
-function partialReason(kind){return ({auth:'API Key 无效，请检查或更换 Key 后重试',rate_limit:'请求过多，请稍等后重试或切换翻译引擎',connection:'无法连接翻译服务，请检查网络后重试或切换翻译引擎',timeout:'连接翻译服务超时，请稍后重试或切换翻译引擎',service_error:'翻译服务返回错误，请稍后重试或切换翻译引擎',request_rejected:'翻译服务返回错误，请稍后重试或切换翻译引擎',insufficient_balance:'账户余额不足，请充值后重试',numbering_format:'翻译返回格式错误，请重试或切换翻译引擎',empty_translation:'翻译服务返回空内容，请重试或切换翻译引擎',quality_rejected:'译文未通过质量检查，请重试或切换翻译引擎',mixed:'存在多种失败原因，请按下方建议处理',unknown:'没有取得明确原因，请查看日志或切换翻译引擎后重试'})[kind]||'没有取得明确原因，请查看日志或切换翻译引擎后重试'}
+function partialReason(kind){const unclear='请检查 Key、余额和网络后重试';return ({auth:'API Key 无效，请检查或更换 Key 后重试',insufficient_balance:'账户余额不足，请充值后重试',mixed:'存在多种失败原因，请按下方建议处理',unknown:unclear})[kind]||unclear}
 function partialCopy(msg){
   const total=msg.segment_count||0,failed=msg.failed_count||0,recovered=msg.recovered_count||0,noProgress=msg.consecutive_no_progress||0,reason=partialReason(msg.primary_failure_kind);
   if(msg.retry_status==='completed'){
@@ -2707,7 +2636,7 @@ function applyTaskState(jid,state){
     const view=taskStateView(state,job.pendingDetails||{});job.pendingDetails=null;
     // 黄条必须在**跑完的这一刻**出现。原来只有恢复/重新发现任务的路径叫了它，
     // 用户坐着等任务跑完什么都看不到，刷新一下才看得见——第一批栽过的同一个坑。
-    renderCardDone(jid,view);showQmWarning(view);showTranscriptionShortfall(view,false,jid);if(job.ws)try{job.ws.close()}catch(e){};
+    renderCardDone(jid,view);showTranscriptionShortfall(view,false,jid);if(job.ws)try{job.ws.close()}catch(e){};
     clearTimeout(job.pollTimer);State.doneJobConfig={...job.config};delete activeJobs[jid];
     removeActiveJobId(jid);checkAllDone('done');refreshStartBtn();return true;
   }
@@ -2789,7 +2718,6 @@ function renderCardDone(jid,msg){
   const canShow=Boolean(msg.can_show_output_folder);
   if(step)step.textContent=canShow?'已完成，成品已保存到目标文件夹':(msg.output_ready?'已完成':'处理已结束，但没有找到这次生成的字幕文件。');
   hideMilestones(jid);
-  showAlignmentFallbackNotice(jid,msg);
   if(typeof renderTranslationSummary==='function')renderTranslationSummary(jid,msg);
   // 一张卡不能同时是「失败」和「成功」。renderCardError 加的标记全项目没人移除，
   // 而关闭卡片时要靠它判断该不该删后端记录——不摘掉，成功卡会被当成失败卡删掉记录。
@@ -2895,19 +2823,14 @@ function saveActiveJobs(){addActiveJobIds(Object.keys(activeJobs))}
 function removeActiveJobId(jid){let ids=[];try{ids=JSON.parse(localStorage.getItem('activeJobs')||'[]')}catch(e){};const next=[...new Set(ids)].filter(id=>id!==jid);localStorage.setItem('activeJobs',JSON.stringify(next))}
 function showError(msg){$('errorText').textContent=msg;$('errorOverlay').classList.add('active');sbtn.disabled=false;sbtn.textContent='重试'}
 function closeError(){$('errorOverlay').classList.remove('active')}
-// keepIfClean：干净任务只是不发言，**不清空**已有横幅。
-// 为什么需要它：#qmWarn 是**全局唯一**的一个元素，而恢复/补建路径会对
-// **每一个**已完成任务各调一次本函数。若干净任务照常执行清空，
-// 一批恢复里最后那个干净任务就会把前面某个真有问题的任务的红/黄横幅擦掉，
-// 用户看到的是「什么问题都没有」。实时完成那一条路径仍然按原样清空，
-// 因为那里一次只处理一个任务，清空是对的。
 // E2：转录欠账说明。**走终态状态，不走进度文案**——
 // 进度文案任务一跑完就被后续消息覆盖，用户刷新页面再也看不到
 // （第一批的「有几块没挂上标点」就是这么丢的）。
 // null = 没有欠账，什么都不显示：正常路由不是降级，说了反而吓人。
-// 全局只有一条提示栏。恢复多个任务时逐个调用，`keepIfClean=true` 让
-// **没有欠账的正常任务不去擦掉前一个任务的警告**——旁边的 showQmWarning
-// 早就有这个参数，这个函数抄结构时漏了，于是后一个正常任务把前一个的红字清空。
+// keepIfClean：全局只有一条提示栏，恢复/补建路径会对**每一个**任务各调一次。
+// `keepIfClean=true` 让**没有欠账的正常任务不去擦掉前一个任务的警告**，
+// 否则一批恢复里最后那个正常任务会把前一个的红字清空。实时完成一次只处理
+// 一个任务，仍按原样清空。
 function showTranscriptionShortfall(msg,keepIfClean,jid){
   const w=$('shortfallWarn');if(!w)return;
   const s=msg&&msg.transcription_shortfall;
@@ -2918,15 +2841,6 @@ function showTranscriptionShortfall(msg,keepIfClean,jid){
   // 关掉别人时它得留着。不记主人就只能靠「还有没有失败卡」猜，会留下已关任务的错误。
   if(w.dataset)w.dataset.jid=jid==null?'':String(jid);
   w.className='qm-warn '+(s.severity==='error'?'red':'yellow')+' active';
-}
-function showQmWarning(msg,keepIfClean){
-  const qm=msg.question_mark_count||0;const total=msg.segment_count||0;
-  const w=$('qmWarn');
-  if(total<20||qm===0){if(!keepIfClean)w.classList.remove('active','yellow','red');return}
-  const r=qm/total;
-  if(r>0.15){w.textContent='音频质量较差（'+Math.round(r*100)+'% 字幕存疑），建议手动校对后使用';w.className='qm-warn red active'}
-  else if(r>=0.05||qm>=50){w.textContent='部分字幕可能不准确（'+Math.round(r*100)+'%），详见任务卡的字幕质量';w.className='qm-warn yellow active'}
-  else{if(!keepIfClean)w.classList.remove('active','yellow','red')}
 }
 
 async function restoreActiveJobsAtStartup(){

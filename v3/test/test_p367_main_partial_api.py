@@ -36,8 +36,8 @@ def test_config_endpoint_remains_the_only_plain_key_channel(monkeypatch):
     assert response["apiKeys"][0]["key"] == fake_secret
 
 
-def test_partial_retry_uses_this_run_keys_and_current_priority(monkeypatch, tmp_path):
-    """D-1 补修 A3：Key 用前端点重试时检测过的那份；免费翻译顺序仍从本机设置刷新。"""
+def test_partial_retry_uses_this_run_keys(monkeypatch, tmp_path):
+    """D-1 补修 A3：Key 用前端点重试时检测过的那份（D-6 P503 起不再刷新免费翻译顺序）。"""
     fake_current = "fake-current-key"
     fake_old = "fake-old-key"
     job_id = "abc123"
@@ -84,10 +84,8 @@ def test_partial_retry_uses_this_run_keys_and_current_priority(monkeypatch, tmp_
     assert response["ok"] is True
     assert response["job_id"] == job_id
     assert response["action"] == "retry"
-    assert response["config"]["translationPriority"] == ["bing", "youdao"]
     assert "apiKeys" not in response["config"]
     assert starts[0]["apiKeys"] == [{"key": fake_current}]
-    assert starts[0]["translationPriority"] == ["bing", "youdao"]
     assert starts[0]["_partial_retry"] is True
     assert starts[0]["_retry_count"] == 2
 
@@ -103,10 +101,11 @@ def test_partial_retry_atomically_persists_authoritative_config_action_and_index
     video.write_bytes(b"video")
     old_config = {
         "video_filename": "input.mp4", "outputMode": "mux",
-        "translationPriority": ["google"], "apiKeys": [{"key": "old"}],
+        "apiKeys": [{"key": "old"}],
     }
     file_hash = hashlib.sha256(video.read_bytes()).hexdigest()
-    old_key = main._task_key(file_hash, old_config)
+    # 升级前的任务存的是旧算法的身份键（D-6 P503 起重试本身不再改变身份键）
+    old_key = f"{file_hash}_oldstylekey0"
     original_meta = {
         "status": "partial", "file_hash": file_hash, "task_key": old_key,
         "source_path": str(video),  # P516
@@ -137,28 +136,29 @@ def test_partial_retry_atomically_persists_authoritative_config_action_and_index
     assert saved["status"] == "running"
     assert saved["partial_resume_action"] == "retry"
     assert saved["retry_count"] == 2
-    assert saved["config"]["translationPriority"] == ["bing"]
     assert saved["config"]["apiKeys"] == [{"key": "new"}]
     assert saved["task_key"] == new_key
     assert old_key not in main.GLOBAL_HASH_INDEX
     assert main.GLOBAL_HASH_INDEX[new_key]["job_id"] == job_id
     assert main.JOB_ID_TO_HASH[job_id] == new_key
     assert main.JOBS[job_id]["status"] == "running"
-    assert response["config"]["translationPriority"] == ["bing"]
     assert "apiKeys" not in response["config"]
 
 
 def test_partial_retry_task_key_collision_returns_409_without_mutation(monkeypatch, tmp_path):
-    """P369：新配置已被别的任务占用时，不能静默覆盖任务索引。"""
+    """P369：新配置已被别的任务占用时，不能静默覆盖任务索引。
+
+    D-6 P503 起重试不再刷新免费引擎顺序，任务身份键只会因「旧任务存的是旧算法的键」而变
+    （升级前的任务）；这里用一个旧键模拟它。"""
     job_id = "collision"
     job_dir = tmp_path / job_id
     job_dir.mkdir()
     video = job_dir / "input.mp4"
     video.write_bytes(b"video")
     file_hash = hashlib.sha256(video.read_bytes()).hexdigest()
-    old_config = {"video_filename": "input.mp4", "translationPriority": ["google"]}
-    new_config = {**old_config, "translationPriority": ["bing"]}
-    old_key = main._task_key(file_hash, old_config)
+    old_config = {"video_filename": "input.mp4"}
+    new_config = old_config
+    old_key = f"{file_hash}_oldstylekey0"
     new_key = main._task_key(file_hash, new_config)
     meta = {
         "status": "partial", "file_hash": file_hash, "task_key": old_key,
@@ -433,6 +433,8 @@ def test_partial_action_cold_start_builds_complete_job_from_meta(monkeypatch, tm
     starts = []
     monkeypatch.setattr(main, "JOBS_DIR", tmp_path)
     monkeypatch.setattr(main, "JOBS", {})
+    monkeypatch.setattr(main, "GLOBAL_HASH_INDEX", {})
+    monkeypatch.setattr(main, "JOB_ID_TO_HASH", {})
     monkeypatch.setattr(main.worker_manager, "is_alive", lambda jid: False)
     monkeypatch.setattr(main.worker_manager, "start", lambda *args, **kwargs: starts.append(args))
     monkeypatch.setattr("backend.config_manager.load_config", lambda: {"apiKeys": [], "translationPriority": []})

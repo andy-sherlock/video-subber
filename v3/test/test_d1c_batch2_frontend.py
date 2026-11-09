@@ -139,14 +139,6 @@ def test_gate_asks_the_backend_without_sending_keys():
     assert data["r"] == {}
 
 
-def test_gate_lets_the_task_start_when_no_key_is_saved():
-    # 删除免费翻译前，不填 Key 仍可开始（方案 §5 残留，行为不变）
-    data = _run_node(_gate_js(
-        "startGate(sbtn).then(r=>console.log(JSON.stringify({r})));",
-        "{ok:false,translate_only:false,kind:'no_key'}"))
-    assert data["r"] == {}
-
-
 def test_go_to_settings_closes_the_dialog_first():
     # A12-4：部分完成弹窗里检测失败点「去设置」，抽屉不能被弹窗挡住
     data = _run_node(_gate_js("""

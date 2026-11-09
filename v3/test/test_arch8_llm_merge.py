@@ -243,15 +243,6 @@ class TestOrchestratorMergeIntegration(unittest.TestCase):
         from backend.translation.orchestrator import _extract_terminology_and_summary
         self.assertTrue(callable(_extract_terminology_and_summary))
 
-    def test_old_functions_still_exist_as_fallbacks(self):
-        """extract_terminology and _generate_context_summary are still available."""
-        from backend.translation.orchestrator import (
-            extract_terminology,
-            _generate_context_summary,
-        )
-        self.assertTrue(callable(extract_terminology))
-        self.assertTrue(callable(_generate_context_summary))
-
 
 if __name__ == "__main__":
     unittest.main()

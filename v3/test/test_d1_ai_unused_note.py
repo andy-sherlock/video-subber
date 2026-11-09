@@ -258,10 +258,9 @@ def test_step_translate_summary_carries_kept_original_count(tmp_path):
 
     with patch("backend.translation.orchestrator.translate_with_orchestrator", _spy):
         result = worker._step_translate(
-            "translate", segments, tmp_path / "translated.json", "speed", ["google"],
+            "translate", segments, tmp_path / "translated.json",
             [{"platform": "deepseek", "key": "k"}], False, {}, tmp_path, len(segments), _Ck(),
             include_failure_details=True,
         )
     summary = result[-1]
     assert summary["kept_original_count"] == 1
-    assert summary["auto_fallback"] is False

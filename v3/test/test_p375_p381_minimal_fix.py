@@ -206,10 +206,10 @@ def test_engine_status_only_wins_during_translate_stage():
     from backend import job_state
     state = job_state.build_public_task_state({
         "id": "j", "status": "running", "stage": "transcribe",
-        "engine_status": {"phase": "free_running", "engine_category": "free"},
+        "engine_status": {"phase": "trying_api", "engine_category": "api"},
     })
     assert state["phase"] == "translate"
-    assert state["display_message"] == "免费翻译引擎运行中"
+    assert state["display_message"] == "正在使用用户配置的 API"
 
 
 def test_p380_chunk_numbers_and_live_api_calls_are_not_added():
@@ -243,18 +243,11 @@ def test_per_batch_item_callbacks_keep_global_local_index_and_report_cumulative_
         def translate_raw(self, *_args, **_kwargs):
             return SimpleNamespace(translated=[""], tokens_used=None, failure_kind="empty_translation")
 
-    class FreeBackend:
-        name = "free"
-
-        def translate_batch(self, _texts):
-            return SimpleNamespace(translated=["戊"], tokens_used=None, failure_kind=None)
-
     items = []
     stats = []
     result = orchestrator._translate_llm_per_batch(
         ["A", "C", "E"],
         [ApiBackend()],
-        [FreeBackend()],
         item_result_callback=lambda *args: items.append(args),
         translation_stats_callback=stats.append,
         progress_callback=lambda *a: None,
@@ -274,43 +267,13 @@ def test_per_batch_item_callbacks_keep_global_local_index_and_report_cumulative_
     ]
 
 
-def test_free_only_item_callback_is_not_reported_as_fallback(monkeypatch):
-    from backend.translation import orchestrator
-
-    monkeypatch.setattr(orchestrator, "_split_into_batches", lambda texts: [texts])
-    monkeypatch.setattr(orchestrator.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(
-        orchestrator,
-        "_run_speed_mode_batch",
-        lambda batch, _backends: (
-            ["甲", orchestrator.FAILED_TRANSLATION],
-            SimpleNamespace(name="free"),
-            [],
-            {1: "network"},
-        ),
-    )
-    items = []
-    result = orchestrator._translate_free_only(
-        ["A", "B"],
-        "speed",
-        [SimpleNamespace(name="free")],
-        item_result_callback=lambda *args: items.append(args),
-    )
-
-    assert result[1] == [1]
-    assert items == [
-        (0, "甲", True, False),
-        (1, None, False, False),
-    ]
-
-
 def test_public_translation_return_contract_stays_five_tuple(monkeypatch):
     from backend.translation import orchestrator
 
-    monkeypatch.setattr(orchestrator, "_build_llm_backends", lambda _keys: [])
+    monkeypatch.setattr(orchestrator, "_build_llm_backends", lambda _keys: [object()])
     monkeypatch.setattr(
         orchestrator,
-        "_translate_free_only",
+        "_translate_llm_per_batch",
         lambda *args, **kwargs: (["甲"], [], None, {}, {}),
     )
     result = orchestrator.translate_with_orchestrator(
@@ -361,7 +324,7 @@ def test_non_cached_resume_translates_only_pending_and_writes_back_by_position(
         "backend.translation.orchestrator.translate_with_orchestrator", fake_translate
     )
     result = worker._step_translate(
-        "translate", segments, translated_path, "speed", ["google"],
+        "translate", segments, translated_path,
         [{"key": "fake"}], False, {}, tmp_path, 5, _Checkpoint(),
         include_failure_details=True,
     )
@@ -369,47 +332,14 @@ def test_non_cached_resume_translates_only_pending_and_writes_back_by_position(
     assert calls == [["B", "D", "E"]]
     assert [segment.zh for segment in segments] == ["已有甲", "译乙", "已有丙", "译丁", "译戊"]
     assert len(result) == 5
-    # G8/A11：summary 新增 fallback_processed / fallback_success，让结束提示
-    # 和最后一次运行中提示用同一组数字（以前前端是自己减出来的，两个来源）。
-    # 本例没走免费兜底，两个数都应为 0。
+    # D-6 P503：免费兜底计数（auto_fallback / fallback_*）已随免费翻译删除。
     assert result[4] == {
         "requested_tier": "api_segment",
         "api_success_count": 3,
         "api_total_count": 3,
         # D-1 A5：新增保留原文条数；本例统计回调没报这个数 → None。
         "kept_original_count": None,
-        "auto_fallback": False,
-        "fallback_processed": 0,
-        "fallback_success": 0,
     }
-
-
-def test_quality_reflection_receives_full_text_and_translation_lists(monkeypatch, tmp_path):
-    from backend import worker
-
-    segments = _segments()
-    seen = {}
-
-    def fake_translate(**kwargs):
-        return ["译乙", "译丁", "译戊"], [], None, {}, {}
-
-    def fake_reflection(current_segments, texts, zh_list, failed, *_args):
-        seen["texts"] = texts
-        seen["zh_list"] = zh_list
-        return failed
-
-    monkeypatch.setattr(
-        "backend.translation.orchestrator.translate_with_orchestrator", fake_translate
-    )
-    monkeypatch.setattr(worker, "_reflection_review", fake_reflection)
-    worker._step_translate(
-        "translate", segments, tmp_path / "translated.json", "quality", ["google"],
-        [{"key": "fake"}], False, {"reflection": True}, tmp_path, 5,
-        _Checkpoint(), include_failure_details=True,
-    )
-
-    assert seen["texts"] == ["A", "B", "C", "D", "E"]
-    assert seen["zh_list"] == ["已有甲", "译乙", "已有丙", "译丁", "译戊"]
 
 
 def test_snapshot_uses_segment_ids_and_keeps_prior_successes(tmp_path):
@@ -513,7 +443,7 @@ def test_worker_terminal_paths_attach_private_summary_without_changing_three_tup
     assert "return failed, sub_splits, ok_count" in source
 
 
-def test_frontend_done_summary_copy_covers_history_basic_and_fallback():
+def test_frontend_done_summary_copy_covers_api_tiers():
     source = _source("frontend/index.html")
     summary_start = source.index("function renderTranslationSummary")
     summary_block = source[summary_start:source.index("function renderCardError", summary_start)]
@@ -521,9 +451,9 @@ def test_frontend_done_summary_copy_covers_history_basic_and_fallback():
     # 「历史任务，翻译层级未知」是软件在说「我不知道」——
     # 用户不需要知道我们不知道什么，那一块留空。
     assert "历史任务，翻译层级未知" not in summary_block
-    assert "普通免费翻译" in summary_block
-    assert "全部 API 失败，已自动使用免费翻译" in summary_block
-    assert "部分字幕由免费翻译补全" in summary_block
+    # D-6 P503：免费翻译三行文案已删。
+    assert "免费" not in summary_block
+    assert "API 上下文专业翻译" in summary_block and "API 逐段翻译" in summary_block
     assert "本轮 API 成功" in summary_block
     done_start = source.index("function renderCardDone")
     done_block = source[done_start:source.index("function dismissRestoredCard", done_start)]

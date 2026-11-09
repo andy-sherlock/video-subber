@@ -242,62 +242,8 @@ class TestP303ActiveJobsRecovery(unittest.TestCase):
 # Commit 2: Translation Quality — P241 + P248
 # ═══════════════════════════════════════════════════════════
 
-class TestP241RetryLanguage(unittest.TestCase):
-    """P241: P230 retry must not hardcode '英文翻译成中文'."""
+# P500 施工 ⑤：「≤10 句才补」_retry_failed_with_llm 的提示词检查 随整片翻译代码删除（方案 5.2）。
 
-    def _capture_retry_prompt(self):
-        """Drive the P230 single-segment retry and capture the prompt sent to the LLM."""
-        from backend.translation.orchestrator import _retry_failed_with_llm
-        captured = []
-
-        class _FakeLLM:
-            name = "fake"
-
-            def translate_raw(self, prompt, max_tokens=512):
-                captured.append(prompt)
-
-                class _R:
-                    translated = ["占位"]
-
-                return _R()
-
-        _retry_failed_with_llm(["hello"], ["[翻译失败]"], [0], _FakeLLM())
-        self.assertTrue(captured, "P230 retry should call translate_raw on the failed segment")
-        return captured[0]
-
-    def test_no_hardcoded_english_to_chinese(self):
-        prompt = self._capture_retry_prompt()
-        self.assertNotIn("将以下英文翻译成中文", prompt,
-                         "P230 retry prompt must use _TARGET_LANGUAGE, not hardcoded '英文→中文'")
-
-    def test_uses_target_language_variable(self):
-        from backend.translation.orchestrator import _TARGET_LANGUAGE
-        prompt = self._capture_retry_prompt()
-        self.assertIn(_TARGET_LANGUAGE, prompt,
-                      "P230 retry prompt must reference _TARGET_LANGUAGE")
-
-
-class TestP248ReflectionTrigger(unittest.TestCase):
-    """P248: P3 reflection must run in quality mode even when no segments failed."""
-
-    def test_reflection_not_gated_on_failed(self):
-        """The condition guarding P3 reflection must NOT require `failed` to be truthy."""
-        from backend import worker
-        src = inspect.getsource(worker)
-        lines = src.split("\n")
-        found = False
-        for line in lines:
-            if "translation_mode" in line and "quality" in line and "api_keys" in line:
-                found = True
-                self.assertNotIn("and failed", line,
-                                 "P3 reflection should not require `and failed`")
-                break
-        self.assertTrue(found, "Could not find the P3 reflection guard condition in worker.py")
-
-
-# ═══════════════════════════════════════════════════════════
-# Commit 3: Filter — P246
-# ═══════════════════════════════════════════════════════════
 
 class TestP246GreenExemption(unittest.TestCase):
     """P246: L4 repeated-pattern and repeated-words must skip GREEN segments."""

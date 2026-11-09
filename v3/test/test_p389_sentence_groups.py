@@ -361,14 +361,11 @@ def test_translation_entry_receives_complete_groups_not_old_fragments(monkeypatc
         "backend.translation.orchestrator.translate_with_orchestrator",
         fake_translate,
     )
-    monkeypatch.setattr(worker, "_reflection_review", lambda *args: args[3])
 
     worker._step_translate(
         "translate",
         groups,
         tmp_path / "translated.json",
-        "speed",
-        ["google"],
         [],
         False,
         {},
@@ -406,14 +403,11 @@ def test_old_snapshot_cannot_restore_translations_to_new_sentence_groups(
         "backend.translation.orchestrator.translate_with_orchestrator",
         fake_translate,
     )
-    monkeypatch.setattr(worker, "_reflection_review", lambda *args: args[3])
 
     worker._step_translate(
         "translate",
         groups,
         tmp_path / "translated.json",
-        "speed",
-        ["google"],
         [],
         False,
         {},
@@ -446,14 +440,11 @@ def test_display_line_splitting_does_not_change_translation_input(monkeypatch, t
         "backend.translation.orchestrator.translate_with_orchestrator",
         fake_translate,
     )
-    monkeypatch.setattr(worker, "_reflection_review", lambda *args: args[3])
 
     worker._step_translate(
         "translate",
         groups,
         tmp_path / "translated.json",
-        "speed",
-        ["google"],
         [],
         False,
         {},

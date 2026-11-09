@@ -85,22 +85,8 @@ class TestP172RepeatWordThreshold(unittest.TestCase):
 # P178: _CHUNK_SIZE / _OVERLAP_SIZE dead code removal
 # ═══════════════════════════════════════════════════════════
 
-class TestP178DeadCodeRemoved(unittest.TestCase):
+# P500 施工 ⑤：_translate_whole_with_markers 的源码检查 随整片翻译代码删除（方案 5.2）。
 
-    def test_chunk_size_not_used_in_translate_function(self):
-        """_translate_whole_with_markers uses _compute_chunk_size, not _CHUNK_SIZE."""
-        import inspect
-        from backend.translation.orchestrator import _translate_whole_with_markers
-        src = inspect.getsource(_translate_whole_with_markers)
-        # Should NOT reference the dead _CHUNK_SIZE constant directly
-        self.assertNotIn("_CHUNK_SIZE", src)
-
-    def test_overlap_size_not_used_in_translate_function(self):
-        """_translate_whole_with_markers should not reference _OVERLAP_SIZE."""
-        import inspect
-        from backend.translation.orchestrator import _translate_whole_with_markers
-        src = inspect.getsource(_translate_whole_with_markers)
-        self.assertNotIn("_OVERLAP_SIZE", src)
 
 
 if __name__ == "__main__":

@@ -691,6 +691,8 @@ class TestShortfallLivesInTheTaskCard(unittest.TestCase):
                   "message": "语音识别未完成：已处理到 20:00，未生成字幕。"
                              "语音识别模型加载失败，请完成运行环境准备后重试。"}
 
+    _SOUND = {"status": "unavailable", "message": "声音参考未使用，字幕仍已生成。"}
+
     def test_shortfall_appears_in_the_card_summary(self):
         out = _run_quality_summary({
             "transcription_shortfall": self._SHORTFALL,
@@ -701,19 +703,18 @@ class TestShortfallLivesInTheTaskCard(unittest.TestCase):
         self.assertIn("show", out["cls"], "摘要区必须显示出来")
 
     def test_shortfall_comes_first(self):
-        """它比「3 句存疑」重要得多，排在前面。"""
+        """它是用户唯一的行动线索，排在最前。（D-3：存疑句数已不显示，换声音参考那一行对照。）"""
         out = _run_quality_summary({
             "transcription_shortfall": self._SHORTFALL,
-            "question_mark_count": 3, "segment_count": 100})
+            "sound_reference": self._SOUND})
         text = out["text"]
-        self.assertLess(text.index("已处理到 20:00"), text.index("句存疑"))
+        self.assertLess(text.index("已处理到 20:00"), text.index("声音参考未使用"))
 
     def test_no_shortfall_changes_nothing(self):
-        """回归：没有欠账时，原来那几样一个字都不许变。"""
+        """回归：没有欠账时，原来那几样一个字都不许变。（D-3：存疑句数已不显示。）"""
         out = _run_quality_summary({
-            "transcription_shortfall": None,
-            "question_mark_count": 3, "segment_count": 100})
-        self.assertEqual(out["text"], "3 句存疑")
+            "transcription_shortfall": None, "sound_reference": self._SOUND})
+        self.assertEqual(out["text"], "声音参考未使用，字幕仍已生成。")
 
 
 class TestFailedJobWithShortfallSurvivesRefresh(unittest.TestCase):

@@ -190,7 +190,7 @@ def test_r3_per_batch_translation_restores_batch_text(monkeypatch):
             return TranslationResult([f"译{i}" for i in range(len(texts))], self.name)
 
     messages = []
-    orchestrator._translate_llm_per_batch(["a b c", "d e f"], [Api()], [],
+    orchestrator._translate_llm_per_batch(["a b c", "d e f"], [Api()],
                                           progress_callback=lambda p, m: messages.append(m))
     wait_at = messages.index("正在等待连接 DeepSeek，恢复后自动继续")
     # P514：睡醒后会再发一次同样的等待文字（先汇报再请求），跳过它看恢复后的那条
@@ -267,6 +267,6 @@ def test_r7_key_already_tried_this_batch_is_not_resent_whole_batch(monkeypatch):
         def translate_raw(self, prompt, max_tokens=512):
             return TranslationResult(["--- 仍不合格"], self.name)
 
-    orchestrator._translate_llm_per_batch(["Hello there.", "How are you?"], [Down(), Picky()], [],
+    orchestrator._translate_llm_per_batch(["Hello there.", "How are you?"], [Down(), Picky()],
                                           progress_callback=lambda *a: None)
     assert Picky.batch_calls == 1

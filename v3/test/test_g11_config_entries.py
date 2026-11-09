@@ -43,5 +43,5 @@ def test_upload_entry_drops_both_language_keys():
     from backend import main
 
     src = inspect.getsource(main._prepare_upload_job)
-    assert "_normalize_job_config" in src or "_DROPPED_LANGUAGE_KEYS" in src, (
+    assert "_normalize_job_config" in src or "_DROPPED_CONFIG_KEYS" in src, (
         "上传入口没有走清理，废弃字段会从这里漏进流水线")

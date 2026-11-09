@@ -50,22 +50,6 @@ class _CannedLLM(translation_base.LLMBackend):
         return raw, {"usage": {"prompt_tokens": 1, "completion_tokens": 1}}
 
 
-class _FakeFreeBackend(translation_base.TranslationBackend):
-    def __init__(self):
-        self.calls = []
-
-    @property
-    def name(self):
-        return "fake-free"
-
-    def translate_batch(self, texts, source_lang="auto", target_lang="zh", context=""):
-        self.calls.append(list(texts))
-        return translation_base.TranslationResult(
-            translated=[f"免费译文-{text}" for text in texts],
-            backend_name=self.name,
-        )
-
-
 _BATCH_MARKER = "仅按 [编号] 译文 格式输出"
 # 模型漏写编号：第一行不匹配 [编号] 前缀 → 解析判定 numbering_format
 _BAD_NUMBERING = "模型忘了编号直接给了译文"
@@ -159,8 +143,6 @@ def test_count_mismatch_triggers_retry(monkeypatch):
     translated, failed, _tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=["a", "b", "c", "d", "e"],
-        mode="quality",
-        priority=[],                      # 没有免费引擎，只能靠精确重发
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -187,19 +169,15 @@ def test_paid_batch_mismatch_retries_whole_batch_on_same_backend_before_free(
 
     paid = _CannedLLM(_paid_raw)
     second_paid = _CannedLLM(_numbered([f"第二厂商译文-{index}" for index in range(40)]))
-    free = _FakeFreeBackend()
     monkeypatch.setattr(
         orch,
         "_build_llm_backends",
         lambda _keys: [paid, second_paid],
     )
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     translated, failed, tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=["google"],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -208,7 +186,6 @@ def test_paid_batch_mismatch_retries_whole_batch_on_same_backend_before_free(
     assert failed == []
     assert len(paid.prompts) == 2
     assert second_paid.prompts == [], "协议重试不能换到第二个付费厂商"
-    assert free.calls == [], "同一付费 AI 已恢复成功时不能调用免费引擎"
     correction = (
         "上一次返回条数与输入不符，很可能合并了相邻两条。"
         "这一次必须严格一条对一条，即使两条原文本是一句话。"
@@ -222,19 +199,15 @@ def test_valid_paid_batch_does_not_trigger_protocol_recovery(monkeypatch):
     texts = [f"source {index}" for index in range(40)]
     paid = _CannedLLM(_numbered([f"付费译文-{index}" for index in range(40)]))
     second_paid = _CannedLLM(_numbered([f"第二厂商译文-{index}" for index in range(40)]))
-    free = _FakeFreeBackend()
     monkeypatch.setattr(
         orch,
         "_build_llm_backends",
         lambda _keys: [paid, second_paid],
     )
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     translated, failed, _tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=["google"],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -243,7 +216,6 @@ def test_valid_paid_batch_does_not_trigger_protocol_recovery(monkeypatch):
     assert failed == []
     assert len(paid.prompts) == 1
     assert second_paid.prompts == []
-    assert free.calls == []
 
 
 def test_three_paid_recovery_levels_exhausted_keep_source_never_free(
@@ -262,24 +234,15 @@ def test_three_paid_recovery_levels_exhausted_keep_source_never_free(
     paid = _CannedLLM(_paid_raw)
     second_paid = _CannedLLM(_numbered([f"第二厂商译文-{index}" for index in range(4)]))
 
-    class _OrderedFree(_FakeFreeBackend):
-        def translate_batch(self, texts, **kwargs):
-            events.append(("free", list(texts)))
-            return super().translate_batch(texts, **kwargs)
-
-    free = _OrderedFree()
     monkeypatch.setattr(
         orch,
         "_build_llm_backends",
         lambda _keys: [paid, second_paid],
     )
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     translated, failed, _tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=["google"],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -295,7 +258,6 @@ def test_three_paid_recovery_levels_exhausted_keep_source_never_free(
     assert [_batch_input_count(prompt) for prompt in batch_prompts] == [4, 4, 2, 2]
     assert len(single_prompts) == 4
     assert second_paid.prompts == [], "恢复耗尽后也不能切换第二个付费厂商"
-    assert [event for event in events if event[0] == "free"] == [], "付费模式免费引擎 0 次"
     assert translated == texts, "修不好的句子保留原文"
     assert failed == []
 
@@ -384,19 +346,15 @@ def test_protocol_recovery_disconnect_waits_on_same_vendor_then_continues(
     monkeypatch.setattr(paid_request, "_wait", waits.append)
     paid = _DisconnectingPaid()
     second_paid = _CannedLLM(_numbered([f"第二厂商译文-{index}" for index in range(4)]))
-    free = _FakeFreeBackend()
     monkeypatch.setattr(
         orch,
         "_build_llm_backends",
         lambda _keys: [paid, second_paid],
     )
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     translated, failed, _tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=["google"],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -405,7 +363,6 @@ def test_protocol_recovery_disconnect_waits_on_same_vendor_then_continues(
     assert waits == [5]
     assert paid.single_calls == [], "整批纠正成功就不再逐条"
     assert second_paid.prompts == [], "恢复链断连也不能把同一批交给另一个付费厂商"
-    assert free.calls == [], "付费模式不再调用免费引擎"
     assert translated == [f"恢复译文{index}" for index in range(4)]
     assert failed == []
 
@@ -450,8 +407,6 @@ def test_second_half_recovers_at_its_own_offset_and_clean_half_is_skipped(monkey
     translated, failed, _tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=[],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -536,8 +491,6 @@ def test_paid_protocol_recovery_has_a_hard_43_retry_call_limit(monkeypatch):
     translated, failed, tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=[],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -561,15 +514,11 @@ def test_paid_protocol_recovery_retries_40_items_despite_ten_item_gate(
         return "逐条付费译文"
 
     paid = _CannedLLM(_fail_batches_but_pass_singles)
-    free = _FakeFreeBackend()
     monkeypatch.setattr(orch, "_build_llm_backends", lambda _keys: [paid])
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     translated, failed, tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=["google"],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -581,43 +530,8 @@ def test_paid_protocol_recovery_retries_40_items_despite_ten_item_gate(
     assert len(single_prompts) == 40
     assert translated == ["逐条付费译文"] * 40
     assert failed == []
-    assert free.calls == []
     assert tokens == {"input_tokens": 44, "output_tokens": 44}, \
         "初次、整批、两半和 40 次逐条付费调用都必须计入用量"
-
-
-def test_blank_free_fallback_results_remain_failed():
-    """免费补缺交空字符串或 None 时，不能写回并谎报成功。"""
-    class _BlankFree(translation_base.TranslationBackend):
-        """免费补缺是逐条调用的，按次序交出：有效译文 / 空串 / None。"""
-
-        def __init__(self):
-            self.queue = ["免费有效译文", "", None]
-
-        @property
-        def name(self):
-            return "blank-free"
-
-        def translate_batch(self, texts, **kwargs):
-            return translation_base.TranslationResult(
-                translated=[self.queue.pop(0)],
-                backend_name=self.name,
-            )
-
-    texts = ["first", "second", "third"]
-    translated = ["[翻译失败]"] * 3
-    failed_indices = [0, 1, 2]
-
-    orch._fill_gaps_with_free(
-        texts,
-        translated,
-        failed_indices,
-        [_BlankFree()],
-        None,
-    )
-
-    assert translated == ["免费有效译文", "[翻译失败]", "[翻译失败]"]
-    assert failed_indices == [1, 2]
 
 
 @pytest.mark.parametrize(
@@ -663,37 +577,31 @@ def test_batch_prompt_forbids_merging_or_splitting_entries():
     ) in llm.prompts[0]
 
 
-def test_partial_failure_triggers_free_fallback(monkeypatch):
-    """T26：177 条里 172 条失败 → 免费引擎必须启动补全，不能留一堆 [翻译失败]。"""
+def test_partial_failure_is_recovered_without_leaving_failures(monkeypatch):
+    """T26：177 条里 172 条失败 → 付费恢复补全或保留原文（D-6 P503 起已无免费引擎），不能留一堆 [翻译失败]。"""
     texts = [f"line {index}" for index in range(177)]
 
     def _raw(prompt):
         return _numbered(["只有一条"])
 
     llm = _CannedLLM(_raw)
-    free = _FakeFreeBackend()
     monkeypatch.setattr(orch, "_build_llm_backends", lambda keys: [llm])
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     translated, failed, _tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=["google"],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
 
     assert len(translated) == 177
-    assert "[翻译失败]" not in translated, "免费引擎必须把缺口补上"
+    assert "[翻译失败]" not in translated, "缺口必须由付费恢复补上或保留原文"
     assert failed == []
 
 
 def test_default_path_has_same_protections_as_context_path(monkeypatch):
     """T28：默认路径（逐段翻译）与上下文感知路径拥有同一套保护。"""
     texts = [f"line {index}" for index in range(6)]
-    free = _FakeFreeBackend()
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     outcomes = {}
     for context_aware in (False, True):
@@ -702,15 +610,13 @@ def test_default_path_has_same_protections_as_context_path(monkeypatch):
         translated, failed, _t, _s, _f = orch.translate_with_orchestrator(
             progress_callback=lambda *a: None,
             texts=texts,
-            mode="quality",
-            priority=["google"],
             api_keys=[{"platform": "deepseek", "key": "x"}],
             context_aware=context_aware,
         )
         outcomes[context_aware] = (translated, failed)
 
     assert outcomes[False][1] == [] and outcomes[True][1] == [], \
-        "两条路都必须由免费引擎补全，不能只有一条路有降落伞"
+        "两条路都必须有同一套保护，不能只有一条路有降落伞"
     assert "[翻译失败]" not in outcomes[False][0]
     assert "[翻译失败]" not in outcomes[True][0]
 
@@ -735,15 +641,11 @@ def test_recovery_stage_keeps_the_same_strong_checks_as_the_main_path(monkeypatc
         return _numbered(["这是一句完全合格的中文译文内容", "totally english output"])
 
     paid = _CannedLLM(_paid_raw)
-    free = _FakeFreeBackend()
     monkeypatch.setattr(orch, "_build_llm_backends", lambda _keys: [paid])
-    monkeypatch.setitem(orch.FREE_BACKENDS, "google", free)
 
     translated, failed, _tokens, _splits, _failures = orch.translate_with_orchestrator(
         progress_callback=lambda *a: None,
         texts=texts,
-        mode="quality",
-        priority=["google"],
         api_keys=[{"platform": "deepseek", "key": "x"}],
         context_aware=False,
     )
@@ -753,7 +655,6 @@ def test_recovery_stage_keeps_the_same_strong_checks_as_the_main_path(monkeypatc
         "恢复阶段的英文原文必须被强检查拦住，绝不能漏进字幕"
     # D-1 A5（合同变更）：被拒的那条保留原文，不再交给免费引擎。
     assert translated[1] == "second source"
-    assert free.calls == []
     assert failed == []
 
     # ── C6 的前缀识别层：只收审校流程词，且容忍模型加的装饰 ──────────
@@ -883,10 +784,8 @@ def test_none_reply_survives_and_success_resets_the_empty_streak():
         ["numbering_format"] * 4,                      # 阶梯四次批量全败 → 落到逐条
         [None, "第二条译文", None, "第四条译文"],
     )
-    free = _FakeFreeBackend()
-
     translated, failed, _tokens, _splits, _failures = orch._translate_llm_per_batch(
-        texts, [backend], [free], progress_callback=lambda *a: None,
+        texts, [backend], progress_callback=lambda *a: None,
     )
 
     assert len(backend.raw_calls) == 4, \
@@ -895,7 +794,6 @@ def test_none_reply_survives_and_success_resets_the_empty_streak():
     assert translated[3] == "第四条译文"
     assert [translated[0], translated[2]] == [texts[0], texts[2]], \
         "付费救不回来的保留原文（D-1 A5），不能因为崩溃而丢掉整个任务"
-    assert free.calls == []
     assert failed == []
 
     # 源头也堵上：LLMBackend 不该交出违反 list[str] 契约的结果。
@@ -916,35 +814,22 @@ def test_none_reply_survives_and_success_resets_the_empty_streak():
 
 # ── 报错说人话 ────────────────────────────────────────────────
 
-def test_corrupt_cache_error_message_is_accurate_and_cache_is_deleted(
-    monkeypatch, tmp_path
-):
-    """质量闸：读到一份坏存档时要报「格式」，删掉它，且不能偷偷重翻。
+def _partial_cache_case(monkeypatch, tmp_path, saved_zh):
+    """造一份身份对得上的「部分完成」缓存，返回 (worker, segments, 缓存路径, 翻译调用记录)。
 
-    这段文案只有一条真实路径能走到：`failure_by_index` 为空且成功率不足一半。
-    翻译刚跑完那条路每个失败位置都会带上原因（`worker.py:2030` 会补 "unknown"），
-    所以恒非空——只有「已有翻译记录，跳过」这条读缓存分支从头到尾不碰它
-    （`worker.py:1894` 初始化的空字典原样留到闸口），坏存档才会撞上这里。
+    `saved_zh(index)` 决定第 index 句存的译文。
     """
     worker = _load_worker(monkeypatch)
-
     segments = [
         SimpleNamespace(id=index, start=index, end=index + 0.5,
                         text=f"line {index}", zh="", words=[])
         for index in range(10)
     ]
-
-    # 身份匹配（id/start/end 对得上）但内容已坏：10 条里 9 条是失败标记。
     translated_path = tmp_path / "translated.json"
     translated_path.write_text(json.dumps([
-        {
-            "id": segment.id,
-            "start": segment.start,
-            "end": segment.end,
-            "text": segment.text,
-            "zh": "译文" if index == 0 else "[翻译失败]",
-        }
-        for index, segment in enumerate(segments)
+        {"id": seg.id, "start": seg.start, "end": seg.end,
+         "text": seg.text, "zh": saved_zh(index)}
+        for index, seg in enumerate(segments)
     ], ensure_ascii=False), encoding="utf-8")
 
     translate_calls = []
@@ -958,26 +843,73 @@ def test_corrupt_cache_error_message_is_accurate_and_cache_is_deleted(
         "translate_with_orchestrator",
         _fake_translate,
     )
+    return worker, segments, translated_path, translate_calls
 
-    with pytest.raises(RuntimeError) as excinfo:
-        worker._step_translate(
-            "translate", segments, translated_path,
-            "quality", ["google"], [], False, {}, tmp_path, len(segments),
-            SimpleNamespace(save=lambda *a, **k: None),
-        )
 
-    assert translate_calls == [], "读到坏存档时不能偷偷重翻，必须先让用户知道"
-    assert not translated_path.exists(), "坏存档必须删掉，否则下次重跑还会撞上同一份"
+def _one_ok_nine_failed(index):
+    return "译文" if index == 0 else "[翻译失败]"
 
-    message = str(excinfo.value)
-    assert "格式" in message, f"错误信息必须点出真正的原因，实际是: {message}"
-    assert "请检查翻译引擎配置后重试。" not in message, \
-        "配置本来就是好的，不能让用户去改没问题的东西"
-    # 前端 formatJobErrorText() 的规则：文案里没有明确建议词时，它会按关键词
-    # 猜原因并追加建议——只要出现「网络」二字就追加「请检查网络后重试。」。
-    # 这条断言守住的是用户最终看到的那句话，不是代码长什么样。
-    assert any(hint in message for hint in ("请查看", "请检查", "请重新", "请先")), \
-        "文案必须自带明确建议，否则前端会自作主张改写成「网络问题」"
+
+def test_p521_accept_partial_exports_even_when_most_lines_failed(monkeypatch, tmp_path):
+    """P521：「部分完成」弹窗点「保留未翻译字幕并生成文件」，成功不到一半也要能导出。
+
+    原来这里有一道「成功率<50% 就当坏存档，删缓存并报错」的质量闸。可「[翻译失败]」
+    是我们自己合法写进缓存的正常状态，弹窗正是为「失败太多」而存在——导出必撞闸，
+    用户按了「生成文件」却拿到报错，缓存还被删了。真坏的存档由读缓存前的三道结构
+    检查（JSON 坏 / 批量污染 / 身份对不上）管，质量闸是第二份、判错的那份规则，已删。
+    """
+    worker, segments, translated_path, translate_calls = _partial_cache_case(
+        monkeypatch, tmp_path, _one_ok_nine_failed)
+
+    failed, _splits, ok_count = worker._step_translate(
+        "translate", segments, translated_path,
+        [], False, {"_accept_partial": True}, tmp_path, len(segments),
+        SimpleNamespace(save=lambda *a, **k: None),
+    )
+
+    assert translate_calls == [], "导出只读缓存，不能偷偷重翻"
+    assert translated_path.exists(), "用户同意导出的缓存不能被删"
+    assert ok_count == 1
+    assert len(failed) == 9
+    assert [s.zh for s in segments[1:]] == ["[翻译失败]"] * 9, \
+        "失败句保持「[翻译失败]」，交给显示层标成「【未翻译】原文」"
+
+
+def test_p521_plain_rerun_on_mostly_failed_cache_goes_to_partial_dialog(monkeypatch, tmp_path):
+    """普通重跑（例如翻译后中断再跑）读到同一份缓存：不报错、不删缓存，
+    返回 9 条失败交给上层再弹一次「部分完成」让用户选。"""
+    worker, segments, translated_path, translate_calls = _partial_cache_case(
+        monkeypatch, tmp_path, _one_ok_nine_failed)
+
+    failed, _splits, ok_count = worker._step_translate(
+        "translate", segments, translated_path,
+        [], False, {}, tmp_path, len(segments),
+        SimpleNamespace(save=lambda *a, **k: None),
+    )
+
+    assert translate_calls == []
+    assert translated_path.exists()
+    assert ok_count == 1
+    assert [item[0] for item in failed] == list(range(1, 10))
+
+
+def test_p521_empty_saved_translation_counts_as_failed(monkeypatch, tmp_path):
+    """②-P521 主审补的那一行：缓存里译文是空串（旧版本或手改过的缓存）时，
+    读缓存要把它当成「[翻译失败]」——否则删闸后它不进 failed、不弹窗，
+    静默出一份整片「【未翻译】」的字幕。「什么算失败」只认
+    `_is_valid_saved_translation` 一份规则。"""
+    worker, segments, translated_path, _calls = _partial_cache_case(
+        monkeypatch, tmp_path, lambda index: "译文" if index == 0 else "")
+
+    failed, _splits, ok_count = worker._step_translate(
+        "translate", segments, translated_path,
+        [], False, {}, tmp_path, len(segments),
+        SimpleNamespace(save=lambda *a, **k: None),
+    )
+
+    assert ok_count == 1
+    assert [s.zh for s in segments[1:]] == ["[翻译失败]"] * 9
+    assert len(failed) == 9
 
 
 # ── 止血那一行的边界 ──────────────────────────────────────────

@@ -370,7 +370,6 @@ let progressed=[];
 function setJobProgress(jid,percent,stage,message,detail,runId){
   progressed.push({jid,percent,stage,message,detail});
 }
-function showAlignmentFallbackNotice(){}
 """,
         "activeJobs.J={config:{}};",
         "function handlePartialState(){};function renderInterruptedCard(){};"
@@ -405,7 +404,6 @@ def test_done_card_shows_output_folder_button_only_when_allowed():
         return _run_node("\n".join([
             _DOM_STUB,
             _function_source("hideMilestones"),
-            _function_source("showAlignmentFallbackNotice"),
             _function_source("renderTranslationSummary"),
             _function_source("revealJobOutput"),
             _function_source("renderCardDone"),
@@ -428,7 +426,6 @@ def test_done_card_renders_unavailable_sound_reference_summary():
     data = _run_node("\n".join([
         _DOM_STUB,
         _function_source("hideMilestones"),
-        _function_source("showAlignmentFallbackNotice"),
         _function_source("renderTranslationSummary"),
         _function_source("revealJobOutput"),
         _function_source("renderCardDone"),

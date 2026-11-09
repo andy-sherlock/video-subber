@@ -367,17 +367,17 @@ class TestFrontendModelList(unittest.TestCase):
             "acc-body",
             "toggleAcc(",
             "语音识别模型",
-            "免费翻译",
             "智能翻译",
             "字幕与输出",
             "识别模型、下载模型、说话人检测",
             'data-acc="voice"',
-            'data-acc="free-translate"',
             'data-acc="smart-translate"',
             'data-acc="output"',
         ]:
             self.assertIn(token, self.html)
-        for removed in ['data-acc="env"', 'data-acc="translate"', 'data-acc="advanced"']:
+        # D-6 P503：免费翻译模块已删。
+        for removed in ['data-acc="env"', 'data-acc="translate"', 'data-acc="advanced"',
+                        'data-acc="free-translate"']:
             self.assertNotIn(removed, self.html)
 
     def test_c3_main_model_copy_uses_human_labels(self):
@@ -1108,8 +1108,8 @@ class TestDrawerAccordion(unittest.TestCase):
 
     def test_accordion_structure_replaces_scroll_nav(self):
         """抽屉是手风琴：每个模块有可点击头 + 就地展开体。"""
-        # 最终版：运行环境进主界面，翻译拆成免费/智能，高级删除，字幕样式并入字幕与输出。
-        for token in ['data-acc="voice"', 'data-acc="free-translate"',
+        # 最终版：运行环境进主界面，翻译只留智能翻译（D-6 P503 删免费），高级删除，字幕样式并入字幕与输出。
+        for token in ['data-acc="voice"',
                       'data-acc="smart-translate"', 'data-acc="output"',
                       "acc-head", "acc-body", "toggleAcc("]:
             self.assertIn(token, self.html, f"手风琴结构缺少 {token}")

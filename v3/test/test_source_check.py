@@ -128,7 +128,7 @@ def _ok_map():
 def test_worker_checks_once_and_keeps_receipt_original(tmp_path):
     from backend import worker
     receipt = _receipt(worker, _nz_words())
-    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path)
+    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path).words
     assert _by_text(fixed, "All")["start"] == 650.24
     assert _by_text(receipt.source_words, "All")["start"] == 637.72    # 收据原样（SC-0e）
     record = json.loads((tmp_path / "source_check.json").read_text())
@@ -139,7 +139,7 @@ def test_pause_hints_use_the_checked_words(tmp_path):
     from backend import worker
     receipt = _receipt(worker, _nz_words())
     record = _ok_map()
-    fixed = worker._source_checked_words(receipt, record, tmp_path)
+    fixed = worker._source_checked_words(receipt, record, tmp_path).words
     hints_fixed = worker._sound_reference_from_record(receipt, record, words=fixed).hints
     hints_raw = worker._sound_reference_from_record(receipt, record).hints
     assert 0 in {h.word_index for h in hints_fixed}                      # SC-0a
@@ -149,7 +149,7 @@ def test_pause_hints_use_the_checked_words(tmp_path):
 def test_formal_grouping_uses_the_checked_words_on_both_routes(tmp_path):
     from backend import worker
     receipt = _receipt(worker, _nz_words())
-    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path)
+    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path).words
     envelope = worker.TranscriptionEnvelope([], receipt)
     groups, _reason = worker._prepare_sentence_groups(envelope, source_words=fixed)  # 没配 Key：备用线路（SC-0f）
     all_word = next(w for g in groups for w in g.words if w["text"] == "All")
@@ -169,7 +169,7 @@ def test_formal_grouping_uses_the_checked_words_on_both_routes(tmp_path):
 def test_whisper_primary_only_records_and_does_not_move(tmp_path):
     from backend import worker
     receipt = _receipt(worker, _nz_words(), primary="whisper")
-    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path)        # SC-6
+    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path).words        # SC-6
     assert _by_text(fixed, "All")["start"] == 637.72
     record = json.loads((tmp_path / "source_check.json").read_text())
     assert record["applied"] is False and len(record["changes"]) == 1
@@ -181,7 +181,7 @@ def test_unavailable_sound_map_skips_source_check(tmp_path):
     unavailable = sound_map.make_map_record(
         dict(_IDENTITY, source_content_sha256="none", track_identity="none"), [],
         total_samples=0, map_status="unavailable", reason_code="input_unavailable")
-    fixed = worker._source_checked_words(receipt, unavailable, tmp_path)      # SC-3
+    fixed = worker._source_checked_words(receipt, unavailable, tmp_path).words      # SC-3
     assert _by_text(fixed, "All")["start"] == 637.72
 
 

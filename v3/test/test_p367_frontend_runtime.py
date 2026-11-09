@@ -40,7 +40,7 @@ def _startup_recovery_sources():
     ])
 
 
-# P512（2026-10-03）：「重试前等设置保存」已按方案删除——Key 与免费翻译顺序都由后台在收到
+# P512（2026-10-03）：「重试前等设置保存」已按方案删除——Key 由后台在收到
 # 请求时读设置文件。新合同「重试不再等保存」见 test_d1c_batch2_frontend.py。
 
 
@@ -284,7 +284,7 @@ def test_reconnect_and_card_poll_use_the_same_http_classifier():
 
 
 def test_partial_action_response_updates_card_authoritative_config():
-    """P369：Retry 换了免费引擎顺序后，完成卡不能继续拿旧配置做比较。"""
+    """P369：Retry 后后端的配置变了，完成卡不能继续拿旧配置做比较。"""
     js = "\n".join([
         """
 const activeJobs={j:{partialState:{retry_count:1},partialActionPending:false,ws:{}}};
@@ -294,14 +294,14 @@ const writePartialIgnore=()=>{};const removeActiveJobId=()=>{};const connectCard
 const showNextPartialPrompt=()=>{};const showToast=()=>{};const $=()=>({classList:{remove(){}}});
 let _partialPromptCurrent=null;
 """,
-        "const fetch=async()=>({ok:true,json:async()=>({config:{model:'large-v3',translationPriority:['bing']}})});",
+        "const fetch=async()=>({ok:true,json:async()=>({config:{model:'large-v3',contextAware:true}})});",
         _function_source("requestPartialAction"),
         "requestPartialAction('j','retry',null).then(()=>console.log(JSON.stringify(activeJobs.j.config)));",
     ])
 
     assert _run_node(js) == {
         "model": "large-v3",
-        "translationPriority": ["bing"],
+        "contextAware": True,
     }
 
 
@@ -439,19 +439,6 @@ def test_task_config_cannot_overwrite_frontend_keys():
     assert data["apiKeys"] == [{"key": "current-fake"}]
     assert data["model"] == "large-v3"
     assert "source_dir" not in data
-
-
-def test_backend_refresh_preserves_user_priority_order():
-    js = "\n".join([
-        "const State={settings:{translationPriority:['youdao','google','bing']},availableBackends:null};",
-        "const element=()=>({innerHTML:'',textContent:'',style:{},appendChild(){}});const els={apiPlatform:element(),apiTip:element(),apiRow:element(),modeRow:element(),transModeTitle:element()};",
-        "const $=id=>els[id];const document={createElement:()=>element()};const buildPriorityList=()=>{};const onPlatformChange=()=>{};const syncContextAwareBtn=()=>{};",
-        _function_source("updateBackendLists"),
-        "updateBackendLists({free:[{id:'google'},{id:'bing'},{id:'youdao'}],llm:[]});",
-        "console.log(JSON.stringify(State.settings.translationPriority));",
-    ])
-
-    assert _run_node(js) == ["youdao", "google", "bing"]
 
 
 def test_closing_partial_card_never_deletes_backend_job():
@@ -630,7 +617,7 @@ def test_retry_finished_card_shows_previous_current_latest_and_direct_actions():
     assert _run_node(js) == {
         "step": "最新结果：成功 8 句，仍失败 2 句",
         "texts": [
-            "上一轮：成功 5 句，失败 5 句。本轮新成功 3 句。最新：成功 8 句，仍失败 2 句。原因：连接翻译服务超时，请稍后重试或切换翻译引擎。",
+            "上一轮：成功 5 句，失败 5 句。本轮新成功 3 句。最新：成功 8 句，仍失败 2 句。原因：请检查 Key、余额和网络后重试。",
             "再次重试剩余字幕",
             "保留未翻译字幕并生成文件",
         ],
@@ -644,20 +631,21 @@ def test_failure_reason_copy_is_actionable():
     ])
 
     assert _run_node(js) == [
-        "无法连接翻译服务，请检查网络后重试或切换翻译引擎",
-        "请求过多，请稍等后重试或切换翻译引擎",
-        "翻译服务返回错误，请稍后重试或切换翻译引擎",
-        "没有取得明确原因，请查看日志或切换翻译引擎后重试",
+        # D-6 Z3：这几条新任务走不到（软件已自动轮换用户的 Key），旧任务落到兜底句
+        "请检查 Key、余额和网络后重试",
+        "请检查 Key、余额和网络后重试",
+        "请检查 Key、余额和网络后重试",
+        "请检查 Key、余额和网络后重试",
     ]
 
 
-def test_engine_status_shows_api_failure_and_free_fallback():
+def test_engine_status_shows_api_failure():
     from backend import job_state
     state = job_state.build_public_task_state({
         "status": "running", "stage": "translate",
-        "engine_status": {"phase": "switching_to_free", "failure_kind": "auth"},
+        "engine_status": {"phase": "api_failed", "failure_kind": "auth"},
     })
-    assert state["display_message"] == "正在切换免费翻译引擎"
+    assert state["display_message"] == "用户配置的 API 失败"
     assert "failure_kind" not in json.dumps(state, ensure_ascii=False)
 
 

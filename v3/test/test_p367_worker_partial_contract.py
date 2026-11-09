@@ -411,8 +411,8 @@ def _cache_args(tmp_path):
     translated.write_text("[]", encoding="utf-8")
     return (
         "burn",
-        {"apiKeys": [{"key": "old"}], "translationPriority": ["google"]},
-        {"apiKeys": [{"key": "new"}], "translationPriority": ["bing"]},
+        {"apiKeys": [{"key": "old"}]},
+        {"apiKeys": [{"key": "new"}]},
         worker.SETTING_STAGE,  # 用生产里的那张表（D-1 补修：apiKeys 已不在表里）
         worker.STAGE_ORDER,
         {"translate": [str(translated)]},
@@ -421,7 +421,7 @@ def _cache_args(tmp_path):
     )
 
 
-def test_partial_retry_key_and_priority_change_preserves_translation_cache(tmp_path):
+def test_partial_retry_key_change_preserves_translation_cache(tmp_path):
     stage, old, new, setting, order, cache, ck, translated = _cache_args(tmp_path)
     new["_partial_retry"] = True
 
@@ -432,18 +432,6 @@ def test_partial_retry_key_and_priority_change_preserves_translation_cache(tmp_p
     assert result == "burn"
     assert translated.exists()
     assert ck.saved == []
-
-
-def test_normal_resubmit_priority_change_still_invalidates_translation_cache(tmp_path):
-    stage, old, new, setting, order, cache, ck, translated = _cache_args(tmp_path)
-
-    result = worker._invalidate_stale_caches(
-        stage, old, new, setting, order, cache, ck
-    )
-
-    assert result == "translate"
-    assert not translated.exists()
-    assert ck.saved[-1][0] == "translate"
 
 
 def test_translation_cache_identity_includes_text_not_just_count_id_start_end():
@@ -482,53 +470,6 @@ def test_translation_cache_identity_includes_text_not_just_count_id_start_end():
 
 
 # P516：「重试用快照」已按方案删除（不复制原视频），三条快照测试随之删除。
-
-
-def test_partial_retry_and_accept_skip_reflection(monkeypatch, tmp_path):
-    calls = []
-
-    def build_backends(keys):
-        calls.append(keys)
-        return []
-
-    monkeypatch.setattr(
-        "backend.translation.orchestrator._build_llm_backends", build_backends
-    )
-    segment = SimpleNamespace(id=0, start=0, end=1, text="one", zh="一")
-
-    for flag in ("_partial_retry", "_accept_partial"):
-        worker._reflection_review(
-            [segment], ["one"], ["一"], [], tmp_path / "translated.json",
-            [{"key": "fake"}], "quality", {"reflection": True, flag: True},
-        )
-
-    assert calls == []
-
-
-def test_worker_rechecks_reflection_corrections_before_writing(monkeypatch, tmp_path):
-    class FakeLLM:
-        def translate_raw(self, prompt, max_tokens=4096):
-            return SimpleNamespace(translated=["[0] 合法占位"])
-
-    monkeypatch.setattr(
-        "backend.translation.orchestrator._build_llm_backends",
-        lambda keys: [FakeLLM()],
-    )
-    monkeypatch.setattr(
-        "backend.translation.reflection.parse_reflection_result",
-        lambda raw, source_texts=None: {0: "建议：脏修正"},
-    )
-    path = tmp_path / "translated.json"
-    segment = SimpleNamespace(id=0, start=0, end=1, text="one", zh="一")
-
-    worker._reflection_review(
-        [segment], ["one"], ["一"], [], path,
-        [{"key": "fake"}], "quality", {"reflection": True},
-    )
-
-    assert segment.zh == "一"
-    if path.exists():
-        assert json.loads(path.read_text(encoding="utf-8"))[0]["zh"] == "一"
 
 
 def test_partial_retry_preserves_success_and_only_translates_failed_cached_text(
@@ -573,7 +514,7 @@ def test_partial_retry_preserves_success_and_only_translates_failed_cached_text(
         "_consecutive_no_progress": 1,
     }
     failed, _, ok_count, failure_by_index, translation_summary = worker._step_translate(
-        "subtitle", segments, translated_path, "speed", ["bing"],
+        "subtitle", segments, translated_path,
         [{"key": "fake"}], False, config, tmp_path,
         3, checkpoint, include_failure_details=True,
     )
@@ -607,7 +548,7 @@ def test_partial_retry_rejects_cache_whose_source_text_changed(tmp_path):
 
     with pytest.raises(worker.PartialActionRejected):
         worker._step_translate(
-            "subtitle", segments, translated_path, "speed", ["bing"],
+            "subtitle", segments, translated_path,
             [{"key": "fake"}], False, {"_partial_retry": True}, tmp_path,
             2, FakeCheckpoint(), include_failure_details=True,
         )
@@ -640,7 +581,7 @@ def test_partial_retry_emits_real_completed_counts_without_fixed_percent(
     monkeypatch.setattr(worker, "_real_stdout", output)
 
     worker._step_translate(
-        "subtitle", segments, translated_path, "speed", ["bing"], [], False,
+        "subtitle", segments, translated_path, [], False,
         {
             "_partial_retry": True,
             "_retry_count": 1,
@@ -669,7 +610,7 @@ def test_accept_partial_cannot_use_mismatched_cache(tmp_path):
 
     try:
         worker._step_translate(
-            "subtitle", segments, translated_path, "speed", ["google"], [],
+            "subtitle", segments, translated_path, [],
             False, {"_accept_partial": True}, tmp_path, 1, FakeCheckpoint(),
         )
     except RuntimeError as error:
@@ -695,7 +636,7 @@ def test_partial_retry_rejects_unusable_translation_cache(
 
     with pytest.raises(worker.PartialActionRejected, match="缓存"):
         worker._step_translate(
-            "subtitle", segments, translated_path, "speed", ["google"], [],
+            "subtitle", segments, translated_path, [],
             False, {"_partial_retry": True}, tmp_path, 1, FakeCheckpoint(),
         )
 
@@ -770,7 +711,7 @@ def test_structured_backend_failure_below_half_enters_partial_instead_of_corrupt
     )
 
     failed, _, ok_count, failures, translation_summary = worker._step_translate(
-        "translate", segments, path, "speed", ["google"], [{"key": "fake"}],
+        "translate", segments, path, [{"key": "fake"}],
         False, {}, tmp_path, 2, FakeCheckpoint(), include_failure_details=True,
     )
 

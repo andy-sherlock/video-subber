@@ -93,3 +93,30 @@ def check_word_times(words, voice_intervals):
             changes.append({"index": i, "word": word["text"], "rule": rule,
                             "old": [start, end], "new": [word["start"], word["end"]]})
     return fixed, changes, skipped
+
+
+# ── D-2 P148：识别卡住，同一个词连写很多遍 ──
+# 真人最多连说 5 遍（「No, no, no, no, no」），09-03 片头卡住是 30 遍。
+_STUCK_MIN_REPEATS = 10
+
+
+def _word_key(text) -> str:
+    return re.sub(r"[\W_]+", "", str(text or "")).casefold()
+
+
+def find_stuck_word_runs(words, min_repeats: int = _STUCK_MIN_REPEATS) -> list:
+    """找同一个词连续出现 ≥ min_repeats 遍的串，返回 ``[(开始下标, 结束下标(不含)), ...]``。
+
+    「同一个词」= 去掉标点、不分大小写后相同；纯标点的词不算词，会打断连续。
+    """
+    runs = []
+    start = 0
+    for index in range(1, len(words) + 1):
+        if index < len(words):
+            key = _word_key(words[index].get("text"))
+            if key and key == _word_key(words[start].get("text")):
+                continue
+        if _word_key(words[start].get("text")) and index - start >= min_repeats:
+            runs.append((start, index))
+        start = index
+    return runs

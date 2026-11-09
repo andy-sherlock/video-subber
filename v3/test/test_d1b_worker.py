@@ -50,24 +50,13 @@ def test_switching_api_keys_keeps_translated_sentences(tmp_path):
 
 def test_other_translate_settings_still_invalidate(tmp_path):
     translated, stage_cache = _caches(tmp_path)
-    old = {"translationMode": "speed"}
-    new = {"translationMode": "quality"}
+    old = {"contextAware": False}
+    new = {"contextAware": True}
 
     worker._invalidate_stale_caches(
         "subtitle", old, new, worker.SETTING_STAGE, worker.STAGE_ORDER, stage_cache, _Ck())
 
     assert not translated.exists(), "翻译方式变了照旧要重翻（不在本批改动范围）"
-
-
-def test_partial_retry_still_ignores_free_translation_order(tmp_path):
-    translated, stage_cache = _caches(tmp_path)
-    old = {"translationPriority": ["google"]}
-    new = {"translationPriority": ["bing"], "_partial_retry": True}
-
-    worker._invalidate_stale_caches(
-        "subtitle", old, new, worker.SETTING_STAGE, worker.STAGE_ORDER, stage_cache, _Ck())
-
-    assert translated.exists()
 
 
 # ── D2：导出本轮不用付费 AI ──────────────────────────────────────────

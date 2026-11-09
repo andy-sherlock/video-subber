@@ -171,7 +171,7 @@ def test_snapshot_read_uses_current_text_fingerprint(monkeypatch, tmp_path):
     try:
         worker._step_translate(
             "translate", segments, tmp_path / "translated.json",
-            "speed", "balanced", [], False, {}, tmp_path, len(segments),
+            [], False, {}, tmp_path, len(segments),
             _Checkpoint(),
         )
     except Exception:

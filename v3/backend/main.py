@@ -208,7 +208,7 @@ def _public_result_projection(source, job_dir: Path | None) -> dict:
 
 
 _DETAIL_CONFIG_FIELDS = frozenset({
-    "translationMode", "translationPriority", "model", "contextAware", "style",
+    "model", "contextAware", "style",
     "outputMode", "subtitles", "speakerDetect", "transcriptionTier", "burn",
 })
 _DETAIL_STYLE_FIELDS = frozenset({
@@ -236,11 +236,6 @@ def _public_config(value) -> dict:
                 and isinstance(setting, str)
                 and job_state.safe_public_text(setting, {"config": value}) is not None
             }
-        elif key == "translationPriority" and isinstance(item, list):
-            public[key] = [
-                name for name in item if isinstance(name, str)
-                and job_state.safe_public_text(name, {"config": value}) is not None
-            ]
         elif isinstance(item, str):
             cleaned = job_state.safe_public_text(item, {"config": value})
             if cleaned is not None:
@@ -413,8 +408,6 @@ def _config_hash(cfg: dict) -> str:
         _output_mode = "burn" if cfg.get("burn", True) else "srt"
     relevant = {
         "model": cfg.get("model", ""),
-        "translationMode": cfg.get("translationMode", ""),
-        "translationPriority": cfg.get("translationPriority", ""),
         "contextAware": cfg.get("contextAware", False),
         "subtitles": cfg.get("subtitles", ""),
         "burn": cfg.get("burn", False),
@@ -824,23 +817,8 @@ def model_delete(model_id: str):
 
 @app.get("/api/backends")
 def get_backends():
-    """Return enabled free backends + available LLM platforms."""
-    from .translation.google import GoogleBackend
-    from .translation.bing import BingBackend
-    from .translation.youdao import YoudaoBackend
-    _name_map = {
-        "google": GoogleBackend(),
-        "bing": BingBackend(),
-        "youdao": YoudaoBackend(),
-    }
-    enabled_free = [
-        {"id": key, "name": b.name, "free": True}
-        for key, b in _name_map.items() if b.enabled
-    ]
-    return {
-        "free": enabled_free,
-        "llm": _get_merged_models(),
-    }
+    """Return available LLM platforms."""
+    return {"llm": _get_merged_models()}
 
 
 _LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -1106,21 +1084,11 @@ def list_llm_models(payload: dict):
 
 @app.get("/api/config")
 def get_config():
-    """Return user config from ~/.video-subber/config.json.
-    translationPriority is always merged with real available backends before returning.
-    """
+    """Return user config from ~/.video-subber/config.json（旧文件里的废弃键不往外送）."""
     from .config_manager import load_config
-    from .translation.google import GoogleBackend
-    from .translation.bing import BingBackend
-    from .translation.youdao import YoudaoBackend
     cfg = load_config()
-    available = [k for k, v in {"google": GoogleBackend(), "bing": BingBackend(), "youdao": YoudaoBackend()}.items() if v.enabled]
-    saved = cfg.get("translationPriority", [])
-    merged = [b for b in saved if b in available]
-    for b in available:
-        if b not in merged:
-            merged.append(b)
-    cfg["translationPriority"] = merged
+    for _key in _DROPPED_CONFIG_KEYS:
+        cfg.pop(_key, None)
     return cfg
 
 
@@ -1129,18 +1097,8 @@ def get_config():
 async def save_config(payload: dict):
     """Save user config to ~/.video-subber/config.json"""
     from .config_manager import save_config
-    from .translation.google import GoogleBackend
-    from .translation.bing import BingBackend
-    from .translation.youdao import YoudaoBackend
-    available = [k for k, v in {"google": GoogleBackend(), "bing": BingBackend(), "youdao": YoudaoBackend()}.items() if v.enabled]
-    saved = payload.get("translationPriority", [])
-    merged = [b for b in saved if b in available]
-    for b in available:
-        if b not in merged:
-            merged.append(b)
-    payload["translationPriority"] = merged
-    # G11：旧配置文件里可能还带着这两个已废弃的语言键，不许再写回磁盘。
-    for _key in _DROPPED_LANGUAGE_KEYS:
+    # 旧前端、旧配置文件里可能还带着已废弃的键，不许再写回磁盘。
+    for _key in _DROPPED_CONFIG_KEYS:
         payload.pop(_key, None)
     save_config(payload)
     return {"ok": True}
@@ -1273,7 +1231,7 @@ def _matching_checkpoint(job_dir: Path, meta: dict, *, stage: str | None = None)
 def _snapshot_from_translated_rows(rows: list, meta: dict) -> dict:
     failed_rows = [
         row for row in rows
-        if isinstance(row, dict) and row.get("zh") == "[翻译失败]"
+        if isinstance(row, dict) and not job_state.is_valid_saved_translation(row.get("zh"))
     ]
     return {
         "segment_count": len(rows),
@@ -1461,11 +1419,12 @@ def _is_recoverable_active_job(job_id: str, entry: dict) -> bool:
 # ── POST /api/jobs — the core: upload/path → hash → dedup → create or restore ──
 
 
-# G11：两个已废弃的语言键。软件自己识别语言，不再从配置里读——
-# 留着它们就是留着第二个语言来源。**只清这两个已废弃字段，不扩张成完整白名单**
+# 已废弃的设置键，读、写、建任务时一律丢掉。**只清这几个已废弃字段，不扩张成完整白名单**
 # （⑥ 安全审查已确认：本地回环单用户下，完整白名单消除不了任何真实攻击路径，
 #   只增加维护面）。
-_DROPPED_LANGUAGE_KEYS = ("sourceLanguage", "language")
+# - G11 两个语言键：软件自己识别语言，留着它们就是留着第二个语言来源。
+# - D-6 P503 两个旧翻译键（极速/质量优先、引擎顺序）：那条翻译路线已删。
+_DROPPED_CONFIG_KEYS = ("sourceLanguage", "language", "translationMode", "translationPriority")
 
 
 def _normalize_job_config(cfg):
@@ -1473,7 +1432,7 @@ def _normalize_job_config(cfg):
         cfg = json.loads(cfg)
     cfg.pop("tier", None)
     cfg.pop("local_path", None)
-    for _key in _DROPPED_LANGUAGE_KEYS:
+    for _key in _DROPPED_CONFIG_KEYS:
         cfg.pop(_key, None)
     return cfg
 
@@ -1578,8 +1537,8 @@ async def _prepare_upload_job(request: Request):
     config_str = form.get("config", "{}")
     cfg = json.loads(config_str)
     cfg.pop("tier", None)
-    # G11：上传入口同样要清掉两个已废弃的语言键——三个入口一个都不能漏。
-    for _key in _DROPPED_LANGUAGE_KEYS:
+    # G11：上传入口同样要清掉已废弃的设置键——三个入口一个都不能漏。
+    for _key in _DROPPED_CONFIG_KEYS:
         cfg.pop(_key, None)
 
     if not file:
@@ -2492,11 +2451,6 @@ def partial_action(job_id: str, payload: dict):
             if isinstance(this_run, JSONResponse):
                 return this_run
             authoritative_config = _apply_this_run(authoritative_config, this_run)
-            from .config_manager import load_config
-            current = load_config()
-            authoritative_config["translationPriority"] = current.get(
-                "translationPriority", authoritative_config.get("translationPriority", [])
-            )
         retry_count = int(meta.get("retry_count", 0)) + (1 if action == "retry" else 0)
         file_hash = str(meta.get("file_hash") or "")
         if not file_hash:

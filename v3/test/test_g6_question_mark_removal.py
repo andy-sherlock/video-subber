@@ -320,18 +320,16 @@ def test_c5_subtitle_quality_reaches_all_four_done_entries(frontend):
         "还有入口在手工点名质量字段（P422 要删掉的正是这个）：\n"
         + "\n".join(forbidden)
     )
-    assert frontend.count("subtitle_quality:quality.subtitle_quality") == 1
+    # D-3 / P530：排版毛病不再写给用户，前端连这个字段都不读了。
+    assert "subtitle_quality" not in frontend
 
 
 def test_c6_quality_line_reports_uncertain_count(frontend):
-    """C6：完成卡质量行必须显示存疑句数（含低于 5% 的区间）。
-
-    D1 裁决：阈值一个字不动，但低于 5% 不再彻底沉默——
-    在质量行末尾追加一句不带情绪的事实，与「本轮 API 成功 118/124」并排。
-    """
+    """C6 已被用户推翻（D-3 / P498，2026-11-04）：存疑句数是程序内部的怀疑，
+    不写给用户。原合同要求「必须显示」，现在断言它不出现。"""
     body = _render_translation_summary_source(frontend)
-    assert "句存疑" in body, "质量摘要函数里没有存疑句数"
-    assert "question_mark_count" in body, "存疑句数没有取自 question_mark_count"
+    assert "句存疑" not in body
+    assert "question_mark_count" not in body
 
 
 def test_c7_restore_paths_carry_quality_fields(frontend):
@@ -356,7 +354,8 @@ def test_c7_restore_paths_carry_quality_fields(frontend):
                 or "renderCardDone(d.job_id,d)" in line), (
             f"恢复路径没有整份透传，仍在手工挑字段：{line[:140]}"
         )
-        assert "showQmWarning(" in line, f"恢复路径没有触发质量提示：{line[:140]}"
+        # D-3 / P499：红黄横幅已拆，恢复路径不得再触发它。
+        assert "showQmWarning(" not in line, f"恢复路径仍在触发旧横幅：{line[:140]}"
 
 
 def test_c5_backend_persists_quality_fields_on_done():
@@ -391,37 +390,11 @@ def test_c5_backend_persists_quality_fields_on_done():
     assert state["result"]["quality"]["subtitle_quality"]["mapping_failed_splits"] == 1
 
 
-def test_qm_warning_clean_job_does_not_wipe_a_dirty_one(frontend):
-    """恢复路径的干净任务不得清空别人的横幅。
-
-    **这是本批自己捅出来的缺陷**（⑦.5 抓到）：`#qmWarn` 是全局唯一的一个元素，
-    而恢复/补建路径会对**每一个**已完成任务各调一次 `showQmWarning`。
-    干净任务照常执行清空的话，一批恢复里最后那个干净任务，
-    会把前面某个真有问题的任务的红/黄横幅擦掉——用户看到「什么问题都没有」。
-
-    改之前这个函数根本不在恢复路径上，所以不会发生；是本批把它加上去才引入的。
-    """
-    body = _slice_function(frontend, "function showQmWarning(")
-    assert "keepIfClean" in body, "showQmWarning 没有「不清空」模式"
-    assert body.count("if(!keepIfClean)") == 2, \
-        "两个清空分支都必须受 keepIfClean 保护（早退分支 + 低于阈值分支）"
-
-    calls = re.findall(r"(?<!function )showQmWarning\((?:[^()]|\{[^{}]*\})*\)", frontend)
-    assert len(calls) == 3, f"showQmWarning 调用点应为 3 个（实时 / 恢复 / 补建），实际 {len(calls)}：{calls}"
-
-    protected = [c for c in calls if c.rstrip().endswith(",true)")]
-    assert len(protected) == 2, (
-        "两条恢复路径必须传 keepIfClean=true，实时完成那一条不传（它一次只处理一个任务，"
-        f"清空是对的）。实际带保护的有 {len(protected)} 个：{calls}"
-    )
-
-
-def test_c10_warning_thresholds_untouched(frontend):
-    """C10：5% / 15% / 50 三个阈值一字不改（红线，须先问用户）。"""
-    body = _slice_function(frontend, "function showQmWarning(")
-    assert "0.15" in body, "红横幅阈值 15% 被改动了"
-    assert "0.05" in body, "黄横幅阈值 5% 被改动了"
-    assert "qm>=50" in body.replace(" ", ""), "绝对数量阈值 50 被改动了"
+def test_qm_banner_is_gone(frontend):
+    """原「干净任务不擦横幅」「C10 阈值一字不改」两条保护的对象（`showQmWarning`
+    与它的 5%/15%/50 阈值）已按用户 D-3 裁决整个删除（P499 旧横幅半边）。"""
+    assert "showQmWarning" not in frontend
+    assert 'id="qmWarn"' not in frontend
 
 
 def test_c12_quality_rendering_never_uses_inner_html(frontend):

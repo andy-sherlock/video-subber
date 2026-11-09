@@ -7,23 +7,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.translation.base import FAILED_TRANSLATION, TranslationResult
 from backend.translation.orchestrator import (
-    _fill_gaps_with_free,
     _is_valid_translation_for_source,
-    _retry_failed_with_llm,
     _translate_llm_per_batch,
-    _translate_one_chunk,
 )
-
-
-class RawScriptLLM:
-    name = "raw-script"
-
-    def __init__(self, raw_results):
-        self.raw_results = list(raw_results)
-
-    def translate_raw(self, prompt, max_tokens=16384):
-        raw = self.raw_results.pop(0)
-        return TranslationResult(translated=[raw], backend_name=self.name)
+# P500 施工 ⑤：整片翻译（_translate_one_chunk）与「≤10 句才补」（_retry_failed_with_llm）已删，
+# 测它们的三条随之删除；上下文感知改走 _translate_llm_per_batch，失败句由下面的逐条测试覆盖。
 
 
 class RecoveryBackend:
@@ -51,16 +39,6 @@ def _result(texts, failure_kind=None, backend_name="fake"):
     )
 
 
-def test_context_chunk_allows_real_name_but_rejects_common_word_copy():
-    llm = RawScriptLLM(["[0] Taylor\n[1] You"])
-
-    _, translated, _ = _translate_one_chunk(
-        [(0, "Taylor"), (1, "You")], "", llm, 0, 1
-    )
-
-    assert translated == {0: "Taylor"}
-
-
 def test_source_guard_rejects_calendar_and_common_subtitle_words():
     rejected = [
         "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
@@ -81,50 +59,6 @@ def test_source_guard_still_allows_real_single_and_multiword_names():
     assert _is_valid_translation_for_source("Taylor", "Taylor")
     assert _is_valid_translation_for_source("Airbnb", "Airbnb")
     assert _is_valid_translation_for_source("Taylor Swift", "Taylor Swift")
-
-
-def test_p230_retry_uses_same_source_aware_name_contract():
-    translated = [FAILED_TRANSLATION, FAILED_TRANSLATION]
-    failed_indices = [0, 1]
-    llm = RawScriptLLM(["Taylor", "You"])
-
-    _retry_failed_with_llm(
-        ["Taylor", "You"], translated, failed_indices, llm
-    )
-
-    assert translated == ["Taylor", FAILED_TRANSLATION]
-    assert failed_indices == [1]
-
-
-def test_p230_rejects_dirty_text_and_keeps_failed_indices():
-    translated = [FAILED_TRANSLATION, FAILED_TRANSLATION]
-    failed_indices = [0, 1]
-    llm = RawScriptLLM(["甲 --- 残留", "建议：译成乙"])
-
-    _retry_failed_with_llm(
-        ["first", "second"], translated, failed_indices, llm
-    )
-
-    assert translated == [FAILED_TRANSLATION, FAILED_TRANSLATION]
-    assert failed_indices == [0, 1]
-
-
-def test_p230_rejection_remains_available_for_free_backend_fill():
-    translated = [FAILED_TRANSLATION]
-    failed_indices = [0]
-    llm = RawScriptLLM(["建议：译成甲"])
-    free = RecoveryBackend(
-        "bing", [_result(["甲"], backend_name="bing")]
-    )
-
-    _retry_failed_with_llm(["one"], translated, failed_indices, llm)
-    failures = _fill_gaps_with_free(
-        ["one"], translated, failed_indices, [free], None
-    )
-
-    assert translated == ["甲"]
-    assert failed_indices == []
-    assert failures == {}
 
 
 def test_second_consecutive_empty_switches_to_next_llm():
@@ -275,16 +209,12 @@ def test_paid_route_keeps_source_and_never_calls_free_engines():
             _result(["建议：仍失败"], backend_name="llm"),
         ],
     )
-    first_free = RecoveryBackend("google", [_result(["甲"], backend_name="google")])
-    second_free = RecoveryBackend("bing", [_result(["乙"], backend_name="bing")])
-
     translated, failed, _, _, _failure_by_index = _translate_llm_per_batch(
-        ["one", "two"], [llm], [first_free, second_free], progress_callback=lambda *a: None
+        ["one", "two"], [llm], progress_callback=lambda *a: None
     )
 
     assert translated == ["one", "two"]
     assert failed == []
-    assert first_free.batch_calls == [] and second_free.batch_calls == []
 
 
 def test_batch_eight_shape_retries_first_40_then_keeps_source():
@@ -312,17 +242,11 @@ def test_batch_eight_shape_retries_first_40_then_keeps_source():
         ],
         [_result([f"译文{index}"], backend_name="llm") for index in range(69)],
     )
-    free = RecoveryBackend(
-        "free",
-        [_result([f"免费译文{index}"]) for index in range(69)],
-    )
-
     translated, failed, _, _, failure_by_index = _translate_llm_per_batch(
-        source, [llm], [free], progress_callback=lambda *a: None
+        source, [llm], progress_callback=lambda *a: None
     )
 
     assert len(llm.raw_calls) == 40, "付费逐条恢复的硬上限是 40 条"
-    assert free.batch_calls == [], "付费模式免费引擎 0 次"
     assert translated[:40] == [f"译文{index}" for index in range(40)]
     assert translated[40:] == source[40:], "第 41 条起保留原文"
     assert failed == [], "最终不允许留下任何失败条目"

@@ -162,7 +162,6 @@ def test_partial_retry_uses_the_settings_file_keys(isolated, tmp_path, monkeypat
     assert response["ok"] is True
     saved = [{"platform": "gpt", "key": "fake-saved-key"}]
     assert isolated[0]["apiKeys"] == saved, "P512：重试用设置文件里的当前 Key，不认网页带来的"
-    assert isolated[0]["translationPriority"] == ["bing"], "免费翻译顺序照旧刷新（不在本批）"
     assert _meta(tmp_path, "pr1")["config"]["apiKeys"] == saved
 
 

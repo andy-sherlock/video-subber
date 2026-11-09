@@ -1,1 +1,1 @@
-"""Translation backends — free APIs + LLM."""
+"""Translation backends — paid LLM APIs (user's own key)."""

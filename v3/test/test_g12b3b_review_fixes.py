@@ -59,7 +59,7 @@ def test_source_check_does_not_move_words_of_non_english_films(tmp_path):
              {"word": "次", "text": "次", "start": 16.0, "end": 16.3}]
     receipt = _receipt(worker, words, "ja")
     assert receipt.language_decision.language == "ja"
-    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path)
+    fixed = worker._source_checked_words(receipt, _ok_map(), tmp_path).words
     assert (fixed[0]["start"], fixed[0]["end"]) == (10.85, 13.5)
     assert json.loads((tmp_path / "source_check.json").read_text())["applied"] is False
 

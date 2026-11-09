@@ -181,11 +181,10 @@ def cfg_path(tmp_path, monkeypatch):
 
 
 def _frontend_payload(**changes):
-    """照前端 `saveConfig` 发出的 11 个键组一份整份设置（`index.html:1543`），值取默认值。"""
+    """照前端 `saveConfig` 发出的 9 个键组一份整份设置，值取默认值（D-6 P503 删了两个翻译键）。"""
     style = {"font": cm.DEFAULT_CONFIG["style"]["font"], "size": 72, "color": "white",
              "outlineColor": "black", "outlineWidth": 2, "bgColor": "transparent"}
-    payload = {"translationMode": "speed", "translationPriority": ["google", "bing", "youdao"],
-               "model": "large-v2", "contextAware": False, "apiKeys": [], "style": style,
+    payload = {"model": "large-v2", "contextAware": False, "apiKeys": [], "style": style,
                "outputMode": "burn", "subtitles": "no", "savePath": "~/Downloads/Video-Subber",
                "speakerDetect": False, "transcriptionTier": "standard"}
     style_changes = changes.pop("style", {})
@@ -195,15 +194,15 @@ def _frontend_payload(**changes):
 
 
 def _legacy_snapshot(size):
-    """旧版本整份写盘的形状（与本机真实配置同形：11 个键、无版本号、带一条 Key）。"""
+    """旧版本整份写盘的形状（无版本号、带一条 Key；旧文件里另有两个已删的翻译键，见 test_d6_p503_step3）。"""
     return _frontend_payload(apiKeys=[_KEY], style={"size": size})
 
 
 def test_t2_1_save_keeps_only_changed_items_with_version(cfg_path):
-    cm.save_config(_frontend_payload(translationMode="quality", apiKeys=[_KEY], style={"size": 56}))
+    cm.save_config(_frontend_payload(contextAware=True, apiKeys=[_KEY], style={"size": 56}))
 
     assert json.loads(cfg_path.read_text(encoding="utf-8")) == {
-        "translationMode": "quality", "apiKeys": [_KEY], "style": {"size": 56},
+        "contextAware": True, "apiKeys": [_KEY], "style": {"size": 56},
         "configVersion": cm.CONFIG_VERSION,
     }
 
@@ -216,7 +215,7 @@ def test_t2_1_save_style_compared_per_key(cfg_path):
 
 
 def test_t2_1_save_overwrites_items_reset_to_default(cfg_path):
-    cm.save_config(_frontend_payload(translationMode="quality", style={"size": 42}))
+    cm.save_config(_frontend_payload(contextAware=True, style={"size": 42}))
     cm.save_config(_frontend_payload())
 
     assert json.loads(cfg_path.read_text(encoding="utf-8")) == {"configVersion": cm.CONFIG_VERSION}
@@ -263,7 +262,6 @@ def test_t2_2_load_result_is_deep_copy(cfg_path):
         cfg = cm.load_config()
         cfg["style"]["size"] = 1
         cfg["apiKeys"].append(_KEY)
-        cfg["translationPriority"].append("x")
         assert cm.DEFAULT_CONFIG == before
         cfg_path.write_text(json.dumps({"configVersion": cm.CONFIG_VERSION}), encoding="utf-8")
 
@@ -272,11 +270,11 @@ def test_t2_2_get_config_has_no_version(cfg_path):
     """合同增量 15：设置接口不返回版本号——否则它会随前端整份设置进每个任务的配置。"""
     from backend import main
 
-    cfg_path.write_text(json.dumps({"configVersion": cm.CONFIG_VERSION, "translationMode": "quality"}),
+    cfg_path.write_text(json.dumps({"configVersion": cm.CONFIG_VERSION, "contextAware": True}),
                         encoding="utf-8")
     body = main.get_config()
     assert "configVersion" not in body
-    assert body["translationMode"] == "quality"
+    assert body["contextAware"] is True
     assert body["style"] == cm.DEFAULT_CONFIG["style"]
 
 
@@ -350,7 +348,7 @@ def test_t2_4_frontend_saved_keys_have_same_backend_defaults():
     Windows 的默认字体前后端本来就不同（锁定方案变更记录 T2-6，已知残留），只在 Windows 上豁免。"""
     front, saved_keys = _frontend_defaults()
 
-    assert len(saved_keys) == 11 and set(saved_keys) <= set(front)
+    assert len(saved_keys) == 9 and set(saved_keys) <= set(front)
     for key in saved_keys:
         assert key in cm.DEFAULT_CONFIG, f"后端默认值缺少 {key}"
         if key == "style":

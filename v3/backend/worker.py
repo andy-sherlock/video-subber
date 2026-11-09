@@ -341,6 +341,8 @@ from backend.transcriber_v2 import (
 )
 from backend.core.whisper_runner import LanguageDecision, LanguageEvidenceMissing
 from backend.key_manager import scrub_logs
+# R2：「这句算不算翻好了」只有一份规则，在 job_state；main.py 数失败句也用它。
+from backend.job_state import is_valid_saved_translation as _is_valid_saved_translation
 from backend.config_manager import coerce_model, DEFAULT_MODEL, VALID_MODELS
 from backend.output_artifacts import (
     derive_output_identity as _shared_output_identity,
@@ -560,9 +562,8 @@ _BREAK_VALIDATION_PREFIX = "断句输入校验失败"
 def _ai_unused_notes(*, translate_only, break_reason, refine_status, previous=None):
     """D-1 C12：这一轮哪一步没用上 AI、为什么——每步结束时只记这一次。
 
-    长句切分不出说明（AI 判断「这句不切」是正常使用）。没填 Key 的纯免费模式
-    不出说明。重试 / 接受部分结果时不跑润色（"not_run"），沿用上一轮的润色说明：
-    只看最终实际采用的结果。
+    长句切分不出说明（AI 判断「这句不切」是正常使用）。重试 / 接受部分结果时不跑润色
+    （"not_run"），沿用上一轮的润色说明：只看最终实际采用的结果。
     """
     if translate_only:
         return [{"step": "breaks_and_refine", "reason": "platform_unsupported"}]
@@ -594,7 +595,7 @@ def _previous_ai_unused(job_dir) -> list:
 def _p395_chunk_words(llm) -> int:
     """一次最多发多少个词。
 
-    P408: 委托给 model_cache.compute_fatigue_chunk（与翻译侧同一个公式）。
+    P408: 委托给 model_cache.compute_fatigue_chunk（P500 起翻译侧不再用它）。
     断句参数：overhead=1000（实测 517 字符，2× 余量），ceiling=2000。
     """
     from backend.model_cache import compute_fatigue_chunk
@@ -763,18 +764,9 @@ def _collect_llm_primary_breaks(
                     _p413_log_excerpt(raw_response),
                 )
 
-            if not parsed:
-                if attempt == 1:
-                    _log.info(
-                        "P395 断句回答没有任何断点，原样重试一次；原回答=%s",
-                        _p413_log_excerpt(raw_response),
-                    )
-                    continue
-                _log.warning(
-                    "P395 断句回答两次都没有断点，整篇回退；原回答=%s",
-                    _p413_log_excerpt(raw_response),
-                )
-                return None, "AI 答案未通过校验"
+            # P506：空答案 = 最后一刀落在本块开头之前，和非空答案走同一条覆盖检查。
+            # 整段 ≤80 词说「不用切」就合格；其余空答案照旧重试一次后退回。
+            last_break = parsed[-1] if parsed else start_index - 1
 
             # 覆盖检查。两种块查的东西不一样：
             #   · 最后一块：末断点之后不能还剩下一整组的量（模型提前收工）
@@ -783,10 +775,10 @@ def _collect_llm_primary_breaks(
             # 不查「推进了多少」。模型每次只返回第一个位置的话，600 个词会被
             # 拖成 **402 次** API 调用（实测），2 小时视频会上万次。
             if is_final_chunk:
-                answer_is_bad = _p395_model_stopped_early(parsed[-1], word_count)
+                answer_is_bad = _p395_model_stopped_early(last_break, word_count)
                 bad_reason = "提前收工"
             else:
-                answer_is_bad = parsed[-1] + 1 - start_index < _GROUP_MAX_WORDS
+                answer_is_bad = last_break + 1 - start_index < _GROUP_MAX_WORDS
                 bad_reason = "推进过少"
             if answer_is_bad:
                 if attempt == 1:
@@ -804,6 +796,8 @@ def _collect_llm_primary_breaks(
                 return None, "AI 答案未通过校验"
             break
 
+        if not parsed:
+            break
         breaks.extend(parsed)
         # 下一次从模型自己选的最后一个断点之后开始——**切口由语义决定，
         # 不是算术算出来的**。这是与 64 词窗口的根本区别。
@@ -866,10 +860,12 @@ def _prepare_sentence_groups(
     sound_hints=(),
     hint_fingerprint=None,
     source_words=None,
+    source_text=None,
 ):
     """在翻译前把已有词级片段收敛为连续句子组。
 
     ``source_words``：源头检查修好的词（G12 第三批 B）；不传则用收据原词。
+    ``source_text``：与 ``source_words`` 一致的全文（D-2 P148 摘过词时会变）；不传则用收据原文。
 
     P395：返回 ``(groups, fallback_reason)``。``fallback_reason`` 不为空时，
     表示这一趟没用上 LLM 断句、走的是规则组句——调用方必须把它拼进用户能看到的
@@ -902,7 +898,8 @@ def _prepare_sentence_groups(
     cache_path = Path(boundary_cache_path) if boundary_cache_path else None
     effective_hint_fingerprint = str(hint_fingerprint or "legacy-no-sound-map")
 
-    raw_text = transcription_receipt.source_text
+    raw_text = (transcription_receipt.source_text
+                if source_text is None else source_text)
     raw_words = (transcription_receipt.source_words
                  if source_words is None else source_words)
     source_fingerprint = transcription_receipt.source_fingerprint
@@ -1443,8 +1440,6 @@ def _validate_config(cfg: dict):
         raise ValueError(f"config.burn 应为 bool，实际为 {type(cfg['burn']).__name__}")
     if "model" in cfg and cfg["model"] not in (*VALID_MODELS, None):
         raise ValueError(f"config.model 无效: {cfg['model']}")
-    if "translationMode" in cfg and cfg["translationMode"] not in ("speed", "quality", None):
-        raise ValueError(f"config.translationMode 无效: {cfg['translationMode']}")
     if "subtitles" in cfg and cfg["subtitles"] not in ("yes", "no", None):
         raise ValueError(f"config.subtitles 无效: {cfg['subtitles']}")
     if "speakerDetect" in cfg and not isinstance(cfg.get("speakerDetect"), (bool, type(None))):
@@ -1462,8 +1457,6 @@ SETTING_STAGE = {
     "model": "transcribe",
     "transcriptionTier": "transcribe",
     "speakerDetect": "transcribe",
-    "translationMode": "translate",
-    "translationPriority": "translate",
     "contextAware": "translate",
     "style": "subtitle",
     "burn": "burn",
@@ -1488,15 +1481,8 @@ def _invalidate_stale_caches(stage, old_config, config,
     """
     if not old_config:
         return stage
-    ignored_keys = (
-        {"translationPriority"}
-        if config.get("_partial_retry")
-        else set()
-    )
     earliest_affected = None
     for key, affected_stage in setting_stage.items():
-        if key in ignored_keys:
-            continue
         old_val = old_config.get(key)
         new_val = config.get(key)
         if old_val != new_val and new_val is not None:
@@ -1552,14 +1538,6 @@ def _translation_cache_matches_segments(cache_rows, segments) -> bool:
         if row.get("text") != getattr(segment, "text", None):
             return False
     return True
-
-
-def _is_valid_saved_translation(value) -> bool:
-    return bool(
-        isinstance(value, str)
-        and value.strip()
-        and value.strip() != "[翻译失败]"
-    )
 
 
 def _write_translation_snapshot(path: Path, items: dict,
@@ -2318,21 +2296,68 @@ def _read_transcription_envelope(payload, request_fingerprint=None):
 _SOURCE_CHECK_RECORD_NAME = "source_check.json"
 
 
+def _stuck_word_runs(receipt):
+    """D-2 P148：识别卡住、同一个词连写 ≥10 遍的串整串不用。返回 ``(要摘的下标, 任务卡说明)``。
+
+    千问、Whisper 当主力都经过这里。中文、日文不查（按字数会撞上「哈哈哈」）。
+    摘完为空就不摘——和 `_drop_impossible_instant_runs` 同一条边界。
+    """
+    from backend.core.source_check import find_stuck_word_runs
+
+    words = receipt.source_words
+    language = str(getattr(receipt.language_decision, "language", "") or "").lower()
+    if not words or language.startswith(("zh", "ja", "yue")):
+        return frozenset(), None
+    runs = find_stuck_word_runs(words)
+    if not runs or sum(end - start for start, end in runs) == len(words):
+        return frozenset(), None
+    for start, end in runs:
+        _log.warning("识别卡住：%r 连写 %d 遍（%.1f–%.1f 秒），这段不用",
+                     words[start]["text"], end - start,
+                     words[start]["start"], words[end - 1]["end"])
+    minutes = sorted({int(words[start]["start"] // 60) + 1 for start, _ in runs})
+    note = f"第 {'、'.join(map(str, minutes))} 分钟识别失败，那里的字幕已留空。"
+    return frozenset(i for start, end in runs for i in range(start, end)), note
+
+
+def _with_stuck_note(shortfall, note):
+    """把 P148 的说明并进转录欠账说明（同一条通道：终态消息、持久状态、任务卡）。"""
+    if not note:
+        return shortfall
+    if not shortfall:
+        return {"severity": "info", "message": note}
+    return {**shortfall, "message": f"{shortfall['message']} {note}"}
+
+
 def _source_checked_words(receipt, map_record, cache_dir):
     """G12 第三批 B（源头检查 §4、§12）：修好的词时间**只在这里生成一次**。
 
-    返回下游共用的那一份词；识别收据里的原始时间原样保留（不写回），
+    返回下游共用的那一份：``words``（词）、``text``（与词一致的全文，组句校验用）、
+    ``stuck_note``（D-2 P148 任务卡说明，没有则 None）。
+    识别收据里的原始词和时间原样保留（不写回），
     恢复任务每次从原始时间重算，不会对修过的时间再修一遍。
     只在 Qwen 主线（英文）启用；Whisper 主线只记录会改几个词；人声地图不可用时不做。
     改动记录写进任务缓存目录，只供复查，程序不读回。
     """
+    from backend.core.qwen_asr_runner import _join_segment_texts
     from backend.core.source_check import check_word_times
 
+    # P148：卡住的串在源头检查**之后**才摘（两条出口都摘，人声地图不可用也摘）。
+    # 先摘会让紧挨卡住串的词后面凭空多出一大段空白，「孤词」规则就把它挪走。
     words = receipt.source_words
+    dropped, stuck_note = _stuck_word_runs(receipt)
+
+    def _checked(final_words):
+        if dropped:
+            final_words = [w for i, w in enumerate(final_words) if i not in dropped]
+        text = (receipt.source_text if not dropped else _join_segment_texts(
+            final_words, getattr(receipt.language_decision, "language", "")))
+        return SimpleNamespace(words=final_words, text=text, stuck_note=stuck_note)
+
     if map_record.get("map_status") != "ok" or not words:
         _log.info("源头检查跳过：人声地图不可用或没有词（map_status=%s）",
                   map_record.get("map_status"))
-        return words
+        return _checked(words)
     rate = map_record["sampling_rate"]
     voice = [(i["start_sample"] / rate, i["end_sample"] / rate)
              for i in map_record["intervals"]]
@@ -2350,7 +2375,7 @@ def _source_checked_words(receipt, map_record, cache_dir):
     _log.info("源头检查：%s %d 个词，因词序倒退不挪 %d 个（主引擎=%s）",
               "挪回" if applied else "只记录、不挪（非 Qwen 主线）会改",
               len(changes), len(skipped), receipt.actual_primary)
-    return fixed if applied else words
+    return _checked(fixed if applied else words)
 
 
 def _sound_reference_from_record(receipt, map_record, *, words=None):
@@ -3052,64 +3077,12 @@ def _run_transcript_refiner(api_keys, segments, receipt=None, refined_path=None,
 
 
 
-def _reflection_review(segments, texts, zh_list, failed, translated_path,
-                       api_keys, translation_mode, config):
-    """Phase 1C (78%): quality 模式下用 LLM 反思修正译文，就地更新 segments 并重写 translated_path。返回 failed。"""
-    if config.get("_partial_retry") or config.get("_accept_partial"):
-        return failed
-    if not (api_keys and translation_mode == "quality"):
-        return failed
-    if not config.get("reflection", False):
-        return failed
-    try:
-        from backend.translation.reflection import (
-            build_reflection_prompt, parse_reflection_result, apply_reflection
-        )
-        from backend.translation.orchestrator import _build_llm_backends
-        _r_backends = _build_llm_backends(api_keys)
-        if _r_backends:
-            _r_llm = _r_backends[0]
-            _r_prompt = build_reflection_prompt(texts, zh_list, limit=30)
-            _r_result = _r_llm.translate_raw(_r_prompt, max_tokens=4096)
-            _r_raw = _r_result.translated[0] if _r_result.translated else ""
-            if _r_raw:
-                _r_corrections = parse_reflection_result(
-                    _r_raw, source_texts=texts
-                )
-                from backend.translation.base import is_clean_translation_text
-                from backend.translation.orchestrator import (
-                    _is_valid_translation_for_source,
-                )
-                _r_corrections = {
-                    idx: text
-                    for idx, text in _r_corrections.items()
-                    if 0 <= idx < len(texts)
-                    and is_clean_translation_text(text)
-                    and _is_valid_translation_for_source(texts[idx], text)
-                }
-                zh_list = apply_reflection(zh_list, _r_corrections)
-                for s, zh in zip(segments, zh_list):
-                    s.zh = zh
-                failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
-                stderr_progress("translate", 78,
-                    f"反思修正完成: {len(_r_corrections)} 条优化")
-                # Re-save corrected translation
-                # 格式必须与 _translation_cache_matches_segments 的读取一致（裸列表）。
-                write_json_archive(translated_path, [{
-                    "id": s.id, "start": s.start, "end": s.end,
-                    "text": s.text, "zh": s.zh,
-                } for s in segments], indent=2)
-    except Exception:
-        _log.warning("反思优化失败", exc_info=True)
-    return failed
-
-
-def _step_translate(stage, segments, translated_path, translation_mode, translation_priority,
+def _step_translate(stage, segments, translated_path,
                     api_keys, context_aware, config, job_dir, total, ck,
                     include_failure_details=False):
-    """Step 3 (35-80%): 翻译或读缓存，含 LLM 全失败降级 + quality 反思修正 + 质量闸。
+    """Step 3 (35-80%): 翻译或读缓存，含 LLM 全失败降级。
 
-    返回 (failed, sub_splits, ok_count)。质量过低（成功率<50%）时删缓存并抛 RuntimeError。
+    返回 (failed, sub_splits, ok_count)。失败句是「[翻译失败]」，由上层弹「部分完成」。
     """
     failed = []
     sub_splits = {}
@@ -3151,6 +3124,7 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
         texts_to_translate,
         index_map=None,
         initial_snapshot_items=None,
+        full_texts=None,
     ):
         from backend.translation.orchestrator import translate_with_orchestrator
 
@@ -3164,10 +3138,6 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             "api_success_count": None,
             "api_total_count": None,
             "kept_original_count": None,
-            "fallback_attempted": False,
-            "fallback_processed": 0,
-            "fallback_success": 0,
-            "fallback_announced": False,
         }
 
         def flush_snapshot():
@@ -3195,36 +3165,18 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             emit("retry_progress", **payload)
 
         def prog(pct: int, msg: str):
-            """G8：翻译阶段的唯一进度出口。
-
-            免费补全的消息带 `FREE_FILL_PREFIX` 这个结构化标记进来（orchestrator
-            不知道自己在自动兜底还是人工重试，那是这里的知识）。认出标记后，
-            剥掉它、换上这条路自己的用户文案。
-            """
-            from backend.translation.orchestrator import FREE_FILL_PREFIX
-
-            is_free_fill = msg.startswith(FREE_FILL_PREFIX)
-            body = msg[len(FREE_FILL_PREFIX):] if is_free_fill else msg
+            """G8：翻译阶段的唯一进度出口。"""
+            body = msg
             mapped = 40 + int(pct * 0.45)
 
             if config.get("_partial_retry"):
-                # ⑦.5 抓到的缺陷：标签原来只加给免费补全那几条，结果 API 翻译
-                # 阶段的消息没有「本轮 N 句」，而前端在有 message 时又把那行
-                # 数字藏了 —— 用户整段看不到本轮总量。标签要**全程**都在。
+                # ⑦.5 抓到的缺陷：API 翻译阶段的消息没有「本轮 N 句」，而前端在有
+                # message 时又把那行数字藏了 —— 用户整段看不到本轮总量。标签要**全程**都在。
                 count = int(config.get("_retry_initial_failed_count",
                                        len(texts_to_translate)))
                 _emit_retry_progress(f"正在再次处理上次失败的 {count} 句字幕｜{body}")
                 return
 
-            if is_free_fill:
-                # ⑦.5 抓到的缺陷：这句话原来单独发一条消息，而下一条进度紧跟着
-                # 就来把它覆盖了 —— 只出现一次的消息，在每秒好几条的流里等于
-                # 没出现过。改成挂在**第一条**运行中消息上，它至少活到第一句返回。
-                if not state["fallback_announced"]:
-                    state["fallback_announced"] = True
-                    body = f"用户 API 翻译失败，正在自动使用免费翻译。{body}"
-                else:
-                    body = f"自动免费兜底｜{body}"
             stderr_progress("translate", mapped, body)
 
         def snapshot_batch_progress(_processed_count: int, _success_count: int):
@@ -3246,13 +3198,6 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             segment_id = segments[position].id
             if success and _is_valid_saved_translation(text):
                 state["items"][segment_id] = text.strip()
-            if is_fallback:
-                state["fallback_attempted"] = True
-                state["fallback_processed"] += 1
-                if success:
-                    state["fallback_success"] += 1
-                # P378/P379：免费补全进度改由 orchestrator._fill_gaps_with_free 统一发送
-                # （消除 83%/79% 坐标冲突、修 P377 进度倒退），此处只记账不发进度。
             if success:
                 flush_snapshot()  # P379 必4：成功才落盘（失败不改 items，无需重写快照）
 
@@ -3284,14 +3229,18 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
 
         result = translate_with_orchestrator(
             texts=texts_to_translate,
-            mode=translation_mode,
-            priority=translation_priority,
             api_keys=api_keys,
             context_aware=context_aware,
             engine_status_callback=engine_status,
             item_result_callback=item_result,
             translation_stats_callback=translation_stats,
             **progress_kwargs,
+            # P500 施工 ④：只有上下文感知要整片原文与真实位置（取原片邻句）；
+            # 逐段传的参数与改前一字不变。
+            **(
+                {"full_texts": full_texts, "positions": positions}
+                if context_aware else {}
+            ),
         )
         if len(result) == 5:
             zh, failed_indices, token_usage, splits, failures = result
@@ -3300,24 +3249,13 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             failures = {idx: "unknown" for idx in failed_indices}
         failures = _remap_to_global_position(failures, positions)
         splits = _remap_to_segment_ids(splits, positions, segments)
-        requested_tier = (
-            "api_context"
-            if context_aware and state["api_total_count"] is not None
-            else "api_segment"
-            if state["api_total_count"] is not None
-            else "basic"
-        )
+        requested_tier = "api_context" if context_aware else "api_segment"
         summary = {
             "requested_tier": requested_tier,
             "api_success_count": state["api_success_count"],
             "api_total_count": state["api_total_count"],
             # D-1 A5：格式修复后仍失败、保留原文的句子数（任务卡「有 N 句未能翻译」）。
             "kept_original_count": state["kept_original_count"],
-            "auto_fallback": bool(state["fallback_attempted"]),
-            # G8/A11：结束提示的数字必须和最后一次运行中的是同一组，不能让前端
-            # 自己拿别的数去减出来——两个来源迟早对不上。
-            "fallback_processed": int(state["fallback_processed"]),
-            "fallback_success": int(state["fallback_success"]),
         }
         flush_snapshot()
         return (
@@ -3328,7 +3266,6 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             failures,
             state["api_success_count"],
             state["api_total_count"],
-            state["fallback_attempted"],
             summary,
         )
 
@@ -3362,11 +3299,12 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             retry_texts = [cached_texts[position] for position in retry_positions]
             (
                 zh_retry, _, token_usage, retry_splits, retry_failures,
-                _, _, _, translation_summary,
+                _, _, translation_summary,
             ) = _run_translation(
                 retry_texts,
                 index_map=retry_positions,
                 initial_snapshot_items=initial_items,
+                full_texts=cached_texts,
             )
             for local_idx, position in enumerate(retry_positions):
                 candidate = zh_retry[local_idx] if local_idx < len(zh_retry) else "[翻译失败]"
@@ -3407,11 +3345,12 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             try:
                 (
                     zh_list, failed_indices, token_usage, sub_splits,
-                    failure_by_index, _, _, _, translation_summary,
+                    failure_by_index, _, _, translation_summary,
                 ) = _run_translation(
                     pending_texts,
                     index_map=pending_positions,
                     initial_snapshot_items=initial_items,
+                    full_texts=[segment.text.strip() for segment in segments],
                 )
             except ImportError:
                 raise RuntimeError("翻译模块未就绪，请检查安装。")
@@ -3438,17 +3377,12 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
             "text": s.text, "zh": s.zh,
         } for s in segments], indent=2)
         ck.save("translate", meta=_checkpoint_meta(config))
-
-        # ── Phase 1C: reflection review (quality mode) ──
-        texts = [s.text for s in segments]
-        full_zh_list = [s.zh for s in segments]
-        failed = _reflection_review(segments, texts, full_zh_list, failed,
-                                    translated_path, api_keys, translation_mode, config)
     else:
         stderr_progress("translate", 40, "已有翻译记录，跳过")
         for s, r in zip(segments, cached_translation):
             if not _is_valid_saved_translation(s.zh):
-                s.zh = r.get("zh", "")
+                # P521：空串等无效译文也算失败，进「部分完成」弹窗，不静默出整片原文
+                s.zh = r.get("zh", "") if _is_valid_saved_translation(r.get("zh")) else "[翻译失败]"
         failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
 
     failed = [(s.id, s.text, s.zh) for s in segments if s.zh == "[翻译失败]"]
@@ -3456,22 +3390,6 @@ def _step_translate(stage, segments, translated_path, translation_mode, translat
     ok_count = sum(1 for s in segments if s.zh.strip() and s.zh != "[翻译失败]")
     stderr_progress("translate", 80, f"翻译完成: {ok_count}/{total} 句成功, {len(failed)} 句失败")
 
-    # Quality gate: if >50% failed, the cache is corrupt — delete it and abort
-    if total > 0 and ok_count / total < 0.5 and not failure_by_index:
-        Path(translated_path).unlink(missing_ok=True)
-        # P392/A8：老消息说「请检查翻译引擎配置」，而本次故障里配置完全正常——
-        # DeepSeek 忠实翻译了 177 条，是我们没接住。让用户去改没问题的东西，
-        # 比不报错还糟。这里只说我们真的知道的事。
-        # ⚠️ 文案里必须带「请查看」这类明确建议词：前端 formatJobErrorText()
-        # 会先看有没有建议词，没有就按关键词猜原因——文案里只要出现「网络」二字，
-        # 它就会自作主张追加「请检查网络后重试。」，把格式问题说成网络问题。
-        raise RuntimeError(
-            f"翻译结果不完整：{total} 条里只有 {ok_count} 条成功"
-            f"（{int(ok_count / total * 100)}%）。"
-            "多半是翻译模型返回的格式不符合要求，也可能是中途断线；"
-            "系统已自动重发缺失条目并尝试用免费引擎补全，仍然不足一半。"
-            "请查看日志中的「翻译批次」记录，或更换翻译模型后重试。"
-        )
     if include_failure_details:
         return failed, sub_splits, ok_count, failure_by_index, translation_summary
     return failed, sub_splits, ok_count
@@ -3899,8 +3817,6 @@ def main():
     # V3.09: 老配置/旧 localStorage 残留的已删型号兜底为 large-v2，并回写以便后续校验通过。
     model = coerce_model(config.get("model", DEFAULT_MODEL))
     config["model"] = model
-    translation_mode = config.get("translationMode", "speed")
-    translation_priority = config.get("translationPriority", ["google", "bing", "youdao"])
     api_keys = _api_keys_for_run(config)
     context_aware = config.get("contextAware", False)
     style = config.get("style", None)
@@ -4038,12 +3954,11 @@ def main():
             cache,
             source_content_sha256=expected_map_source_hash,
         )
-        checked_words = _source_checked_words(
-            transcription.receipt, map_record, cache)
+        checked = _source_checked_words(transcription.receipt, map_record, cache)
         sound_reference = _sound_reference_from_record(
             transcription.receipt,
             map_record,
-            words=checked_words,
+            words=checked.words,
         )
         sound_reference_summary = sound_reference.public_summary
         config["sound_reference"] = sound_reference_summary
@@ -4074,7 +3989,8 @@ def main():
             boundary_cache_path=boundary_cache_path,
             sound_hints=sound_reference.hints,
             hint_fingerprint=sound_reference.hint_fingerprint,
-            source_words=checked_words,
+            source_words=checked.words,
+            source_text=checked.text,
         )
         total = len(segments)
         # P460 已裁决不做：这里的 `segments` 是**组句之后**的句子组，
@@ -4088,6 +4004,11 @@ def main():
         # 那条路任务跑完就被覆盖。
         _transcription_shortfall = (
             (transcription.receipt.observation_evidence or {}).get("shortfall"))
+        # D-2 P148：「第 X 分钟识别失败」只跟着交付了成品的终态，以及等用户决定导出还是
+        # 重试的部分完成走（D-3 P549）。出错路径仍用上面那份——
+        # 那句话和失败原因无关，带着它的失败任务还会在刷新后被重新列出。
+        _delivered_shortfall = _with_stuck_note(
+            _transcription_shortfall, checked.stuck_note)
         stderr_progress(
             "transcribe", 35,
             _p395_transcribe_message(
@@ -4117,7 +4038,7 @@ def main():
         # ── Step 3: Translate (35-80%) ──
         current_step = "translate"
         translation_result = _step_translate(
-            stage, segments, translated_path, translation_mode, translation_priority,
+            stage, segments, translated_path,
             api_keys, context_aware, config, job_dir, total, ck,
             include_failure_details=True)
         if len(translation_result) == 5:
@@ -4161,7 +4082,8 @@ def main():
                 payload["translation_summary"] = translation_summary
             payload["sound_reference"] = sound_reference_summary
             sys.stdout = _real_stdout
-            emit("partial", **payload)
+            emit("partial", **payload,
+                 transcription_shortfall=_delivered_shortfall)
             return
 
         if config.get("_partial_retry") or config.get("_accept_partial"):
@@ -4231,16 +4153,15 @@ def main():
                     result_video=result_video,
                     result_srt=srt_path,
                     question_mark_count=qm_count,
-                    transcription_shortfall=_transcription_shortfall,
+                    transcription_shortfall=_delivered_shortfall,
                 )
             else:
                 done_fields = {}
                 if translation_summary is not None:
                     done_fields["translation_summary"] = translation_summary
                 done_fields["sound_reference"] = sound_reference_summary
-                # A13：字幕质量摘要必须随终态消息返回，用户可见。
-                # 合同禁止静默交付——被封顶的长字幕、切不动的分屏、
-                # 仍低于 0.84 秒的条目，用户都有权知道。
+                # 字幕质量摘要只进任务记录，界面不再显示（D-3 / P530，界面提示
+                # 规则第 2 条：自己的毛病不写给用户）；字段留到清理批。
                 summary = _subtitle_quality_summary(subtitle_report)
                 if summary:
                     done_fields["subtitle_quality"] = summary
@@ -4251,7 +4172,7 @@ def main():
                      segment_count=total,
                      success_count=ok_count,
                      question_mark_count=qm_count,
-                     transcription_shortfall=_transcription_shortfall,
+                     transcription_shortfall=_delivered_shortfall,
                      **_retry_terminal_fields(
                          config,
                          int(config.get("_retry_initial_failed_count", 0)),
@@ -4359,9 +4280,9 @@ def _friendly_error(raw: str) -> str:
     if "memoryerror" in _raw_lower or "out of memory" in _raw_lower or "cannot allocate memory" in _raw_lower:
         return "内存不足，无法处理该视频。请尝试切换到更省内存的模型（如 large-v3-turbo），或关闭其他占用内存的程序后重试。"
     if "ReadTimeout" in raw or "Timeout" in raw or "timeout" in raw.lower():
-        return "连接翻译服务器超时。请检查网络，或切换到其他翻译引擎后重试。"
+        return "连接翻译服务器超时。请检查网络后重试。"
     if "429" in raw or "Too Many Requests" in raw:
-        return "翻译请求过于频繁，已被限流。请稍等片刻后重试，或切换翻译引擎。"
+        return "翻译请求过于频繁，已被限流。请稍等片刻后重试。"
     if "Authentication" in raw or "Invalid API Key" in raw or "401" in raw or "403" in raw:
         return "API Key 验证失败。请检查设置中的 Key 是否正确、是否已过期。"
     return f"处理过程中断。错误详情：{raw[:80]}"

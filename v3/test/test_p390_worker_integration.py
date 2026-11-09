@@ -395,14 +395,11 @@ def test_translation_cache_with_different_sentence_identity_is_retranslated(
         "backend.translation.orchestrator.translate_with_orchestrator",
         fake_translate,
     )
-    monkeypatch.setattr(worker, "_reflection_review", lambda *args: args[3])
 
     worker._step_translate(
         "subtitle",
         segments,
         translated_path,
-        "speed",
-        ["google"],
         [],
         False,
         {},
@@ -477,8 +474,6 @@ def test_translation_cache_with_matching_sentence_identity_is_reused(
         "subtitle",
         segments,
         translated_path,
-        "speed",
-        ["google"],
         [],
         False,
         {},
@@ -535,8 +530,6 @@ def test_bare_list_translation_cache_is_current_format_and_not_rewritten(
         "subtitle",
         [segment],
         translated_path,
-        "speed",
-        ["google"],
         [],
         False,
         {},
@@ -589,14 +582,11 @@ def test_legacy_versioned_envelope_translation_cache_is_rejected_and_retranslate
         "backend.translation.orchestrator.translate_with_orchestrator",
         fake_translate,
     )
-    monkeypatch.setattr(worker, "_reflection_review", lambda *args: args[3])
 
     worker._step_translate(
         "subtitle",
         [segment],
         translated_path,
-        "speed",
-        ["google"],
         [],
         False,
         {},
@@ -615,78 +605,6 @@ def test_legacy_versioned_envelope_translation_cache_is_rejected_and_retranslate
         "end": 1.0,
         "text": "A complete thought.",
         "zh": "新译文",
-    }]
-
-
-def test_reflection_rewrites_the_same_bare_list_translation_cache_shape(
-    monkeypatch,
-    tmp_path,
-):
-    """质量反思重写缓存时必须和主翻译写入使用完全相同的裸列表格式。
-
-    替身签名必须跟上 _reflection_review 的真实调用
-    （parse_reflection_result(raw, source_texts=...)）。签名对不上会抛 TypeError，
-    而 _reflection_review 外面包着 except Exception——异常被吞掉后文件根本不会被写，
-    测试只看得到「文件不存在」，看不到真正的原因。parsed_with 记录真实入参，
-    用来证明确实执行到了这一步，而不是中途被兜底跳过。
-    """
-    worker = _load_worker_without_audio_models(monkeypatch)
-    segment = SimpleNamespace(
-        id=-1,
-        start=0.0,
-        end=1.0,
-        text="A complete thought.",
-        zh="旧译文",
-    )
-    translated_path = tmp_path / "translated.json"
-    parsed_with = []
-
-    def fake_parse_reflection_result(raw, source_texts=None):
-        parsed_with.append((raw, source_texts))
-        return {0: "修正译文"}
-
-    monkeypatch.setitem(
-        sys.modules,
-        "backend.translation.reflection",
-        SimpleNamespace(
-            build_reflection_prompt=lambda *args, **kwargs: "review",
-            parse_reflection_result=fake_parse_reflection_result,
-            apply_reflection=lambda values, corrections: ["修正译文"],
-        ),
-    )
-
-    class _ReflectionLLM:
-        def translate_raw(self, prompt, max_tokens=4096):
-            return SimpleNamespace(translated=['{"0": "修正译文"}'])
-
-    import backend.translation.orchestrator as orchestrator
-
-    monkeypatch.setattr(
-        orchestrator,
-        "_build_llm_backends",
-        lambda api_keys: [_ReflectionLLM()],
-    )
-
-    failed = worker._reflection_review(
-        [segment],
-        [segment.text],
-        [segment.zh],
-        [],
-        translated_path,
-        [{"platform": "deepseek", "key": "x"}],
-        "quality",
-        {"reflection": True},
-    )
-
-    saved = json.loads(translated_path.read_text(encoding="utf-8"))
-    assert failed == []
-    assert parsed_with == [('{"0": "修正译文"}', ["A complete thought."])]
-    assert saved == [{
-        "id": -1,
-        "start": 0.0,
-        "end": 1.0,
-        "text": "A complete thought.",
-        "zh": "修正译文",
     }]
 
 
@@ -980,14 +898,11 @@ def test_p390_display_splitting_never_changes_translation_input(
         "backend.translation.orchestrator.translate_with_orchestrator",
         fake_translate,
     )
-    monkeypatch.setattr(worker, "_reflection_review", lambda *args: args[3])
 
     worker._step_translate(
         "translate",
         groups,
         tmp_path / "translated.json",
-        "speed",
-        ["google"],
         [],
         False,
         {},

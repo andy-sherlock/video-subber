@@ -19,8 +19,6 @@ def coerce_model(model):
 
 
 DEFAULT_CONFIG = {
-    "translationMode": "speed",
-    "translationPriority": ["google", "bing", "youdao"],
     "model": DEFAULT_MODEL,
     "style": {
         "font": "Microsoft YaHei" if sys.platform == "win32" else "PingFang SC",

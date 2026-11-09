@@ -111,7 +111,7 @@ def test_a1_公开状态只有唯一合同字段且嵌套字段固定(tmp_path):
     }
     assert set(state["result"]["quality"]) == {
         "question_mark_count", "subtitle_quality", "translation_summary",
-        "fa_quality", "alignment_fallback", "sound_reference",
+        "sound_reference",
         # G12 第三批 A / E2：转录欠账说明（None = 没有欠账）。
         # 走公开状态而不是进度消息——进度文案任务跑完就被覆盖，
         # 用户刷新页面再也看不到（第一批的缺标点警告就是这么丢的）。
@@ -232,7 +232,8 @@ def test_a5_质量摘要只保留页面实际使用的固定字段(tmp_path):
     blob = json.dumps(quality, ensure_ascii=False)
     assert quality["question_mark_count"] == 3
     assert quality["subtitle_quality"]["below_min_display"] == {"count": 2}
-    assert quality["translation_summary"]["fallback_success"] == 1
+    assert quality["translation_summary"]["api_success_count"] == 8
+    assert "fallback_success" not in quality["translation_summary"], "D-6 P503：免费补全计数已删"
     assert set(quality["sound_reference"]) == {"status", "message", "reason_code"}
     assert "secret" not in blob and "raw_responses" not in blob and "hints" not in blob
 
@@ -401,9 +402,7 @@ function handlePartialState(...args){{calls.push(['partial',...args])}}
 function renderCardError(...args){{calls.push(['error',...args])}}
 function renderInterruptedCard(...args){{calls.push(['interrupted',...args])}}
 function removeCard(...args){{calls.push(['cancelled',...args])}}
-function showAlignmentFallbackNotice(){{}}
 function renderTranslationSummary(){{}}
-function showQmWarning(){{}}
 {should_apply}
 {apply_state}
 const newer={{revision:8,status:'running',phase:'translate',percent:44,
@@ -456,7 +455,6 @@ const els={{'fill-j':{{style:{{}},classList:{{remove:()=>{{}}}}}},'step-j':{{}},
   'pct-j':{{}},'card-j':{{classList:{{add:()=>{{}},remove:()=>{{}}}}}},'result-j':null,'err-j':err}};
 const document={{getElementById:id=>els[id]||null}};
 function hideMilestones(){{}}
-function showAlignmentFallbackNotice(){{}}
 {render_done}
 renderCardDone('j',{{output_ready:true,can_show_output_folder:false,failed_segments:[]}});
 console.log(JSON.stringify({{text:err.innerHTML,classes:[...classes]}}));

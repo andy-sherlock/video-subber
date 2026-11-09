@@ -380,8 +380,8 @@ class TestB5SubtitleStyleMerged(unittest.TestCase):
         self.assertNotIn("place('accBodyStyle'", self.compact,
                          "不该再把样式搬进独立 accBodyStyle")
         self.assertIn(
-            "place('accBodyOutput',['outputPanel','styleSubSection','subtitleMarkerNote']",
-            self.compact, "样式、字幕标记说明搬进 accBodyOutput（styleModeHint 已删）")
+            "place('accBodyOutput',['outputPanel','styleSubSection']",
+            self.compact, "样式搬进 accBodyOutput（styleModeHint、subtitleMarkerNote 已删）")
 
     def test_style_mode_hint_removed(self):
         """Fix 1：非烧录模式不再显示「字幕样式·仅烧录可用」灰框——彻底删除，
@@ -434,47 +434,29 @@ class TestB6TranslationSplit(unittest.TestCase):
             '默认可直接用免费翻译。添加 API Key 后会优先使用智能翻译；智能翻译不可用时，会改用免费翻译继续。',
             self.html)
 
-    def test_smart_and_free_sections_distinct_titles(self):
-        """两个分区标题层级拉开（trans-section-title，不再 12px 同色灰 card-label）。"""
+    def test_smart_section_title(self):
+        """分区标题层级拉开（trans-section-title，不再 12px 同色灰 card-label）。
+        D-6 P503：免费翻译区已删，只剩智能翻译区。"""
         self.assertIn('id="smartTransSection"', self.html)
-        self.assertIn('id="freeTransSection"', self.html)
+        self.assertNotIn('id="freeTransSection"', self.html)
         self.assertIn('trans-section-title', self.html)
         self.assertIn('>智能翻译<', self.html)
-        self.assertIn('>免费翻译<', self.html)
 
     def test_smart_subtitle_plain_language(self):
         self.assertIn('用 Claude、GPT 这类大模型翻译，更懂上下文和专业词，需要你自己的 API Key。',
                       self.html)
 
-    def test_static_translate_sections_keep_free_before_smart(self):
-        """静态区块仍按免费在前、智能在后，便于 mount 后保持同样阅读顺序。"""
-        self.assertIn('id="translateStrategy"', self.html)
-        self.assertIn('>翻译策略<', self.html)
-        i_strategy = self.html.index('id="translateStrategy"')
-        i_free = self.html.index('id="freeTransSection"')
-        i_smart = self.html.index('id="smartTransSection"')
-        self.assertLess(i_strategy, i_free, "翻译策略必须在免费翻译区上方")
-        self.assertLess(i_free, i_smart, "免费翻译必须在智能翻译区上方")
-
     def test_contextaware_moved_into_smart_section(self):
         """contextAware(ctxToggle) 必须在智能翻译区，高级模块已经删除。"""
         i_smart = self.html.index('id="smartTransSection"')
-        i_note = self.html.index('id="subtitleMarkerNote"')
+        # D-3：原书签 subtitleMarkerNote 已删，换成源码里紧跟其后的下一个面板。
+        i_note = self.html.index('id="voiceSpeakerPanel"')
         i_ctx = self.html.index('id="ctxToggle"')
         self.assertTrue(i_smart < i_ctx < i_note, "ctxToggle 必须落在智能翻译区内")
         self.assertNotIn('id="advCard"', self.html, "高级设置卡片应删除")
         self.assertNotIn('data-acc="advanced"', self.html, "高级手风琴模块应删除")
 
-    def test_free_section_priority_list_always_visible(self):
-        """免费区只留 Google/Bing/有道拖拽顺序，且始终可见（不被 translationMode 门控）。"""
-        self.assertIn('class="priority-list show"', self.html)
-        self.assertNotIn("$('priorityList').classList.toggle('show'", self.html,
-                         "免费区拖拽顺序不该再被 translationMode 门控隐藏")
-        self.assertNotIn("pl.classList.toggle('show'", self.html)
-
     def test_mount_translate_uses_new_blocks(self):
-        self.assertIn("place('accBodyFreeTranslate',['translateStrategy','freeTransSection']",
-                      self.compact)
         self.assertIn("place('accBodySmartTranslate',['smartTransSection']",
                       self.compact)
         self.assertNotIn("accBodyTranslate", self.html,
@@ -507,7 +489,7 @@ class TestB6SmartTranslationCompact(unittest.TestCase):
     def test_existing_handler_ids_stay_inside_smart_config_body(self):
         """保持原 id 不变，但把付费配置细节收进 smartTransConfigBody。"""
         body_start = self.html.index('id="smartTransConfigBody"')
-        body_end = self.html.index('id="subtitleMarkerNote"')
+        body_end = self.html.index('id="voiceSpeakerPanel"')  # D-3：原书签已删
         for element_id in [
             'id="ctxToggle"', 'id="apiKeyInput"', 'id="apiPlatform"',
             'id="apiModel"', 'id="apiCustomModel"', 'id="apiModelName"',
@@ -517,12 +499,6 @@ class TestB6SmartTranslationCompact(unittest.TestCase):
             idx = self.html.index(element_id)
             self.assertTrue(body_start < idx < body_end,
                             f"{element_id} 必须仍在智能翻译配置体里，不能改 id")
-
-    def test_free_translation_stays_visible_outside_paid_config_body(self):
-        smart_start = self.html.index('id="smartTransSection"')
-        priority = self.html.index('id="priorityList"')
-        self.assertLess(priority, smart_start,
-                        "免费翻译区必须在付费配置体之外，始终可见")
 
     def test_worker_user_visible_fallback_messages_have_no_llm_word(self):
         """后端发给前端的进度/弹窗文案也不能带用户可见的 LLM。"""
@@ -555,8 +531,8 @@ class TestC3FinalInformationArchitecture(unittest.TestCase):
                            self.html)
         self.assertEqual(
             order,
-            ["voice", "free-translate", "smart-translate", "output"],
-            "抽屉最终顺序必须是：语音识别 → 免费翻译 → 智能翻译 → 字幕与输出")
+            ["voice", "smart-translate", "output"],
+            "抽屉最终顺序必须是：语音识别 → 智能翻译 → 字幕与输出（D-6 P503 删免费翻译模块）")
         for gone in ['data-acc="env"', 'data-acc="translate"',
                      'data-acc="advanced"']:
             self.assertNotIn(gone, self.html)
@@ -851,13 +827,13 @@ console.log(JSON.stringify({threw,opened,closed}));
         self.assertIn("can_show_output_folder", body)
         self.assertIn("job-card-result", self.html)
 
-    def test_p341_alignment_fallback_notice_is_visible_on_job_card(self):
-        """P341: Qwen3-FA 对齐失败后，粗时间兜底要显示给用户看。"""
+    def test_p551_alignment_fallback_notice_is_deleted(self):
+        """P551（D-4）：这条提示后端从不供数据，永远触发不了，已删除。"""
         self.assertIn("job-card-quality", self.html)
-        self.assertIn("时间轴对齐失败，已使用粗时间继续", self.html)
-        self.assertIn("fa_quality", self.html)
-        self.assertIn("alignment_fallback", self.html)
-        self.assertIn("showAlignmentFallbackNotice", self.html)
+        self.assertNotIn("时间轴对齐失败，已使用粗时间继续", self.html)
+        self.assertNotIn("fa_quality", self.html)
+        self.assertNotIn("alignment_fallback", self.html)
+        self.assertNotIn("showAlignmentFallbackNotice", self.html)
 
     def test_tier_toggle_removed_and_main_tier_is_independent(self):
         for gone in [r"\btierPanel\b", r"\btierNote\b", r"#tierToggle"]:
@@ -890,11 +866,10 @@ console.log(JSON.stringify({threw,opened,closed}));
                       self.compact,
                       "说话人检测应挂到语音识别模块底部")
 
-    def test_subtitle_marker_note_moved_to_output_bottom(self):
-        self.assertIn(
-            "place('accBodyOutput',['outputPanel','styleSubSection','subtitleMarkerNote']",
-            self.compact,
-            "字幕标记说明必须放到字幕与输出模块底部")
+    def test_subtitle_marker_note_removed(self):
+        # D-3 A6：这条说明后半句承诺「字幕质量情况显示在任务卡上」，任务卡已不显示，
+        # 前半句与说话人检测开关下的说明重复——整条删掉。
+        self.assertNotIn('id="subtitleMarkerNote"', self.html)
 
 
 class TestApplePolishCraftBatch(unittest.TestCase):
@@ -964,7 +939,8 @@ class TestApplePolishCraftBatch(unittest.TestCase):
 
     def test_stage3b_icon_chars_preserved(self):
         # ③b 字符图标 SVG 统一仍后置，本批不得提前删这些字符图标。
-        for ch in ("≡", "▶", "⚙"):
+        # D-6 P503：「≡」是免费引擎顺序拖拽手柄，随免费翻译区一起删了。
+        for ch in ("▶", "⚙"):
             self.assertIn(ch, self.html, f"③b 后置图标被提前删了：{ch}")
 
 
